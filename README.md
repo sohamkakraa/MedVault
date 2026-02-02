@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MedVault
 
-## Getting Started
+MedVault is a local-first medical record organizer. Upload PDFs (labs, prescriptions, imaging, bills), extract structured data, and view trends in a modern dashboard. All data is stored in your browser’s localStorage.
 
-First, run the development server:
+## Features
+- PDF upload + extraction
+- Structured medical data in a clean dashboard
+- Customizable trend charts
+- Profile management (allergies, conditions, provider, next visit)
+- Doctor visit summary export
+- Document detail view
 
+## Tech Stack
+- Next.js App Router
+- Tailwind CSS
+- LocalStorage for persistence
+
+## Setup
+
+### 1) Install
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2) Environment
+Copy `.env.example` to `.env.local` and fill in your keys.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+cp .env.example .env.local
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 3) Run
+```bash
+npm run dev
+```
 
-## Learn More
+Open http://localhost:3000
 
-To learn more about Next.js, take a look at the following resources:
+## Environment Variables
+```
+OPENAI_API_KEY=your_key
+OPENAI_MODEL=gpt-5-nano
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Notes
+- Data is stored in the browser; clearing localStorage will reset everything.
+- For production, replace localStorage with a database.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## License
+MIT
