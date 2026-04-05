@@ -273,7 +273,7 @@ async function extractWithOpenAI(text: string, typeHint: string) {
       format: {
         type: "json_schema",
         json_schema: EXTRACT_SCHEMA,
-      },
+      } as any,
     },
     max_output_tokens: 1200,
   });
@@ -288,6 +288,7 @@ async function extractWithOpenAI(text: string, typeHint: string) {
     summary: string;
     medications: ExtractedMedication[];
     labs: ExtractedLab[];
+    lab_rows?: any[];
     allergies: string[];
     conditions: string[];
     sections: { title: string; items: string[] }[];

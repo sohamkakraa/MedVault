@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import { getStore, saveStore, removeDoc } from "@/lib/store";
 import { ExtractedLab, ExtractedMedication } from "@/lib/types";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Activity, Calendar, ClipboardList, FileText, FileUp, Pill, Plus, Sparkles, User, X } from "lucide-react";
+import { Activity, Calendar, ClipboardList, FileText, FileUp, Pill, Plus, Sparkles, User, X, Zap } from "lucide-react";
 
 function toChartPoints(labs: ExtractedLab[], metricName: string) {
   const filtered = labs
@@ -165,6 +165,11 @@ export default function DashboardPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/body">
+              <Button variant="ghost" className="gap-2">
+                <Zap className="h-4 w-4" /> Body View
+              </Button>
+            </Link>
             <Link href="/upload">
               <Button variant="ghost" className="gap-2">
                 <FileUp className="h-4 w-4" /> Upload
