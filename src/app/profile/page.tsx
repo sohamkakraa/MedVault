@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { getStore, saveStore } from "@/lib/store";
+import { getHydrationSafeStore, getStore, saveStore } from "@/lib/store";
 import { AppTopNav } from "@/components/nav/AppTopNav";
 import { addTrackerLabData, TRACKERS } from "@/lib/trackers";
 import { Plus, LogOut, Plug, Unplug } from "lucide-react";
 
 export default function ProfilePage() {
-  const [store, setStore] = useState(() => getStore());
+  const [store, setStore] = useState(() => getHydrationSafeStore());
   const [allergyInput, setAllergyInput] = useState("");
   const [conditionInput, setConditionInput] = useState("");
   const [trendOpen, setTrendOpen] = useState(false);
@@ -33,6 +33,7 @@ export default function ProfilePage() {
   ];
 
   useEffect(() => {
+    setStore(getStore());
     const onFocus = () => setStore(getStore());
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);

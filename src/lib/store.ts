@@ -100,6 +100,11 @@ function cloneSeed(): PatientStore {
   return JSON.parse(JSON.stringify(seedStore)) as PatientStore;
 }
 
+/** Same snapshot as server `getStore()` — no `localStorage`. Use for initial React state, then `getStore()` in `useEffect` to hydrate. */
+export function getHydrationSafeStore(): PatientStore {
+  return cloneSeed();
+}
+
 export function getStore(): PatientStore {
   if (typeof window === "undefined") {
     return cloneSeed();

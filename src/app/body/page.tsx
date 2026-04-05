@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { getStore } from "@/lib/store";
+import { getHydrationSafeStore, getStore } from "@/lib/store";
 import type { ExtractedLab } from "@/lib/types";
 import { ChevronDown } from "lucide-react";
 import { AppTopNav } from "@/components/nav/AppTopNav";
@@ -388,12 +388,12 @@ function hashStr(s: string): number {
 
 export default function BodyPage() {
   const [scrollY, setScrollY] = useState(0);
-  const [windowHeight, setWindowHeight] = useState(
-    typeof window !== "undefined" ? window.innerHeight : 800
-  );
-  const [store] = useState<ReturnType<typeof getStore> | null>(() => getStore());
+  const [windowHeight, setWindowHeight] = useState(800);
+  const [store, setStore] = useState(() => getHydrationSafeStore());
 
   useEffect(() => {
+    setStore(getStore());
+    setWindowHeight(window.innerHeight);
     const handleScroll = () => setScrollY(window.scrollY);
     const handleResize = () => setWindowHeight(window.innerHeight);
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { getStore } from "@/lib/store";
+import { getHydrationSafeStore, getStore } from "@/lib/store";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -12,9 +12,10 @@ import { ArrowLeft } from "lucide-react";
 
 export default function DocDetailPage() {
   const params = useParams<{ id: string }>();
-  const [store, setStore] = useState(() => getStore());
+  const [store, setStore] = useState(() => getHydrationSafeStore());
 
   useEffect(() => {
+    setStore(getStore());
     const onFocus = () => setStore(getStore());
     const onCustom = () => setStore(getStore());
     window.addEventListener("focus", onFocus);

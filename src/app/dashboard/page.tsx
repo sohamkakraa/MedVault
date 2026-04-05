@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { ChartContainer, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { AppTopNav } from "@/components/nav/AppTopNav";
-import { getStore, saveStore, removeDoc, mergeExtractedDoc } from "@/lib/store";
+import { getHydrationSafeStore, getStore, saveStore, removeDoc, mergeExtractedDoc } from "@/lib/store";
 import { DocType, ExtractedDoc, ExtractedLab, ExtractedMedication } from "@/lib/types";
 import { REQUIRED_TRACKER_METRICS } from "@/lib/trackers";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -130,7 +130,7 @@ type OverlayKind = "reports" | "meds" | "labs" | "add-med" | "add-report" | "upl
 const UPLOAD_TYPES: DocType[] = ["Lab report", "Prescription", "Bill", "Imaging", "Other"];
 
 export default function DashboardPage() {
-  const [store, setStore] = useState(() => getStore());
+  const [store, setStore] = useState(() => getHydrationSafeStore());
   const [printing, setPrinting] = useState(false);
   const [overlay, setOverlay] = useState<OverlayKind>(null);
   const [activeMedInfo, setActiveMedInfo] = useState<string | null>(null);
@@ -148,7 +148,7 @@ export default function DashboardPage() {
   });
 
   useEffect(() => {
-    // Refresh from localStorage in case another page updated it
+    setStore(getStore());
     const onFocus = () => setStore(getStore());
     window.addEventListener("focus", onFocus);
     const onStorage = (e: StorageEvent) => {
