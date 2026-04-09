@@ -10,7 +10,12 @@ import { Select } from "@/components/ui/Select";
 import { afterOtpSignIn, getStore, syncPatientStoreWithServer } from "@/lib/store";
 import { buildPhoneDialOptions } from "@/lib/phoneDialOptions";
 
-export default function LoginForm() {
+type LoginFormProps = {
+  /** Shown when the server has AUTH_BETA_DEMO_* configured (no secrets in the client). */
+  showBetaDemoGuidance?: boolean;
+};
+
+export default function LoginForm({ showBetaDemoGuidance }: LoginFormProps) {
   const sp = useSearchParams();
   const next = sp.get("next") ?? "/dashboard";
   const router = useRouter();
@@ -27,6 +32,7 @@ export default function LoginForm() {
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [devOtpHint, setDevOtpHint] = useState<string | null>(null);
+  const [betaOtpHint, setBetaOtpHint] = useState<string | null>(null);
 
   const identifier = mode === "email" ? email.trim() : phoneNational.trim();
 
@@ -36,6 +42,7 @@ export default function LoginForm() {
     setErr(null);
     setInfo(null);
     setDevOtpHint(null);
+    setBetaOtpHint(null);
     try {
       const r = await fetch("/api/auth/request-otp", {
         method: "POST",
@@ -50,11 +57,13 @@ export default function LoginForm() {
         error?: string;
         message?: string;
         devOtp?: string;
+        betaDemoOtp?: string;
       };
       if (!j.ok) throw new Error(j.error ?? "Could not send code");
       setStep("otp");
       if (j.message) setInfo(j.message);
       if (typeof j.devOtp === "string") setDevOtpHint(j.devOtp);
+      if (typeof j.betaDemoOtp === "string") setBetaOtpHint(j.betaDemoOtp);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "Something went wrong");
     } finally {
@@ -119,6 +128,16 @@ export default function LoginForm() {
             </div>
           </CardHeader>
           <CardContent>
+            {showBetaDemoGuidance && (
+              <div className="mb-4 rounded-xl border border-[var(--border)] bg-[var(--panel-2)] p-3 text-xs leading-relaxed text-[var(--fg)]">
+                <p className="font-medium text-[var(--fg)]">Beta testers</p>
+                <p className="mt-1 mv-muted">
+                  Use the <span className="text-[var(--fg)]">demo email</span> you were given, then request a code.
+                  Enter the <span className="text-[var(--fg)]">6-digit beta code</span> from your invite. If your host
+                  enabled on-screen hints, the code appears after you tap Send code.
+                </p>
+              </div>
+            )}
             {step === "enter" ? (
               <form onSubmit={requestOtp} className="space-y-4">
                 <div className="flex gap-2 rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] p-1">
@@ -207,6 +226,12 @@ export default function LoginForm() {
                     Development: your code is <span className="font-mono font-semibold">{devOtpHint}</span>
                   </p>
                 )}
+                {betaOtpHint && (
+                  <p className="rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 p-3 text-xs text-[var(--fg)]">
+                    Beta demo: your one-time code is{" "}
+                    <span className="font-mono font-semibold">{betaOtpHint}</span>
+                  </p>
+                )}
                 <label className="text-xs mv-muted block">
                   One-time code
                   <Input
@@ -233,6 +258,8 @@ export default function LoginForm() {
                       setStep("enter");
                       setCode("");
                       setErr(null);
+                      setBetaOtpHint(null);
+                      setDevOtpHint(null);
                     }}
                   >
                     Back

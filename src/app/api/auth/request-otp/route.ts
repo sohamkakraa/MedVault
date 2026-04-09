@@ -3,6 +3,7 @@ import { z } from "zod";
 import { setOtpDb } from "@/lib/auth/otpDb";
 import { checkOtpRateLimit } from "@/lib/auth/otpRateLimit";
 import { normalizeLoginIdentifier } from "@/lib/auth/identifiers";
+import { getBetaDemoConfig, isBetaDemoIdentifier, shouldExposeBetaDemoOtp } from "@/lib/auth/betaDemo";
 
 export const runtime = "nodejs";
 
@@ -36,7 +37,9 @@ export async function POST(req: Request) {
     );
   }
 
-  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const betaCfg = getBetaDemoConfig();
+  const code =
+    betaCfg && isBetaDemoIdentifier(norm) ? betaCfg.otp : String(Math.floor(100000 + Math.random() * 900000));
   try {
     await setOtpDb(norm.key, code);
   } catch {
@@ -48,11 +51,13 @@ export async function POST(req: Request) {
 
   const devReturn =
     process.env.NODE_ENV !== "production" && process.env.AUTH_DEV_RETURN_OTP === "1";
+  const betaExpose = isBetaDemoIdentifier(norm) && shouldExposeBetaDemoOtp();
 
   return NextResponse.json({
     ok: true,
     channel: norm.kind,
     ...(devReturn ? { devOtp: code } : {}),
+    ...(betaExpose ? { betaDemoOtp: code } : {}),
     message:
       "No SMS or email is sent in this prototype. For local testing, set AUTH_DEV_RETURN_OTP=1 to receive the code in this response; production would use your messaging provider.",
   });

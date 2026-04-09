@@ -7,7 +7,18 @@ UMA (Ur Medical Assistant) helps people upload medical PDFs, see trends, and cha
 - **PostgreSQL + Prisma**: `User`, `OtpChallenge`, `PatientRecord` (JSON blob per user).
 - **Sign-in**: One-time codes stored in the database; signed session cookie (`AUTH_SECRET`) with user id.
 - **Patient data**: `GET` / `PUT` `/api/patient-store` syncs the structured store for signed-in users (PDF base64 is omitted in the payload to keep rows small).
-- **Still prototype**: SMS/email OTP delivery is not wired—you use `AUTH_DEV_RETURN_OTP=1` locally or add a provider for real betas.
+- **Still prototype**: SMS/email OTP delivery is not wired—you use `AUTH_DEV_RETURN_OTP=1` locally, configure a **shared beta demo** (below), or add a provider for real betas.
+
+### Shared beta (dummy) sign-in
+
+For **invited testers** on a hosted build, you can enable one shared email account without SMS or email delivery:
+
+1. Set **`AUTH_BETA_DEMO_EMAIL`** to a dedicated address (for example `demo-beta@yourdomain.com`).
+2. Set **`AUTH_BETA_DEMO_OTP`** to any **six digits**. Share the email and code with testers over a **private** channel (Slack, email invite, etc.).
+3. Testers choose **Email** on the sign-in page, enter that address, tap **Send code**, then enter the 6-digit code.
+4. Optional **`AUTH_BETA_EXPOSE_DEMO_OTP=1`**: after **Send code**, the UI (and JSON response) includes the OTP so testers do not need the invite text. Same trade-off as `AUTH_DEV_RETURN_OTP`—use only on **non-public** preview URLs, not a production site open to the internet.
+
+Everyone using that email shares a single **User** and **PatientRecord** in the database. Rotate the OTP or remove these variables when the beta ends.
 
 ## What is not “enterprise complete”
 
@@ -108,6 +119,9 @@ A common **free** combo: **[Vercel](https://vercel.com) (Hobby)** for the app + 
    | `ANTHROPIC_MODEL` | Optional (defaults in `.env.example`) |
    | `ANTHROPIC_PDF_MODEL` | Optional |
    | `AUTH_DEV_RETURN_OTP` | Set to `1` **only** for internal demos where returning the OTP in JSON is acceptable—**never** for public betas unless you understand the risk |
+   | `AUTH_BETA_DEMO_EMAIL` | Optional: shared beta email (see “Shared beta (dummy) sign-in”) |
+   | `AUTH_BETA_DEMO_OTP` | Optional: six digits; must be set with the demo email |
+   | `AUTH_BETA_EXPOSE_DEMO_OTP` | Optional: `1` to show the demo OTP on screen after Send code (closed previews only) |
 
 5. Deploy. This repo’s `vercel.json` runs **`npm install`**, then a **`DATABASE_URL` check**, **`prisma migrate deploy`**, **`prisma generate`**, and **`next build`** so tables exist before the app is built.
 
