@@ -62,6 +62,18 @@ cp .env.example .env.local
 
 Fill at least: `DATABASE_URL`, `DIRECT_URL` (match `DATABASE_URL` unless you use Neon pooled + direct), `AUTH_SECRET` (16+ random characters), and `ANTHROPIC_API_KEY` if you use AI features. For local OTP testing: `AUTH_DEV_RETURN_OTP=1`.
 
+#### Pull env vars from Vercel (optional)
+
+If the repo is linked with the [Vercel CLI](https://vercel.com/docs/cli), you can download the project’s variables into a local file (do **not** commit real secrets):
+
+```bash
+vercel env pull .env.development.local
+```
+
+This app talks to Postgres through **Prisma** using `DATABASE_URL` (and `DIRECT_URL` when set) on the **Node.js** runtime. You do **not** need to install `@neondatabase/serverless` for that path; add it only if you intentionally move to Prisma’s Neon serverless adapter or Edge-only database access.
+
+After `npm run db:migrate`, open **`/comments`** to verify inserts: a form uses the Server Action **`create`** to write to the `comments` table.
+
 ### 4) Run
 
 ```bash

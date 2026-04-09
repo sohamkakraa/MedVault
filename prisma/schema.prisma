@@ -32,3 +32,12 @@ model PatientRecord {
   data      Json
   updatedAt DateTime @updatedAt @map("updated_at")
 }
+
+/** Demo / wiring table (Neon tutorial parity); not part of core health data flows. */
+model Comment {
+  id        String   @id @default(cuid())
+  comment   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("comments")
+}
