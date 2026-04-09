@@ -40,18 +40,18 @@ npm install
 
 ### 2) Database
 
-Create a Postgres database (local Docker, or a free [Neon](https://neon.tech) project). Set `DATABASE_URL` in `.env.local` (see `.env.example`).
+Create a Postgres database (local Docker, or a free [Neon](https://neon.tech) project). Set `DATABASE_URL` and **`DIRECT_URL`** in `.env.local` (see `.env.example`). On Neon, use the **pooled** URI for `DATABASE_URL` and the **direct** URI for `DIRECT_URL`; for a single host, copy the same string into both.
 
 Apply the schema:
 
 ```bash
-npx prisma migrate deploy
+npm run db:migrate
 ```
 
 For quick local iteration you can use:
 
 ```bash
-npx prisma db push
+npm run db:push
 ```
 
 ### 3) Environment
@@ -60,7 +60,7 @@ npx prisma db push
 cp .env.example .env.local
 ```
 
-Fill at least: `DATABASE_URL`, `AUTH_SECRET` (16+ random characters), and `ANTHROPIC_API_KEY` if you use AI features. For local OTP testing: `AUTH_DEV_RETURN_OTP=1`.
+Fill at least: `DATABASE_URL`, `DIRECT_URL` (match `DATABASE_URL` unless you use Neon pooled + direct), `AUTH_SECRET` (16+ random characters), and `ANTHROPIC_API_KEY` if you use AI features. For local OTP testing: `AUTH_DEV_RETURN_OTP=1`.
 
 ### 4) Run
 
@@ -76,7 +76,7 @@ That means dependencies or the generated client are missing. From the project ro
 
 ```bash
 npm install
-npx prisma generate
+npm run db:generate
 ```
 
 Commit an up-to-date **`package-lock.json`** after `npm install` so Vercel installs the same tree. This repo’s `vercel.json` uses `npm install` (not `npm ci`) so the first deploy can reconcile the lockfile if needed.
@@ -97,8 +97,10 @@ A common **free** combo: **[Vercel](https://vercel.com) (Hobby)** for the app + 
 ### A) Neon (database)
 
 1. Sign up at [neon.tech](https://neon.tech), create a project.
-2. Copy the **connection string** (include `sslmode=require` if offered).
-3. You will paste it as `DATABASE_URL` in Vercel.
+2. In the Neon dashboard, open **Connection details** and copy **two** strings when available:
+   - **Pooled** (or “Transaction” / serverless) → `DATABASE_URL` in Vercel.
+   - **Direct** (non-pooled, for migrations) → `DIRECT_URL` in Vercel.
+3. If you only use one connection string, set **both** env vars to the same value (works for small betas; Neon recommends split pooled/direct for production).
 
 ### B) GitHub
 
@@ -108,12 +110,13 @@ A common **free** combo: **[Vercel](https://vercel.com) (Hobby)** for the app + 
 
 1. Sign up at [vercel.com](https://vercel.com) (free Hobby tier).
 2. **Add New Project** → import the GitHub repo.
-3. **Before the first deploy**, open **Settings → Environment Variables** and add **`DATABASE_URL`** (and the other vars below). If `DATABASE_URL` is missing, the build fails with Prisma **P1012** because `prisma migrate deploy` and `prisma generate` read `prisma/schema.prisma` during the build.
+3. **Before the first deploy**, open **Settings → Environment Variables** and add **`DATABASE_URL`** (and the other vars below). If `DATABASE_URL` is missing, the build fails early. If **`migrate deploy`** fails on Neon while `generate` works, add **`DIRECT_URL`** (Neon’s **direct** connection string).
 4. **Environment variables** (Production + Preview):
 
    | Name | Notes |
    |------|--------|
-   | `DATABASE_URL` | Neon connection string |
+   | `DATABASE_URL` | Postgres connection string (Neon: pooled / serverless URI) |
+   | `DIRECT_URL` | Same as `DATABASE_URL` if you have one URI; Neon: **direct** URI for migrations |
    | `AUTH_SECRET` | Long random string (32+ chars) |
    | `ANTHROPIC_API_KEY` | For PDF extraction + Claude chat |
    | `ANTHROPIC_MODEL` | Optional (defaults in `.env.example`) |
@@ -123,7 +126,7 @@ A common **free** combo: **[Vercel](https://vercel.com) (Hobby)** for the app + 
    | `AUTH_BETA_DEMO_OTP` | Optional: six digits; must be set with the demo email |
    | `AUTH_BETA_EXPOSE_DEMO_OTP` | Optional: `1` to show the demo OTP on screen after Send code (closed previews only) |
 
-5. Deploy. This repo’s `vercel.json` runs **`npm install`**, then a **`DATABASE_URL` check**, **`prisma migrate deploy`**, **`prisma generate`**, and **`next build`** so tables exist before the app is built.
+5. Deploy. This repo’s `vercel.json` runs **`npm install`** (which runs **`prisma generate`**), then **`node scripts/vercel-build.mjs`**: **`prisma migrate deploy`**, **`prisma generate`**, **`next build`**. Build logs include **`[vercel-build]`** lines so you can see which step failed.
 
 6. **Preview deployments**: push a branch or open a PR—Vercel shows a unique preview URL in the dashboard and on the PR. Use that to share a “temp” beta link.
 
@@ -137,7 +140,7 @@ A common **free** combo: **[Vercel](https://vercel.com) (Hobby)** for the app + 
 | Command | Purpose |
 |---------|---------|
 | `npm run dev` | Development server |
-| `npm run build` | `prisma generate` + `next build` |
+| `npm run build` | `prisma generate` (via script) + `next build` |
 | `npm run start` | Production server (after `build`) |
 | `npm run db:migrate` | `prisma migrate deploy` (production/staging DB) |
 | `npm run db:push` | `prisma db push` (prototyping; skips migration files) |

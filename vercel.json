@@ -1,4 +1,4 @@
 {
   "installCommand": "npm install --no-audit --no-fund",
-  "buildCommand": "node scripts/assert-database-url.mjs && prisma migrate deploy && prisma generate && next build"
+  "buildCommand": "node scripts/vercel-build.mjs"
 }
