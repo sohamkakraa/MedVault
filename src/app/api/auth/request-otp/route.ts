@@ -8,7 +8,11 @@ import {
   isBetaDemoIdentifier,
   shouldExposeBetaDemoOtp,
 } from "@/lib/auth/betaDemo";
-import { isOtpEmailDeliveryConfigured, sendSignInOtpEmail } from "@/lib/auth/sendSignInOtp";
+import {
+  isOtpEmailDeliveryConfigured,
+  messageForSendSignInOtpFailure,
+  sendSignInOtpEmail,
+} from "@/lib/auth/sendSignInOtp";
 
 export const runtime = "nodejs";
 
@@ -80,7 +84,7 @@ export async function POST(req: Request) {
     const sent = await sendSignInOtpEmail(norm.display, code);
     if (!sent.ok) {
       return NextResponse.json(
-        { ok: false, error: "We could not send the sign-in email. Try again in a moment." },
+        { ok: false, error: messageForSendSignInOtpFailure(sent) },
         { status: 503 },
       );
     }
