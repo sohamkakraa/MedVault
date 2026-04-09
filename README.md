@@ -128,6 +128,18 @@ A common **free** combo: **[Vercel](https://vercel.com) (Hobby)** for the app + 
 
 5. Deploy. This repo’s `vercel.json` runs **`npm install`** (which runs **`prisma generate`**), then **`node scripts/vercel-build.mjs`**: **`prisma migrate deploy`**, **`prisma generate`**, **`next build`**. Build logs include **`[vercel-build]`** lines so you can see which step failed.
 
+#### Build failed: `vercel-build` exited with 1
+
+Vercel’s summary line does **not** say *which* command failed. The script runs **three** steps in order; exit code **1** means **one** of them returned non-zero.
+
+In the **full** build log, search for **`[vercel-build]`**:
+
+- A **diagnostic** block at the start shows whether `DATABASE_URL` / `DIRECT_URL` are set (lengths only, no secrets) and whether the Prisma/Next CLI files exist.
+- Before each step: **`── prisma migrate deploy ──`**, then **`── prisma generate ──`**, then **`── next build ──`**. Find the **last** such banner: the real error (Prisma **P####**, TypeScript, ESLint, etc.) appears **immediately above** it.
+- After a failure, the script prints a short **decode** hint for that step.
+
+**Repeated** failures are usually the **same** underlying issue (for example **migrate deploy** against a DB that is asleep, unreachable from Vercel, or still using a **pooled-only** Neon URL without a **direct** `DIRECT_URL`).
+
 6. **Preview deployments**: push a branch or open a PR—Vercel shows a unique preview URL in the dashboard and on the PR. Use that to share a “temp” beta link.
 
 ### D) After deploy
