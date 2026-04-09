@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * Vercel build: clear step labels in logs, DATABASE_URL check, Prisma + Next.
+ * Vercel build: clear step labels, Prisma + Next via node (avoid npx spawn issues on CI).
  */
-import { spawnSync } from "node:child_process";
 import { applyDirectUrlDefault } from "./prisma-env.mjs";
+import { prismaSpawn } from "./run-prisma-cli.mjs";
+import { nextSpawn } from "./run-next-build.mjs";
 
 if (!process.env.DATABASE_URL?.trim()) {
   console.error(`
@@ -24,15 +25,21 @@ See README.md → "Deploy a beta on a free tier".
 
 applyDirectUrlDefault();
 
-function run(label, command, args) {
-  console.error(`\n[vercel-build] ${label}\n`);
-  const r = spawnSync(command, args, { stdio: "inherit", env: process.env, shell: false });
-  if (r.status !== 0) {
-    console.error(`\n[vercel-build] FAILED: ${label} (exit ${r.status ?? 1})\n`);
-    process.exit(r.status ?? 1);
+function fail(label, code) {
+  console.error(`\n[vercel-build] FAILED: ${label} (exit ${code})\n`);
+  if (label.includes("migrate")) {
+    console.error(
+      "If this is a database error: set DATABASE_URL and (on Neon) DIRECT_URL for this Vercel environment, then redeploy.",
+    );
   }
+  process.exit(code);
 }
 
-run("prisma migrate deploy", "npx", ["prisma", "migrate", "deploy"]);
-run("prisma generate", "npx", ["prisma", "generate"]);
-run("next build", "npx", ["next", "build"]);
+function run(label, code) {
+  console.error(`\n[vercel-build] ${label}\n`);
+  if (code !== 0) fail(label, code);
+}
+
+run("prisma migrate deploy", prismaSpawn(["migrate", "deploy"]));
+run("prisma generate", prismaSpawn(["generate"]));
+run("next build", nextSpawn(["build"]));

@@ -8,7 +8,7 @@
     "db:generate": "node scripts/prisma-generate.mjs",
     "db:migrate": "node scripts/prisma-migrate-deploy.mjs",
     "db:push": "node scripts/prisma-db-push.mjs",
-    "build": "node scripts/prisma-generate.mjs && next build",
+    "build": "node scripts/prisma-generate.mjs && node scripts/run-next-build.mjs",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
