@@ -6,10 +6,12 @@ import { PatientStoreBootstrap } from "@/components/providers/PatientStoreBootst
 export const metadata: Metadata = {
   title: "UMA — Ur Medical Assistant",
   description: "UMA is your personal health companion and medical record assistant.",
+  // Favicon: `src/app/icon.svg` (App Router). Legacy `/favicon.ico` → `/logo.svg` in `next.config.ts`.
   icons: {
-    icon: [{ url: "/logo.svg", type: "image/svg+xml" }],
-    shortcut: "/logo.svg",
-    apple: "/logo.svg",
+    apple: [{ url: "/logo.svg", type: "image/svg+xml" }],
+  },
+  appleWebApp: {
+    title: "UMA",
   },
 };
 
