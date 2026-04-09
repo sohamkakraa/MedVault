@@ -5,7 +5,7 @@
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { existsSync } from "node:fs";
-import { applyDirectUrlDefault } from "./prisma-env.mjs";
+import { prismaChildEnv } from "./prisma-env.mjs";
 
 const prismaMain = path.join(process.cwd(), "node_modules", "prisma", "build", "index.js");
 
@@ -17,7 +17,7 @@ export function prismaSpawn(args) {
   }
   const r = spawnSync(process.execPath, [prismaMain, ...args], {
     stdio: "inherit",
-    env: process.env,
+    env: prismaChildEnv(),
     cwd: process.cwd(),
   });
   if (r.error) {
@@ -28,6 +28,5 @@ export function prismaSpawn(args) {
 }
 
 export function runPrismaCli(args) {
-  applyDirectUrlDefault();
   process.exit(prismaSpawn(args));
 }
