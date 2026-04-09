@@ -1,7 +1,9 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import Script from "next/script";
 import { ThemeInit } from "@/components/theme/ThemeInit";
 import { PatientStoreBootstrap } from "@/components/providers/PatientStoreBootstrap";
+import { THEME_BOOT_SCRIPT } from "@/lib/themePreference";
 
 export const metadata: Metadata = {
   title: "UMA — Ur Medical Assistant",
@@ -17,8 +19,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning data-theme="dark">
+    <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning className="min-h-screen">
+        <Script id="uma-theme-boot" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         <ThemeInit />
         <PatientStoreBootstrap />
         {children}

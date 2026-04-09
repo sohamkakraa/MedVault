@@ -1,0 +1,9 @@
+Stock photos (Unsplash License) bundled for the login page UI.
+
+hero-wellness.jpg
+  https://unsplash.com/photos/woman-doing-yoga-1544367567-0f2fcb009e0b
+
+accent-plants.jpg
+  https://unsplash.com/photos/green-pine-trees-during-daytime-1469474968028-56623f02e42e
+
+Replace these files with your own assets if you prefer; update LOGIN_HERO / LOGIN_ACCENT in LoginForm.tsx if filenames change.

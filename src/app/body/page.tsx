@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { getHydrationSafeStore, getStore } from "@/lib/store";
+import { resolveThemePreference } from "@/lib/themePreference";
 import type { ExtractedLab } from "@/lib/types";
 import { ChevronDown } from "lucide-react";
 import { AppTopNav } from "@/components/nav/AppTopNav";
@@ -389,7 +390,7 @@ function hashStr(s: string): number {
 function syncThemeFromDocument(): "light" | "dark" {
   const t = document.documentElement.dataset.theme;
   if (t === "light" || t === "dark") return t;
-  return getStore().preferences?.theme ?? "dark";
+  return resolveThemePreference(getStore().preferences?.theme);
 }
 
 export default function BodyPage() {
@@ -397,19 +398,19 @@ export default function BodyPage() {
   const [windowHeight, setWindowHeight] = useState(800);
   const [store, setStore] = useState(() => getHydrationSafeStore());
   const [theme, setTheme] = useState<"light" | "dark">(() =>
-    typeof window === "undefined" ? "dark" : (getStore().preferences?.theme ?? "dark")
+    typeof window === "undefined" ? resolveThemePreference(undefined) : syncThemeFromDocument()
   );
 
   useEffect(() => {
     queueMicrotask(() => {
       setStore(getStore());
-      setTheme(getStore().preferences?.theme ?? syncThemeFromDocument());
+      setTheme(syncThemeFromDocument());
       setWindowHeight(window.innerHeight);
     });
     const handleScroll = () => setScrollY(window.scrollY);
     const handleResize = () => setWindowHeight(window.innerHeight);
 
-    const syncTheme = () => setTheme(getStore().preferences?.theme ?? syncThemeFromDocument());
+    const syncTheme = () => setTheme(syncThemeFromDocument());
     const onStoreUpdate = () => syncTheme();
 
     window.addEventListener("scroll", handleScroll, { passive: true });

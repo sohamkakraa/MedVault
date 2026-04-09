@@ -136,3 +136,35 @@ html[data-theme="dark"] select.uma-select {
     display: block !important;
   }
 }
+
+/* Beta login: post-auth loader */
+@keyframes uma-logo-float {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-6px) scale(1.05);
+  }
+}
+
+@keyframes uma-logo-soft-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+.uma-logo-loader-img {
+  animation: uma-logo-float 2s ease-in-out infinite;
+}
+
+.uma-logo-loader-ring {
+  animation: uma-logo-soft-pulse 1.6s ease-in-out infinite;
+  border-color: color-mix(in srgb, var(--accent) 38%, transparent);
+}

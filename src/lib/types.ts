@@ -114,7 +114,8 @@ export type PatientStore = {
     menstrualCycle?: MenstrualCyclePrefs;
   };
   preferences: {
-    theme: "dark" | "light";
+    /** `system` follows the device light/dark preference. */
+    theme: "dark" | "light" | "system";
     /** First-run wizard after OTP sign-in (local device only). */
     onboarding?: {
       completedAtISO?: string;

@@ -135,7 +135,7 @@ export function createBlankPatientStore(
       ...partialProfile,
     },
     preferences: {
-      theme: "dark",
+      theme: "system",
       onboarding: { lastStepReached: 1 as const },
     },
     standardLexicon: [],
@@ -272,7 +272,7 @@ const seedStore: PatientStore = {
     },
   },
   preferences: {
-    theme: "dark",
+    theme: "system",
   },
   standardLexicon: [],
   updatedAtISO: new Date().toISOString(),

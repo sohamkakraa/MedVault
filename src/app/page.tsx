@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
-import { UmaLogo } from "@/components/branding/UmaLogo";
+import { LandingHeader } from "@/components/nav/LandingHeader";
 import {
   Activity,
   Brain,
@@ -20,24 +20,7 @@ import {
 export default function HomePage() {
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="border-b border-[var(--border)] bg-[var(--panel)]/90 backdrop-blur sticky top-0 z-30">
-        <div className="mx-auto max-w-6xl px-4 h-14 flex items-center justify-between gap-4">
-          <Link href="/" className="shrink-0">
-            <UmaLogo className="hidden sm:inline-flex" />
-            <UmaLogo compact className="sm:hidden" />
-          </Link>
-          <div className="flex items-center gap-2">
-            <Link href="/login">
-              <Button variant="ghost" className="text-sm">
-                Sign in
-              </Button>
-            </Link>
-            <Link href="/login?next=/dashboard">
-              <Button className="text-sm">Get started</Button>
-            </Link>
-          </div>
-        </div>
-      </header>
+      <LandingHeader />
 
       <main className="flex-1">
         <section className="mx-auto max-w-6xl px-4 pt-16 pb-20 md:pt-24 md:pb-28">
@@ -51,13 +34,10 @@ export default function HomePage() {
               for conversations with your care team. Built for real life, not clinical jargon.
             </p>
             <div className="mt-10 flex flex-wrap gap-3">
-              <Link href="/login?next=/dashboard">
+              <Link href="/login">
                 <Button className="gap-2">
                   <Sparkles className="h-4 w-4" /> Start with a secure sign-in
                 </Button>
-              </Link>
-              <Link href="/login">
-                <Button variant="ghost">I already have a code</Button>
               </Link>
             </div>
             <p className="mt-8 text-[11px] mv-muted leading-relaxed max-w-xl">
