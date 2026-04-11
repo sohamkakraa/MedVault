@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { AppTopNav } from "@/components/nav/AppTopNav";
 import { RecordNoticeToast } from "@/components/ui/RecordNoticeToast";
+import { UmaCharacter } from "@/components/chat/UmaCharacter";
 import { getStore, mergeExtractedDoc } from "@/lib/store";
 import type { ExtractedDoc, StandardLexiconEntry } from "@/lib/types";
 
@@ -231,28 +232,8 @@ export default function ChatPage() {
         <section className="flex-1 min-h-0 rounded-none sm:rounded-3xl border-y border-[var(--border)] sm:border bg-[var(--panel)] sm:shadow-[var(--shadow)] flex flex-col overflow-hidden">
           <div className="border-b border-[var(--border)] px-4 py-3 flex items-center justify-between gap-3 shrink-0">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="relative h-11 w-11 shrink-0 rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] grid place-items-center">
-                <svg
-                  viewBox="0 0 64 64"
-                  className={`h-8 w-8 transition-transform duration-300 ${
-                    petMood === "happy" ? "scale-110" : ""
-                  }`}
-                  style={{ animation: "umaBreath 2.4s ease-in-out infinite" }}
-                  aria-hidden
-                >
-                  <circle cx="32" cy="32" r="26" fill="var(--panel)" stroke="var(--border)" strokeWidth="3" />
-                  <circle cx="23" cy="28" r="3" fill="var(--fg)" />
-                  <circle cx="41" cy="28" r="3" fill="var(--fg)" />
-                  <path
-                    d={petMood === "thinking" ? "M22 41 Q32 34 42 41" : "M22 39 Q32 46 42 39"}
-                    fill="none"
-                    stroke="var(--fg)"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                  />
-                  <path d="M18 16 Q22 10 28 14" fill="none" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" />
-                  <path d="M46 16 Q42 10 36 14" fill="none" stroke="var(--accent-2)" strokeWidth="3" strokeLinecap="round" />
-                </svg>
+              <div className="relative shrink-0 rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] grid place-items-center overflow-hidden" style={{ width: 54, height: 48, padding: '3px 2px' }}>
+                <UmaCharacter mood={petMood} compact />
                 {celebrate && (
                   <>
                     <span

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { LandingHeader } from "@/components/nav/LandingHeader";
+import { DedicationSection } from "@/components/DedicationSection";
 import {
   Activity,
   Brain,
@@ -46,6 +47,9 @@ export default function HomePage() {
             </p>
           </div>
         </section>
+
+        {/* ─── Dedication to Uma Kakra ──────────────────────── */}
+        <DedicationSection />
 
         <section className="border-t border-[var(--border)] bg-[var(--panel)]/60 py-16 md:py-20">
           <div className="mx-auto max-w-6xl px-4">

@@ -11,6 +11,7 @@ import { normalizeLabUnitString } from "@/lib/labUnits";
 import { enrichDocFromMarkdown } from "@/lib/parseMarkdownArtifact";
 import { mergeLexiconPatches, resolveCanonicalLabName } from "@/lib/standardized";
 import { patientStoreForApiPayload } from "@/lib/patientStoreApi";
+import { applyEffectiveThemeToDocument, resolveThemePreference } from "@/lib/themePreference";
 
 const KEY = "mv_patient_store_v1";
 const ACCOUNT_INIT = "mv_account_initialized_v1";
@@ -89,10 +90,27 @@ export async function syncPatientStoreWithServer(): Promise<void> {
       return;
     }
     if (serverT >= localT || !localHasData) {
+      const theme =
+        localHasData
+          ? (local.preferences?.theme ?? server.preferences?.theme ?? "system")
+          : (server.preferences?.theme ?? local.preferences?.theme ?? "system");
+      const merged: PatientStore = {
+        ...server,
+        preferences: {
+          ...(local.preferences ?? {}),
+          ...(server.preferences ?? {}),
+          onboarding: {
+            ...local.preferences?.onboarding,
+            ...server.preferences?.onboarding,
+          },
+          theme,
+        },
+      };
       skipNextRemotePush = true;
       try {
-        localStorage.setItem(KEY, JSON.stringify(server));
-        window.dispatchEvent(new CustomEvent("mv-store-update", { detail: server }));
+        localStorage.setItem(KEY, JSON.stringify(merged));
+        applyEffectiveThemeToDocument(resolveThemePreference(merged.preferences.theme));
+        window.dispatchEvent(new CustomEvent("mv-store-update", { detail: merged }));
       } finally {
         skipNextRemotePush = false;
       }

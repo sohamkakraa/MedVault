@@ -3,7 +3,12 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { verifyAndConsumeOtpDb } from "@/lib/auth/otpDb";
 import { normalizeLoginIdentifier } from "@/lib/auth/identifiers";
-import { SESSION_COOKIE, SESSION_MAX_AGE, signSessionToken } from "@/lib/auth/sessionToken";
+import {
+  SESSION_COOKIE,
+  SESSION_MAX_AGE,
+  sessionSigningFailureHint,
+  signSessionToken,
+} from "@/lib/auth/sessionToken";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -76,7 +81,7 @@ export async function POST(req: Request) {
     phoneE164: user.phoneE164 ?? undefined,
   });
   if (!token) {
-    return NextResponse.json({ ok: false, error: "Server configuration error." }, { status: 500 });
+    return NextResponse.json({ ok: false, error: sessionSigningFailureHint() }, { status: 500 });
   }
 
   const res = NextResponse.json({ ok: true });

@@ -10,6 +10,13 @@ export function resolveThemePreference(pref: ThemePreference | undefined): Effec
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
+/** After the theme boot script runs, matches painted `data-theme` (avoids SSR/client hydration drift). */
+export function readEffectiveThemeFromDocument(): EffectiveTheme | null {
+  if (typeof document === "undefined") return null;
+  const t = document.documentElement.dataset.theme;
+  return t === "light" || t === "dark" ? t : null;
+}
+
 export function applyEffectiveThemeToDocument(effective: EffectiveTheme) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;

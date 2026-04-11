@@ -17,6 +17,21 @@ function getSecret(): string {
   return "";
 }
 
+/**
+ * Production (including Vercel Preview: NODE_ENV=production) needs AUTH_SECRET ≥ 16 chars.
+ * Local `next dev` uses a dev fallback, so missing AUTH_SECRET only breaks prod-like deploys.
+ */
+export function sessionSigningFailureHint(): string {
+  if (process.env.NODE_ENV !== "production") {
+    return "Server configuration error.";
+  }
+  const s = process.env.AUTH_SECRET;
+  if (!s || s.length < 16) {
+    return "Sign-in cannot complete: set AUTH_SECRET to at least 16 characters in this environment (e.g. Vercel → Settings → Environment Variables → Preview).";
+  }
+  return "Server configuration error.";
+}
+
 function toBase64Url(bytes: Uint8Array): string {
   let bin = "";
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]!);

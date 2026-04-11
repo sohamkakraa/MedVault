@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/Button";
 import { getStore, saveStore } from "@/lib/store";
 import {
   applyEffectiveThemeToDocument,
+  readEffectiveThemeFromDocument,
   resolveThemePreference,
   type EffectiveTheme,
   type ThemePreference,
@@ -16,24 +17,44 @@ type Props = {
   className?: string;
 };
 
-export function ThemeToggle({ className }: Props) {
-  const [stored, setStored] = useState<ThemePreference>(() =>
-    typeof window === "undefined" ? "system" : (getStore().preferences?.theme ?? "system"),
-  );
-  const [effective, setEffective] = useState<EffectiveTheme>(() =>
-    typeof window === "undefined" ? "light" : resolveThemePreference(getStore().preferences?.theme),
-  );
+type ThemeSnap = { stored: ThemePreference; effective: EffectiveTheme };
 
-  useEffect(() => {
-    const eff = resolveThemePreference(stored);
-    setEffective(eff);
-    applyEffectiveThemeToDocument(eff);
-  }, [stored]);
+const SERVER_SNAP_JSON = JSON.stringify({
+  stored: "system",
+  effective: "light",
+} satisfies ThemeSnap);
+
+function computeThemeSnap(): ThemeSnap {
+  const store = getStore();
+  const pref = (store.preferences?.theme ?? "system") as ThemePreference;
+  const fromHtml = readEffectiveThemeFromDocument();
+  const effective = fromHtml ?? resolveThemePreference(pref);
+  return { stored: pref, effective };
+}
+
+function subscribe(onChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener("storage", onChange);
+  window.addEventListener("mv-store-update", onChange);
+  const mq = window.matchMedia("(prefers-color-scheme: dark)");
+  mq.addEventListener("change", onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener("mv-store-update", onChange);
+    mq.removeEventListener("change", onChange);
+  };
+}
+
+function getThemeSnapJson(): string {
+  return JSON.stringify(computeThemeSnap());
+}
+
+export function ThemeToggle({ className }: Props) {
+  const raw = useSyncExternalStore(subscribe, getThemeSnapJson, () => SERVER_SNAP_JSON);
+  const { stored, effective } = JSON.parse(raw) as ThemeSnap;
 
   function toggle() {
     const nextEffective: EffectiveTheme = effective === "dark" ? "light" : "dark";
-    setStored(nextEffective);
-    setEffective(nextEffective);
     applyEffectiveThemeToDocument(nextEffective);
     const store = getStore();
     store.preferences.theme = nextEffective;
