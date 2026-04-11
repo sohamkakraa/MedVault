@@ -136,7 +136,9 @@ function formatConversationHistory(messages: AgentMessage[]): Array<{
   content: string;
 }> {
   return messages
-    .filter((m) => m.role === "user" || m.role === "assistant")
+    .filter((m): m is AgentMessage & { role: "user" | "assistant" } =>
+      m.role === "user" || m.role === "assistant"
+    )
     .map((m) => ({
       role: m.role,
       content: m.content,
