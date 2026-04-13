@@ -12,8 +12,6 @@ type Props = {
   className?: string;
   /** When false, hides the specimen/report date row (e.g. on document detail). */
   showDate?: boolean;
-  /** When false, hides the hover/focus hint (e.g. on document detail). */
-  showInteractionHint?: boolean;
 };
 
 function LabTooltipBody({
@@ -65,7 +63,6 @@ export function LabReadingTile({
   extensions,
   className = "",
   showDate = true,
-  showInteractionHint = true,
 }: Props) {
   const it = interpretLab(lab, extensions);
   const out = it.flag === "low" || it.flag === "high";
@@ -146,9 +143,6 @@ export function LabReadingTile({
           {it.displayUnit ? ` ${it.displayUnit}` : lab.unit && !it.displayUnit ? ` ${lab.unit}` : ""}
         </div>
         {showDate ? <div className="text-xs mv-muted mt-1">{lab.date || "—"}</div> : null}
-        {showInteractionHint ? (
-          <p className="text-[10px] mv-muted mt-1.5">Hover or focus to see what this means and typical ranges.</p>
-        ) : null}
       </div>
       {tooltip}
     </>

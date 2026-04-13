@@ -60,7 +60,7 @@ export default function OnboardingPage() {
       return;
     }
     if (!sex.trim()) {
-      setErr("Please select sex.");
+      setErr("Please pick an option for sex.");
       return;
     }
     const em = email.trim().toLowerCase();
@@ -78,8 +78,8 @@ export default function OnboardingPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           email: em,
-          phoneCountryCode: countryCode,
-          phoneNational: digits,
+          ...(countryCode.trim() ? { phoneCountryCode: countryCode.trim() } : {}),
+          ...(digits ? { phoneNational: digits } : {}),
         }),
       });
       const j = (await r.json()) as { ok?: boolean; error?: string };
@@ -137,7 +137,7 @@ export default function OnboardingPage() {
 
   const steps = [
     { n: 1, label: "About you" },
-    { n: 2, label: "Records" },
+    { n: 2, label: "Files" },
   ];
 
   return (
@@ -148,7 +148,7 @@ export default function OnboardingPage() {
           <p className="text-xs font-medium uppercase tracking-wide mv-muted">Welcome</p>
           <h1 className="mt-1 text-2xl font-semibold mv-title">Let&apos;s set things up</h1>
           <p className="mt-2 text-sm mv-muted leading-relaxed">
-            Two quick steps. You can skip the optional upload—your dashboard stays available.
+            Two quick steps. You can skip the upload—your home screen is still there.
           </p>
         </div>
 
@@ -170,9 +170,9 @@ export default function OnboardingPage() {
         {phase === 1 && (
           <Card>
             <CardHeader>
-              <h2 className="text-sm font-medium">Personal details</h2>
+              <h2 className="text-sm font-medium">Your details</h2>
               <p className="text-xs mv-muted mt-1">
-                We&apos;ll use your email to sign you in.
+                We use your email to sign you in.
               </p>
             </CardHeader>
             <CardContent>
@@ -240,21 +240,21 @@ export default function OnboardingPage() {
         {phase === 2 && (
           <Card>
             <CardHeader>
-              <h2 className="text-sm font-medium">Add a medical file</h2>
+              <h2 className="text-sm font-medium">Add a health file (optional)</h2>
               <p className="text-xs mv-muted mt-1">
-                Optional—upload a lab report or prescription so UMA can chart trends and explain results in plain
-                language.
+                You can upload a lab printout or prescription so UMA can chart your numbers and explain them in simple
+                words.
               </p>
             </CardHeader>
             <CardContent className="space-y-3">
               <Link href="/upload" className="block">
-                <Button className="w-full">Go to upload</Button>
+                <Button className="w-full">Go to upload page</Button>
               </Link>
               <Button type="button" className="w-full" onClick={finishOnboarding}>
-                Continue to dashboard
+                Go to home screen
               </Button>
               <p className="text-[11px] mv-muted leading-relaxed">
-                Not medical advice. You can upload documents anytime from the app menu.
+                Not medical advice. You can upload files anytime from the home screen.
               </p>
             </CardContent>
           </Card>

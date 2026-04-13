@@ -24,10 +24,10 @@ interface Message {
 }
 
 const SUGGESTION_CHIPS = [
-  'What was my last HbA1c?',
-  'Am I still on Metformin?',
-  'What time should I take my medications?',
-  'Explain my last lab report',
+  'How do I read my lab results?',
+  'How should I prepare for a doctor visit?',
+  'What belongs in my health record?',
+  'Where do I upload a PDF?',
 ];
 
 export default function ChatScreen() {
@@ -63,16 +63,8 @@ export default function ChatScreen() {
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
-        text: 'I understand your question. Based on your records, ' +
-          (text.includes('HbA1c')
-            ? 'your most recent HbA1c was 6.8% on April 5, 2026.'
-            : text.includes('Metformin')
-            ? 'you are currently taking Metformin 500mg twice daily.'
-            : text.includes('time')
-            ? 'you should take your medications with breakfast and dinner as prescribed.'
-            : text.includes('lab')
-            ? 'your recent labs show good overall control with slight room for improvement in cholesterol management.'
-            : 'this is a helpful question for your health. Please let me know if you need clarification.'),
+        text:
+          'UMA chat is not wired to your full records in this build yet. For personal numbers or medication lists, use the web app after you sign in and add your files. I can still help with general questions—what would you like to know?',
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, assistantMessage]);

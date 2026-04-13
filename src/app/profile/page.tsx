@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -18,8 +18,19 @@ export default function ProfilePage() {
   const [conditionInput, setConditionInput] = useState("");
   const [trendOpen, setTrendOpen] = useState(false);
   const [flowDateInput, setFlowDateInput] = useState("");
-  const providers = ["Dr. A. Kumar", "Dr. Avery Torres", "Dr. Melina Shah", "Dr. Daniel Kim", "Dr. Priya Iyer"];
-  // const dialOptions = useMemo(() => buildPhoneDialOptions(), []);
+  const doctorNameSuggestions = useMemo(() => {
+    const seen = new Set<string>();
+    const add = (s?: string) => {
+      const t = s?.trim();
+      if (t) seen.add(t);
+    };
+    for (const d of store.docs) {
+      (d.doctors ?? []).forEach((x) => add(x));
+      const p = d.provider?.trim();
+      if (p && /^dr\.?\s/i.test(p)) add(p);
+    }
+    return Array.from(seen).sort((a, b) => a.localeCompare(b));
+  }, [store.docs]);
   const sexOptions = ["Male", "Female", "Prefer not to say"];
   const trendOptions = [
     "HbA1c",
@@ -101,7 +112,7 @@ export default function ProfilePage() {
     const firstTrimmed = (first ?? "").trim();
     const lastTrimmed = (last ?? "").trim();
     const full = [firstTrimmed, lastTrimmed].filter(Boolean).join(" ").trim();
-    // Always persist strings (never undefined) so JSON/localStorage keeps keys and getStore() does not fall back to seed defaults.
+    // Always persist strings (never undefined) so JSON/localStorage keeps keys and getStore() does not drop fields.
     updateProfile({
       firstName: firstTrimmed,
       lastName: lastTrimmed,
@@ -155,38 +166,38 @@ export default function ProfilePage() {
           <Card id="profile-patient-details" className="scroll-mt-24">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-medium">Patient details</h2>
+                <h2 className="text-sm font-medium">Your details</h2>
                 <Badge>{[store.profile.firstName, store.profile.lastName].filter(Boolean).join(" ") || store.profile.name}</Badge>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="text-xs mv-muted">
-                  First name(s)
+              <div className="grid grid-cols-1 gap-x-4 gap-y-5 md:grid-cols-2 md:items-start">
+                <label className="flex min-w-0 flex-col gap-1.5 text-xs mv-muted">
+                  <span className="leading-tight">First name(s)</span>
                   <Input
                     value={store.profile.firstName ?? ""}
                     onChange={(e) => saveIdentity(e.target.value, store.profile.lastName)}
                   />
                 </label>
-                <label className="text-xs mv-muted">
-                  Last name
+                <label className="flex min-w-0 flex-col gap-1.5 text-xs mv-muted">
+                  <span className="leading-tight">Last name</span>
                   <Input
                     value={store.profile.lastName ?? ""}
                     onChange={(e) => saveIdentity(store.profile.firstName, e.target.value)}
                   />
                 </label>
-                <label className="text-xs mv-muted">
-                  Date of birth
+                <label className="flex min-w-0 flex-col gap-1.5 text-xs mv-muted">
+                  <span className="leading-tight">Date of birth</span>
                   <Input
                     type="date"
                     value={store.profile.dob ?? ""}
                     onChange={(e) => updateProfile({ dob: e.target.value })}
                   />
                 </label>
-                <label className="text-xs mv-muted">
-                  Sex
+                <label className="flex min-w-0 flex-col gap-1.5 text-xs mv-muted">
+                  <span className="leading-tight">Sex</span>
                   <Select
-                    className="mt-1 w-full rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] py-2 text-sm text-[var(--fg)]"
+                    className="w-full rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] py-2 text-sm text-[var(--fg)]"
                     value={store.profile.sex ?? ""}
                     onChange={(e) => updateProfile({ sex: e.target.value || undefined })}
                   >
@@ -200,8 +211,8 @@ export default function ProfilePage() {
                     ))}
                   </Select>
                 </label>
-                <label className="text-xs mv-muted">
-                  Email
+                <label className="flex min-w-0 flex-col gap-1.5 text-xs mv-muted md:col-span-2">
+                  <span className="leading-tight">Email</span>
                   <Input
                     type="email"
                     value={store.profile.email ?? ""}
@@ -213,48 +224,58 @@ export default function ProfilePage() {
                   Mobile number
                   ...
                 </div> */}
-                <label className="text-xs mv-muted md:col-span-2">
-                  Primary care provider
-                  <Select
-                    className="mt-1 w-full rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] py-2 text-sm text-[var(--fg)]"
+                <label className="flex min-w-0 flex-col gap-1.5 text-xs mv-muted md:col-span-2">
+                  <span className="leading-tight">Regular doctor</span>
+                  <Input
+                    list={
+                      doctorNameSuggestions.length > 0 ? "uma-regular-doctor-suggestions" : undefined
+                    }
                     value={store.profile.primaryCareProvider ?? ""}
                     onChange={(e) =>
-                      updateProfile({ primaryCareProvider: e.target.value ? e.target.value : undefined })
+                      updateProfile({ primaryCareProvider: e.target.value.trim() || undefined })
                     }
-                  >
-                    <option value="">None</option>
-                    {providers.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </Select>
+                    placeholder={
+                      doctorNameSuggestions.length > 0
+                        ? "Type a name or pick from your files"
+                        : "Your doctor's name (optional)"
+                    }
+                  />
+                  {doctorNameSuggestions.length > 0 ? (
+                    <datalist id="uma-regular-doctor-suggestions">
+                      {doctorNameSuggestions.map((name) => (
+                        <option key={name} value={name} />
+                      ))}
+                    </datalist>
+                  ) : null}
+                  <p className="text-[11px] leading-relaxed mv-muted">
+                    No preset list—names you see here come from doctors found on your uploaded files.
+                  </p>
                 </label>
-                <label className="text-xs mv-muted">
-                  Next visit date
+                <label className="flex min-w-0 flex-col gap-1.5 text-xs mv-muted md:col-span-2">
+                  <span className="leading-tight">Next doctor visit</span>
                   <Input
                     type="date"
                     value={store.profile.nextVisitDate ?? ""}
                     onChange={(e) => updateProfile({ nextVisitDate: e.target.value || undefined })}
                   />
                 </label>
-                <div className="text-xs mv-muted md:col-span-2">
-                  Trends to show
-                  <div className="relative mt-2">
+                <div className="flex min-w-0 flex-col gap-2 text-xs mv-muted md:col-span-2">
+                  <span className="leading-tight">Charts to show first</span>
+                  <div className="relative">
                     <button
                       type="button"
-                      className="w-full rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] px-3 py-2 text-left text-sm"
+                      className="w-full rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] px-3 py-2.5 text-left text-sm text-[var(--fg)]"
                       onClick={() => setTrendOpen((v) => !v)}
                     >
                       {(store.profile.trends ?? []).length
-                        ? `${(store.profile.trends ?? []).length} selected`
-                        : "Select trends"}
+                        ? `${(store.profile.trends ?? []).length} picked`
+                        : "Pick charts"}
                     </button>
                     {trendOpen ? (
                       <div className="absolute z-20 mt-2 w-full rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-3 shadow-lg">
                         <div className="grid gap-2 sm:grid-cols-2">
                           {trendOptions.map((t) => (
-                            <label key={t} className="flex items-center gap-2 text-sm">
+                            <label key={t} className="flex items-center gap-2 text-sm text-[var(--fg)]">
                               <input
                                 type="checkbox"
                                 checked={(store.profile.trends ?? []).includes(t)}
@@ -268,12 +289,12 @@ export default function ProfilePage() {
                     ) : null}
                   </div>
                 </div>
-                <label className="text-xs mv-muted md:col-span-2">
-                  Care notes
+                <label className="flex min-w-0 flex-col gap-1.5 text-xs mv-muted md:col-span-2">
+                  <span className="leading-tight">Private notes</span>
                   <Input
                     value={store.profile.notes ?? ""}
                     onChange={(e) => updateProfile({ notes: e.target.value })}
-                    placeholder="Appointment preferences, reminders, etc."
+                    placeholder="Things to remember for visits, questions for your doctor, etc."
                   />
                 </label>
               </div>
@@ -287,10 +308,10 @@ export default function ProfilePage() {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Ruler className="h-4 w-4 text-[var(--accent)]" />
-                <h2 className="text-sm font-medium">Body metrics</h2>
+                <h2 className="text-sm font-medium">Height and weight</h2>
               </div>
               <p className="text-xs mv-muted mt-1">
-                Optional numbers for your own tracking. Use centimetres and kilograms for BMI, or leave blank.
+                Optional. Use centimetres and kilograms, or leave blank.
               </p>
             </CardHeader>
             <CardContent>
@@ -347,21 +368,21 @@ export default function ProfilePage() {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Droplets className="h-4 w-4 text-[var(--accent-2)]" />
-                <h2 className="text-sm font-medium">Cycle tracking (beta)</h2>
+                <h2 className="text-sm font-medium">Period tracking (early test)</h2>
               </div>
               <p className="text-xs mv-muted mt-1">
-                For beta testing this appears for everyone. Estimates are approximate and not medical advice. Your
-                clinician can help interpret symptoms and timing.
+                Shown while we test it. Numbers are rough guesses, not medical advice. Your doctor can help with symptoms
+                and timing.
               </p>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <label className="text-xs mv-muted block">
-                Typical cycle length (days)
+            <CardContent className="flex flex-col gap-6">
+              <label className="flex min-w-0 flex-col gap-1.5 text-xs mv-muted">
+                <span className="leading-tight">Typical cycle length (days)</span>
                 <Input
                   type="number"
                   min={21}
                   max={45}
-                  className="mt-1 max-w-[120px]"
+                  className="max-w-[120px]"
                   value={store.profile.menstrualCycle?.typicalCycleLengthDays ?? 28}
                   onChange={(e) => {
                     const n = parseInt(e.target.value, 10);
@@ -370,34 +391,35 @@ export default function ProfilePage() {
                   }}
                 />
               </label>
-              <label className="text-xs mv-muted block">
-                First day of last period
+              <label className="flex min-w-0 flex-col gap-1.5 text-xs mv-muted">
+                <span className="leading-tight">First day of last period</span>
                 <Input
                   type="date"
-                  className="mt-1 max-w-[220px]"
+                  className="max-w-[220px]"
                   value={store.profile.menstrualCycle?.lastPeriodStartISO ?? ""}
                   onChange={(e) =>
                     updateMenstrualCycle({ lastPeriodStartISO: e.target.value || undefined })
                   }
                 />
               </label>
-              <div>
-                <p className="text-xs mv-muted">Log flow days</p>
-                <p className="text-[11px] mv-muted mt-0.5">
-                  Add a date when you had bleeding so your dashboard can reflect it.
+              <div className="flex min-w-0 flex-col gap-2 border-t border-[var(--border)] pt-5">
+                <p className="text-xs font-medium text-[var(--fg)] leading-tight">Period flow days</p>
+                <p className="text-[11px] leading-relaxed mv-muted">
+                  Add a date when you had your period so your home screen can show it.
                 </p>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-end gap-3">
                   <Input
                     type="date"
-                    className="max-w-[180px]"
+                    className="max-w-[220px]"
                     value={flowDateInput}
                     onChange={(e) => setFlowDateInput(e.target.value)}
+                    aria-label="Date to log as a flow day"
                   />
-                  <Button type="button" className="gap-2" onClick={addFlowDay}>
+                  <Button type="button" className="h-10 shrink-0 gap-2" onClick={addFlowDay}>
                     <Plus className="h-4 w-4" /> Log day
                   </Button>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="flex min-h-[2.5rem] flex-wrap gap-2">
                   {(store.profile.menstrualCycle?.flowLogDates ?? [])
                     .slice()
                     .sort()
@@ -406,14 +428,14 @@ export default function ProfilePage() {
                       <button
                         key={d}
                         type="button"
-                        className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--panel-2)] px-3 py-1 text-xs"
+                        className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--panel-2)] px-3 py-1.5 text-xs"
                         onClick={() => removeFlowDay(d)}
                       >
                         {d} <span className="text-[10px] mv-muted">remove</span>
                       </button>
                     ))}
                   {!store.profile.menstrualCycle?.flowLogDates?.length && (
-                    <span className="text-sm mv-muted">No flow days logged yet.</span>
+                    <span className="self-center text-sm mv-muted py-1">No flow days added yet.</span>
                   )}
                 </div>
               </div>
@@ -440,7 +462,7 @@ export default function ProfilePage() {
                     {a} <span className="text-[10px] mv-muted">remove</span>
                   </button>
                 ))}
-                {!store.profile.allergies.length && <p className="text-sm mv-muted">No allergies on record.</p>}
+                {!store.profile.allergies.length && <p className="text-sm mv-muted">No allergies listed yet.</p>}
               </div>
               <div className="mt-4 flex gap-2">
                 <Input
@@ -458,7 +480,7 @@ export default function ProfilePage() {
           <Card id="profile-conditions" className="scroll-mt-24">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-medium">Conditions</h2>
+                <h2 className="text-sm font-medium">Health issues</h2>
                 <Badge>{store.profile.conditions.length}</Badge>
               </div>
             </CardHeader>
@@ -473,7 +495,7 @@ export default function ProfilePage() {
                     {c} <span className="text-[10px] mv-muted">remove</span>
                   </button>
                 ))}
-                {!store.profile.conditions.length && <p className="text-sm mv-muted">No conditions on record.</p>}
+                {!store.profile.conditions.length && <p className="text-sm mv-muted">No health issues listed yet.</p>}
               </div>
               <div className="mt-4 flex gap-2">
                 <Input

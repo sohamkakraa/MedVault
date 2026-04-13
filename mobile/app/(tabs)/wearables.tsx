@@ -47,11 +47,12 @@ function ProviderIcon({ icon, size, color }: { icon: string; size: number; color
 
 /* ─── Types ──────────────────────────────────────────────────────── */
 
+/** Placeholder until HealthKit / Health Connect supplies live samples. */
 interface WearableData {
-  steps: number;
-  heartRate: number;
-  sleepHours: number;
-  spO2: number;
+  steps: number | null;
+  heartRate: number | null;
+  sleepHours: number | null;
+  spO2: number | null;
 }
 
 type ScreenState = 'select_provider' | 'setup_instructions' | 'connected';
@@ -73,10 +74,10 @@ export default function WearablesScreen() {
   const others = getOtherProviders();
 
   const todayData: WearableData = {
-    steps: 8452,
-    heartRate: 72,
-    sleepHours: 7.4,
-    spO2: 98,
+    steps: null,
+    heartRate: null,
+    sleepHours: null,
+    spO2: null,
   };
 
   const contentWidth = isTablet ? '48%' : '100%';
@@ -122,10 +123,21 @@ export default function WearablesScreen() {
 
   /* ─── Sub-renders ──────────────────────────────────────────────── */
 
+  const formatMetric = (value: string | number | null, unit: string) => {
+    if (value === null) return '—';
+    const body =
+      typeof value === 'number'
+        ? Number.isInteger(value)
+          ? value.toLocaleString('en-US')
+          : String(value)
+        : String(value);
+    return unit ? `${body} ${unit}` : body;
+  };
+
   const renderMetricCard = (
     icon: React.ReactNode,
     label: string,
-    value: string | number,
+    value: string | number | null,
     unit: string,
   ) => (
     <Card
@@ -139,8 +151,9 @@ export default function WearablesScreen() {
         </Text>
       </View>
       <View style={styles.metricValue}>
-        <Text style={[styles.metricNumber, { color: theme.accent }]}>{value}</Text>
-        <Text style={[styles.metricUnit, { color: theme.muted }]}>{unit}</Text>
+        <Text style={[styles.metricNumber, { color: theme.accent }]}>
+          {formatMetric(value, unit)}
+        </Text>
       </View>
     </Card>
   );
@@ -327,7 +340,7 @@ export default function WearablesScreen() {
                 {selectedProvider?.name ?? 'Connected'}
               </Text>
               <Text style={[styles.statusDetail, { color: theme.muted, marginTop: spacing.xs }]}>
-                Last synced 5 minutes ago via {getPlatformBridgeName()}
+                Live numbers will appear after your device syncs through {getPlatformBridgeName()}.
               </Text>
             </View>
           </View>
@@ -344,7 +357,7 @@ export default function WearablesScreen() {
       <View style={[styles.metricsGrid, { marginTop: spacing.xl }]}>
         {renderMetricCard(
           <Activity size={20} color={theme.accent} />, 'Steps',
-          todayData.steps.toLocaleString(), 'steps',
+          todayData.steps, 'steps',
         )}
         {renderMetricCard(
           <Heart size={20} color={theme.accent2} />, 'Heart Rate',
@@ -369,17 +382,9 @@ export default function WearablesScreen() {
           </Text>
         </View>
         <View style={[styles.trendContent, { marginTop: spacing.lg }]}>
-          <View style={styles.trendItem}>
-            <Text style={[styles.trendLabel, { color: theme.muted }]}>Avg Steps</Text>
-            <Text style={[styles.trendValue, { color: theme.accent }]}>8,906</Text>
-            <Text style={[styles.trendChange, { color: theme.success }]}>↑ 12% vs last week</Text>
-          </View>
-          <View style={[styles.trendDivider, { borderBottomColor: theme.border }]} />
-          <View style={styles.trendItem}>
-            <Text style={[styles.trendLabel, { color: theme.muted }]}>Avg Sleep</Text>
-            <Text style={[styles.trendValue, { color: theme.accent }]}>7.3 hrs</Text>
-            <Text style={[styles.trendChange, { color: theme.success }]}>↑ 4% vs last week</Text>
-          </View>
+          <Text style={[styles.insightsText, { color: theme.muted }]}>
+            Weekly averages and comparisons will show here once your wearable has shared enough history.
+          </Text>
         </View>
       </Card>
 
@@ -393,8 +398,7 @@ export default function WearablesScreen() {
           Weekly Insights
         </Text>
         <Text style={[styles.insightsText, { color: theme.fg }]}>
-          You're walking more this week! Keep up the great activity level. Your sleep has
-          been consistent — this is excellent for your overall health.
+          Personalized tips will appear here when there is enough recent data from your connected device.
         </Text>
         <Button
           title="Ask Uma about trends"

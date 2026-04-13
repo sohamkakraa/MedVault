@@ -7,6 +7,11 @@ import type {
 } from "@/lib/types";
 import { resolveCanonicalLabName } from "@/lib/standardized";
 
+/** Strip inline markdown bold/italic/code markers the LLM sometimes leaks into table cells. */
+function stripMdMarkers(s: string): string {
+  return s.replace(/\*\*|__|\*|_|`/g, "").trim();
+}
+
 /** Structured fields recovered from UMA-style markdown artifacts (pipe tables + headings). */
 export type ParsedFromMarkdown = {
   labs: ExtractedLab[];
@@ -155,15 +160,15 @@ function parseLabTable(
   for (let i = dataStart; i < table.length; i++) {
     const row = table[i];
     if (isSepRow(row)) continue;
-    const rawName = (row[keyIdx] ?? "").trim();
-    const value = (row[valIdx] ?? "").trim();
+    const rawName = stripMdMarkers((row[keyIdx] ?? "").trim());
+    const value = stripMdMarkers((row[valIdx] ?? "").trim());
     if (!rawName || rawName.toLowerCase() === "field" || /^total$/i.test(rawName)) continue;
     if (!value || value === "—") continue;
 
     rawNames.push(rawName);
     const name = resolveCanonicalLabName(rawName, extensions);
-    const unit = unitIdx >= 0 ? (row[unitIdx] ?? "").trim() : "";
-    const refRange = refIdx >= 0 ? (row[refIdx] ?? "").trim() : "";
+    const unit = unitIdx >= 0 ? stripMdMarkers((row[unitIdx] ?? "").trim()) : "";
+    const refRange = refIdx >= 0 ? stripMdMarkers((row[refIdx] ?? "").trim()) : "";
     const rowDate = dateIdx >= 0 ? (row[dateIdx] ?? "").trim() : "";
     const date =
       rowDate && rowDate !== "—"
@@ -207,16 +212,16 @@ function parseMedicationTable(table: string[][]): ExtractedMedication[] {
   for (let i = dataStart; i < table.length; i++) {
     const row = table[i];
     if (isSepRow(row)) continue;
-    const name = (row[nameIdx] ?? "").trim();
+    const name = stripMdMarkers((row[nameIdx] ?? "").trim());
     if (!name || name.toLowerCase() === "medication") continue;
     out.push({
       name,
-      dose: doseIdx >= 0 ? (row[doseIdx] ?? "").trim() || undefined : undefined,
-      frequency: freqIdx >= 0 ? (row[freqIdx] ?? "").trim() || undefined : undefined,
-      route: routeIdx >= 0 ? (row[routeIdx] ?? "").trim() || undefined : undefined,
-      startDate: startIdx >= 0 ? (row[startIdx] ?? "").trim() || undefined : undefined,
-      endDate: endIdx >= 0 ? (row[endIdx] ?? "").trim() || undefined : undefined,
-      notes: notesIdx >= 0 ? (row[notesIdx] ?? "").trim() || undefined : undefined,
+      dose: doseIdx >= 0 ? stripMdMarkers((row[doseIdx] ?? "").trim()) || undefined : undefined,
+      frequency: freqIdx >= 0 ? stripMdMarkers((row[freqIdx] ?? "").trim()) || undefined : undefined,
+      route: routeIdx >= 0 ? stripMdMarkers((row[routeIdx] ?? "").trim()) || undefined : undefined,
+      startDate: startIdx >= 0 ? stripMdMarkers((row[startIdx] ?? "").trim()) || undefined : undefined,
+      endDate: endIdx >= 0 ? stripMdMarkers((row[endIdx] ?? "").trim()) || undefined : undefined,
+      notes: notesIdx >= 0 ? stripMdMarkers((row[notesIdx] ?? "").trim()) || undefined : undefined,
     });
   }
   return out;
@@ -250,7 +255,7 @@ function extractBulletSection(md: string, titleRegex: string): string[] {
   const items: string[] = [];
   for (const line of block.split(/\r?\n/)) {
     const t = line.trim();
-    const bullet = t.replace(/^[-*]\s+/, "").trim();
+    const bullet = stripMdMarkers(t.replace(/^[-*]\s+/, "").trim());
     if (bullet.length > 1 && bullet !== "—" && !t.startsWith("|")) items.push(bullet);
   }
   return items;

@@ -4,12 +4,15 @@ import {
   ExtractedDoc,
   ExtractedLab,
   ExtractedMedication,
+  MenstrualCyclePrefs,
   StandardLexiconEntry,
   UMA_TRACKER_LAB_SOURCE,
 } from "@/lib/types";
 import { normalizeLabUnitString } from "@/lib/labUnits";
 import { enrichDocFromMarkdown } from "@/lib/parseMarkdownArtifact";
 import { mergeLexiconPatches, resolveCanonicalLabName } from "@/lib/standardized";
+import { applyManualMedicationDefaults, mergeMedicationFromDocument } from "@/lib/medicationClassification";
+import { defaultHealthLogs, normalizeHealthLogs } from "@/lib/healthLogs";
 import { patientStoreForApiPayload } from "@/lib/patientStoreApi";
 import { applyEffectiveThemeToDocument, resolveThemePreference } from "@/lib/themePreference";
 
@@ -75,6 +78,8 @@ export async function syncPatientStoreWithServer(): Promise<void> {
   const localHasData =
     (local.docs?.length ?? 0) > 0 ||
     Boolean((local.profile?.name ?? "").trim()) ||
+    Boolean((local.profile?.firstName ?? "").trim()) ||
+    Boolean((local.profile?.lastName ?? "").trim()) ||
     (local.meds?.length ?? 0) > 0 ||
     (local.labs?.length ?? 0) > 0;
 
@@ -83,7 +88,12 @@ export async function syncPatientStoreWithServer(): Promise<void> {
     const serverT = new Date(server.updatedAtISO).getTime();
     const localT = new Date(local.updatedAtISO).getTime();
     const serverEmpty =
-      !(server.docs?.length ?? 0) && !(server.profile?.name ?? "").trim() && !(server.meds?.length ?? 0);
+      !(server.docs?.length ?? 0) &&
+      !(server.profile?.name ?? "").trim() &&
+      !(server.profile?.firstName ?? "").trim() &&
+      !(server.profile?.lastName ?? "").trim() &&
+      !(server.meds?.length ?? 0) &&
+      !(server.labs?.length ?? 0);
 
     if (serverEmpty && localHasData) {
       await pushPatientStoreToServer();
@@ -96,6 +106,7 @@ export async function syncPatientStoreWithServer(): Promise<void> {
           : (server.preferences?.theme ?? local.preferences?.theme ?? "system");
       const merged: PatientStore = {
         ...server,
+        healthLogs: normalizeHealthLogs(server.healthLogs),
         preferences: {
           ...(local.preferences ?? {}),
           ...(server.preferences ?? {}),
@@ -142,6 +153,7 @@ export function createBlankPatientStore(
     docs: [],
     meds: [],
     labs: [],
+    healthLogs: defaultHealthLogs(),
     profile: {
       name: "",
       firstName: "",
@@ -195,113 +207,91 @@ export function afterOtpSignIn(session: { email?: string | null; phoneE164?: str
   saveStore({ ...s, profile: { ...s.profile, ...sessionPatch } });
 }
 
-const seedStore: PatientStore = {
-  docs: [
-    {
-      id: "doc-1",
-      type: "Lab report",
-      title: "Comprehensive Metabolic Panel",
-      dateISO: "2025-11-12",
-      provider: "Lakeside Diagnostics",
-      summary: "Normal electrolytes, mildly elevated fasting glucose, LDL flagged high.",
-      labs: [
-        { name: "HbA1c", value: "6.1", unit: "%", date: "2025-11-12" },
-        { name: "LDL Cholesterol", value: "138", unit: "mg/dL", date: "2025-11-12" },
-        { name: "HDL Cholesterol", value: "52", unit: "mg/dL", date: "2025-11-12" },
-        { name: "Glucose (fasting)", value: "108", unit: "mg/dL", date: "2025-11-12" },
-      ],
-      tags: ["annual", "metabolic"],
-    },
-    {
-      id: "doc-2",
-      type: "Prescription",
-      title: "Primary Care Follow-up",
-      dateISO: "2025-12-03",
-      provider: "Dr. A. Kumar",
-      summary: "Continued statin therapy, started metformin for prediabetes.",
-      medications: [
-        { name: "Atorvastatin", dose: "20 mg", frequency: "nightly", startDate: "2023-02-01" },
-        { name: "Metformin", dose: "500 mg", frequency: "BID", startDate: "2025-12-03" },
-      ],
-      tags: ["primary care"],
-    },
-    {
-      id: "doc-3",
-      type: "Imaging",
-      title: "Chest X-ray Summary",
-      dateISO: "2025-10-02",
-      provider: "Northview Imaging",
-      summary: "No acute cardiopulmonary disease. Mild thoracic scoliosis noted.",
-      tags: ["imaging"],
-    },
-  ],
-  meds: [
-    {
-      name: "Atorvastatin",
-      dose: "20 mg",
-      frequency: "nightly",
-      startDate: "2023-02-01",
-      notes: "Occasional missed doses on weekends.",
-    },
-    {
-      name: "Metformin",
-      dose: "500 mg",
-      frequency: "BID",
-      startDate: "2025-12-03",
-      notes: "Take with meals to reduce GI upset.",
-    },
-    {
-      name: "Vitamin D3",
-      dose: "1000 IU",
-      frequency: "daily",
-      startDate: "2024-06-15",
-    },
-  ],
-  labs: [
-    { name: "HbA1c", value: "6.1", unit: "%", date: "2025-11-12" },
-    { name: "LDL Cholesterol", value: "138", unit: "mg/dL", date: "2025-11-12" },
-    { name: "HDL Cholesterol", value: "52", unit: "mg/dL", date: "2025-11-12" },
-    { name: "Glucose (fasting)", value: "108", unit: "mg/dL", date: "2025-11-12" },
-    { name: "HbA1c", value: "5.9", unit: "%", date: "2025-07-08" },
-    { name: "LDL Cholesterol", value: "128", unit: "mg/dL", date: "2025-07-08" },
-  ],
-  profile: {
-    name: "Soham Kakra",
-    firstName: "Soham",
-    lastName: "Kakra",
-    dob: "1989-04-19",
-    email: "jordan.lee@uma.local",
-    countryCode: "",
-    phone: "",
-    primaryCareProvider: "Dr. A. Kumar",
-    nextVisitDate: "2026-02-18",
-    trends: ["HbA1c", "LDL", "RBC"],
-    allergies: ["Penicillin", "Peanuts"],
-    conditions: ["Prediabetes", "Hyperlipidemia"],
-    notes: "Exercises 3x/week. Prefers evening appointments.",
-    bodyMetrics: {
-      heightCm: "165",
-      weightKg: "62",
-    },
-    menstrualCycle: {
-      typicalCycleLengthDays: 28,
-      lastPeriodStartISO: "2026-04-01",
-      flowLogDates: ["2026-04-01", "2026-04-02"],
-    },
-  },
-  preferences: {
-    theme: "system",
-  },
-  standardLexicon: [],
-  updatedAtISO: new Date().toISOString(),
-};
+function defaultMenstrualCycle(): MenstrualCyclePrefs {
+  return { typicalCycleLengthDays: 28, flowLogDates: [] };
+}
 
-function cloneSeed(): PatientStore {
-  return JSON.parse(JSON.stringify(seedStore)) as PatientStore;
+function normalizeMenstrualFromSaved(saved: MenstrualCyclePrefs | undefined): MenstrualCyclePrefs {
+  const base = defaultMenstrualCycle();
+  return {
+    typicalCycleLengthDays:
+      typeof saved?.typicalCycleLengthDays === "number" ? saved.typicalCycleLengthDays : base.typicalCycleLengthDays,
+    lastPeriodStartISO: typeof saved?.lastPeriodStartISO === "string" ? saved.lastPeriodStartISO : undefined,
+    flowLogDates: Array.isArray(saved?.flowLogDates) ? saved.flowLogDates : [...(base.flowLogDates ?? [])],
+  };
+}
+
+/** Parse JSON from localStorage without merging in demo seed data (each user/account stays isolated). */
+function parseStoredPatientStore(parsed: unknown): PatientStore {
+  const blank = createBlankPatientStore();
+  if (!parsed || typeof parsed !== "object") return blank;
+
+  const o = parsed as PatientStore & { wearables?: unknown };
+  const { wearables: _legacyWearables, ...parsedSansWearables } = o;
+  void _legacyWearables;
+  const rawPref = parsedSansWearables.preferences ?? {};
+  const { connectedTrackers: _legacyCt, ...preferencesSansTrackers } = rawPref as typeof rawPref & {
+    connectedTrackers?: unknown;
+  };
+  void _legacyCt;
+
+  const savedProfile = parsedSansWearables.profile ?? {};
+  const theme = preferencesSansTrackers.theme;
+  const safeTheme =
+    theme === "dark" || theme === "light" || theme === "system" ? theme : blank.preferences.theme;
+
+  return {
+    docs: Array.isArray(parsedSansWearables.docs) ? parsedSansWearables.docs : [],
+    meds: Array.isArray(parsedSansWearables.meds) ? parsedSansWearables.meds : [],
+    labs: Array.isArray(parsedSansWearables.labs) ? parsedSansWearables.labs : [],
+    profile: {
+      ...blank.profile,
+      ...savedProfile,
+      name: typeof savedProfile.name === "string" ? savedProfile.name : "",
+      firstName: typeof savedProfile.firstName === "string" ? savedProfile.firstName : "",
+      lastName: typeof savedProfile.lastName === "string" ? savedProfile.lastName : "",
+      allergies: Array.isArray(savedProfile.allergies) ? savedProfile.allergies : [],
+      conditions: Array.isArray(savedProfile.conditions) ? savedProfile.conditions : [],
+      trends: Array.isArray(savedProfile.trends) ? savedProfile.trends : [],
+      bodyMetrics: {
+        ...(blank.profile.bodyMetrics ?? {}),
+        ...(savedProfile.bodyMetrics ?? {}),
+      },
+      menstrualCycle: normalizeMenstrualFromSaved(savedProfile.menstrualCycle),
+    },
+    preferences: {
+      ...blank.preferences,
+      ...preferencesSansTrackers,
+      theme: safeTheme,
+      onboarding: {
+        ...blank.preferences.onboarding,
+        ...preferencesSansTrackers.onboarding,
+      },
+    },
+    standardLexicon: Array.isArray(parsedSansWearables.standardLexicon)
+      ? parsedSansWearables.standardLexicon
+      : [],
+    healthLogs: normalizeHealthLogs((parsedSansWearables as Partial<PatientStore>).healthLogs),
+    updatedAtISO:
+      typeof parsedSansWearables.updatedAtISO === "string"
+        ? parsedSansWearables.updatedAtISO
+        : blank.updatedAtISO,
+  };
+}
+
+function normalizeLabNumericValue(raw: string | number | undefined): string {
+  if (raw === undefined || raw === null) return "";
+  const s = String(raw).trim();
+  // Strip trailing angle brackets / inequality signs that the LLM sometimes prepends ("< 5.0" → "5.0")
+  const stripped = s.replace(/^[<>≤≥=\s]+/, "").trim();
+  const f = parseFloat(stripped);
+  // Only use the parsed float when unambiguously numeric (avoids changing "Negative" → "NaN")
+  if (!Number.isNaN(f) && isFinite(f)) return String(f);
+  return s.toLowerCase();
 }
 
 function labDedupeKey(l: ExtractedLab): string {
-  return `${l.name.toLowerCase()}|${l.date ?? ""}|${l.value}|${l.unit ?? ""}`;
+  return `${l.name.toLowerCase()}|${l.date ?? ""}|${normalizeLabNumericValue(l.value)}|${l.unit ?? ""}`;
 }
 
 /**
@@ -311,10 +301,17 @@ function labDedupeKey(l: ExtractedLab): string {
 export function rebuildLabsAndMedsFromDocuments(store: PatientStore) {
   const lex = store.standardLexicon ?? [];
 
+  /** Strip inline markdown bold/italic/code markers the LLM sometimes leaks into field values. */
+  function stripMd(s: string | undefined): string {
+    if (!s) return "";
+    return s.replace(/\*\*|__|\*|_|`/g, "").trim();
+  }
+
   function normalizeLabRow(l: ExtractedLab): ExtractedLab {
-    const name = resolveCanonicalLabName(l.name, lex);
-        const nu = l.unit ? normalizeLabUnitString(l.unit) : "";
-    return { ...l, name, unit: nu || l.unit?.trim() || undefined };
+    const name = resolveCanonicalLabName(stripMd(l.name), lex);
+    const rawValue = typeof l.value === "string" ? stripMd(l.value) : l.value;
+    const nu = l.unit ? normalizeLabUnitString(stripMd(l.unit)) : "";
+    return { ...l, name, value: rawValue, unit: nu || stripMd(l.unit) || undefined };
   }
 
   const seen = new Set<string>();
@@ -347,99 +344,105 @@ export function rebuildLabsAndMedsFromDocuments(store: PatientStore) {
     const enriched = enrichDocFromMarkdown(doc, lex);
     for (const m of enriched.medications ?? []) {
       const k = m.name.toLowerCase();
-      if (!medMap.has(k)) medMap.set(k, { ...m, sourceDocId: doc.id });
+      if (!medMap.has(k)) medMap.set(k, mergeMedicationFromDocument(m, doc));
     }
   }
 
   for (const m of store.meds) {
     if (!m.sourceDocId) {
       const k = m.name.toLowerCase();
-      if (!medMap.has(k)) medMap.set(k, m);
+      if (!medMap.has(k)) medMap.set(k, applyManualMedicationDefaults(m));
     }
   }
 
   store.meds = Array.from(medMap.values()).slice(0, 200);
 }
 
-/** Same snapshot as server `getStore()` — no `localStorage`. Use for initial React state, then `getStore()` in `useEffect` to hydrate. */
+/** Blank store for SSR / first paint; client `useEffect` should call `getStore()` to read `localStorage`. */
 export function getHydrationSafeStore(): PatientStore {
-  return cloneSeed();
+  return createBlankPatientStore();
 }
 
 export function getStore(): PatientStore {
   if (typeof window === "undefined") {
-    return cloneSeed();
+    return createBlankPatientStore();
   }
   const raw = localStorage.getItem(KEY);
-  if (!raw) return cloneSeed();
+  if (!raw) return createBlankPatientStore();
   try {
-    const parsed = JSON.parse(raw) as PatientStore & { wearables?: unknown; preferences?: { connectedTrackers?: unknown } };
-    const { wearables: _legacyWearables, ...parsedSansWearables } = parsed;
-    void _legacyWearables;
-    const savedProfile = parsedSansWearables.profile ?? {};
-    const rawPref = parsedSansWearables.preferences ?? {};
-    const { connectedTrackers: _legacyCt, ...preferencesSansTrackers } = rawPref as typeof rawPref & {
-      connectedTrackers?: unknown;
-    };
-    void _legacyCt;
-    const seedP = seedStore.profile;
-    const mergedMenstrual = {
-      typicalCycleLengthDays:
-        typeof savedProfile.menstrualCycle?.typicalCycleLengthDays === "number"
-          ? savedProfile.menstrualCycle.typicalCycleLengthDays
-          : seedP.menstrualCycle?.typicalCycleLengthDays ?? 28,
-      lastPeriodStartISO:
-        typeof savedProfile.menstrualCycle?.lastPeriodStartISO === "string"
-          ? savedProfile.menstrualCycle.lastPeriodStartISO
-          : seedP.menstrualCycle?.lastPeriodStartISO,
-      flowLogDates: Array.isArray(savedProfile.menstrualCycle?.flowLogDates)
-        ? savedProfile.menstrualCycle.flowLogDates
-        : seedP.menstrualCycle?.flowLogDates ?? [],
-    };
-
-    return {
-      ...cloneSeed(),
-      ...parsedSansWearables,
-      profile: {
-        ...seedP,
-        ...savedProfile,
-        name: typeof savedProfile.name === "string" ? savedProfile.name : seedP.name,
-        firstName: typeof savedProfile.firstName === "string" ? savedProfile.firstName : seedP.firstName,
-        lastName: typeof savedProfile.lastName === "string" ? savedProfile.lastName : seedP.lastName,
-        allergies: Array.isArray(savedProfile.allergies) ? savedProfile.allergies : seedP.allergies,
-        conditions: Array.isArray(savedProfile.conditions) ? savedProfile.conditions : seedP.conditions,
-        bodyMetrics: {
-          ...(seedP.bodyMetrics ?? {}),
-          ...(savedProfile.bodyMetrics ?? {}),
-        },
-        menstrualCycle: mergedMenstrual,
-      },
-      preferences: {
-        ...seedStore.preferences,
-        ...preferencesSansTrackers,
-        onboarding: {
-          ...seedStore.preferences.onboarding,
-          ...preferencesSansTrackers.onboarding,
-        },
-      },
-      standardLexicon: Array.isArray(parsedSansWearables.standardLexicon)
-        ? parsedSansWearables.standardLexicon
-        : cloneSeed().standardLexicon,
-    };
+    return parseStoredPatientStore(JSON.parse(raw));
   } catch {
-    return cloneSeed();
+    return createBlankPatientStore();
   }
 }
 
 export function saveStore(store: PatientStore) {
-  if (!store.profile) store.profile = seedStore.profile;
-  if (!store.preferences) store.preferences = seedStore.preferences;
+  const blank = createBlankPatientStore();
+  if (!store.profile) store.profile = blank.profile;
+  if (!store.preferences) store.preferences = blank.preferences;
+  if (!store.healthLogs) store.healthLogs = defaultHealthLogs();
   store.updatedAtISO = new Date().toISOString();
   localStorage.setItem(KEY, JSON.stringify(store));
   try {
     window.dispatchEvent(new CustomEvent("mv-store-update", { detail: store }));
   } catch {}
   scheduleRemotePush();
+}
+
+/**
+ * Returns the year-month prefix of a dateISO string ("2026-03") for fuzzy
+ * same-month comparison (handles slight date discrepancies across related reports).
+ */
+function yearMonth(iso: string): string {
+  return iso.slice(0, 7); // "YYYY-MM"
+}
+
+/**
+ * Check whether the new document's labs significantly overlap with an existing document
+ * from the same calendar month. Returns the best match if overlap ≥ 35%, else null.
+ *
+ * A full-panel report that is a superset of an earlier CBC will score ~100% on
+ * the CBC's lab names, so even a 35% threshold catches most same-visit duplicates.
+ */
+export function detectDocumentLabOverlap(
+  newDoc: ExtractedDoc,
+  existingDocs: ExtractedDoc[],
+  lex: StandardLexiconEntry[] = []
+): { overlappingDocTitle: string; overlapPct: number } | null {
+  const newLabs = enrichDocFromMarkdown(newDoc, lex).labs ?? [];
+  if (newLabs.length < 3) return null;
+
+  const newNames = new Set(
+    newLabs.map((l) => resolveCanonicalLabName(l.name, lex).toLowerCase())
+  );
+
+  let bestMatch: { overlappingDocTitle: string; overlapPct: number } | null = null;
+
+  for (const existing of existingDocs) {
+    if (!newDoc.dateISO || !existing.dateISO) continue;
+
+    // Same calendar month (allows for ±1 day date extraction differences)
+    if (yearMonth(newDoc.dateISO) !== yearMonth(existing.dateISO)) continue;
+
+    const existingLabs = enrichDocFromMarkdown(existing, lex).labs ?? [];
+    if (existingLabs.length < 3) continue;
+
+    const existingNames = new Set(
+      existingLabs.map((l) => resolveCanonicalLabName(l.name, lex).toLowerCase())
+    );
+
+    // Use the smaller set as the denominator so "CBC ⊂ Full panel" scores high
+    let sharedCount = 0;
+    for (const name of newNames) {
+      if (existingNames.has(name)) sharedCount++;
+    }
+
+    const overlapPct = sharedCount / Math.min(newNames.size, existingNames.size);
+    if (overlapPct >= 0.35 && (!bestMatch || overlapPct > bestMatch.overlapPct)) {
+      bestMatch = { overlappingDocTitle: existing.title ?? "existing report", overlapPct };
+    }
+  }
+  return bestMatch;
 }
 
 export function mergeExtractedDoc(
@@ -459,6 +462,11 @@ export function mergeExtractedDoc(
   store.docs = [enriched, ...store.docs].slice(0, 500);
 
   rebuildLabsAndMedsFromDocuments(store);
+
+  const firstDocDoctor = enriched.doctors?.map((d) => d.trim()).find(Boolean);
+  if (firstDocDoctor && !(store.profile.primaryCareProvider ?? "").trim()) {
+    store.profile.primaryCareProvider = firstDocDoctor;
+  }
 
   // Merge allergies / conditions from doc-level extraction
   if (enriched.allergies?.length) {

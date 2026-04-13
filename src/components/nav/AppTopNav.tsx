@@ -16,7 +16,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/chat", label: "Chat" },
-  { href: "/body", label: "Body Map" },
+  { href: "/body", label: "Body" },
 ];
 
 export function AppTopNav({
@@ -46,7 +46,7 @@ export function AppTopNav({
   return (
     <header
       className={cn(
-        "z-40 border-b border-[var(--border)] bg-[var(--panel)]/90 backdrop-blur",
+        "no-print z-40 border-b border-[var(--border)] bg-[var(--panel)]/90 backdrop-blur",
         fixed ? "fixed inset-x-0 top-0" : "sticky top-0"
       )}
     >
@@ -65,10 +65,11 @@ export function AppTopNav({
             className="relative inline-flex rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] p-1 min-w-[220px] sm:min-w-[300px]"
           >
             <span
-              className="absolute top-1 bottom-1 rounded-xl bg-[var(--panel)] shadow-sm transition-all duration-300 ease-out"
+              className="pointer-events-none absolute top-1 bottom-1 rounded-xl bg-[var(--panel)] shadow-sm transition-[left,width] duration-300 ease-out"
               style={{
-                left: `calc(${activeIndex} * (100% / ${NAV_ITEMS.length}) + 4px)`,
-                width: `calc(100% / ${NAV_ITEMS.length} - 8px)`,
+                /* p-1 = 4px padding; segment width = inner track / n (not 100%/n − 8px, which shrinks each tab wrongly) */
+                left: `calc(4px + ${activeIndex} * (100% - 8px) / ${NAV_ITEMS.length})`,
+                width: `calc((100% - 8px) / ${NAV_ITEMS.length})`,
               }}
               aria-hidden
             />
@@ -81,7 +82,7 @@ export function AppTopNav({
                   role="tab"
                   aria-selected={active}
                   className={cn(
-                    "relative z-10 rounded-xl px-2 sm:px-3 py-1.5 text-xs sm:text-sm transition text-center flex-1",
+                    "relative z-10 min-w-0 rounded-xl px-2 sm:px-3 py-1.5 text-xs sm:text-sm transition text-center flex-1",
                     active
                       ? "text-[var(--fg)]"
                       : "text-[var(--muted)] hover:text-[var(--fg)]"
@@ -118,7 +119,7 @@ export function AppTopNav({
         </div>
       )}
       <div className="sr-only" aria-live="polite">
-        Navigation keyboard: use left and right arrow keys.
+        Tip: use the left and right arrow keys to move between tabs.
       </div>
     </header>
   );

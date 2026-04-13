@@ -101,10 +101,10 @@ export function organGroupFromProfileSex(sex: string | undefined): OrganGroupId 
 export const BODY_SCROLL_SECTIONS: BodyScrollSection[] = [
   {
     id: "intro",
-    title: "Your Body, Illuminated",
+    title: "Your body at a glance",
     subtitle: "Health overview",
     description:
-      "An interactive map of your health data, drawn from your saved records. Scroll down to move from head to toe — each stop highlights a region or system.",
+      "A simple map built from the records you saved. Scroll down from head to toe—each stop shows a body area and any related test results.",
     organAssetId: "none",
     mode: "organ-group",
     labKeys: [],

@@ -49,6 +49,12 @@ function createDefaultStore(): PatientStore {
     docs: [],
     meds: [],
     labs: [],
+    healthLogs: {
+      bloodPressure: [],
+      medicationIntake: [],
+      sideEffects: [],
+      medicationReminders: [],
+    },
     profile: {
       allergies: [],
       conditions: [],
@@ -237,6 +243,12 @@ export const useStore = create<UmaStore>((set, get) => ({
       docs: s.docs,
       meds: s.meds,
       labs: s.labs,
+      healthLogs: s.healthLogs ?? {
+        bloodPressure: [],
+        medicationIntake: [],
+        sideEffects: [],
+        medicationReminders: [],
+      },
       profile: s.profile,
       preferences: s.preferences,
       updatedAtISO: s.updatedAtISO,
@@ -251,6 +263,12 @@ function persist(full: UmaStore, _patch: Partial<PatientStore>) {
     docs: full.docs,
     meds: full.meds,
     labs: full.labs,
+    healthLogs: full.healthLogs ?? {
+      bloodPressure: [],
+      medicationIntake: [],
+      sideEffects: [],
+      medicationReminders: [],
+    },
     profile: full.profile,
     preferences: full.preferences,
     updatedAtISO: full.updatedAtISO,

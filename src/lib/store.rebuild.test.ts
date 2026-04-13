@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PatientStore } from "@/lib/types";
 import { UMA_TRACKER_LAB_SOURCE } from "@/lib/types";
+import { defaultHealthLogs } from "@/lib/healthLogs";
 import { rebuildLabsAndMedsFromDocuments } from "@/lib/store";
 
 function minimalStore(overrides: Partial<PatientStore>): PatientStore {
@@ -8,6 +9,7 @@ function minimalStore(overrides: Partial<PatientStore>): PatientStore {
     docs: [],
     meds: [],
     labs: [],
+    healthLogs: defaultHealthLogs(),
     profile: {
       name: "T",
       allergies: [],
@@ -65,5 +67,25 @@ describe("rebuildLabsAndMedsFromDocuments", () => {
     });
     rebuildLabsAndMedsFromDocuments(store);
     expect(store.labs.some((l) => l.sourceDocId === UMA_TRACKER_LAB_SOURCE)).toBe(true);
+  });
+
+  it("marks medicines from a prescription file and guesses OTC when the name matches", () => {
+    const store = minimalStore({
+      docs: [
+        {
+          id: "rx1",
+          type: "Prescription",
+          title: "Repeat prescription",
+          summary: "s",
+          medications: [{ name: "Ibuprofen", dose: "400 mg" }],
+        },
+      ],
+      meds: [],
+    });
+    rebuildLabsAndMedsFromDocuments(store);
+    expect(store.meds).toHaveLength(1);
+    expect(store.meds[0].medicationLineSource).toBe("prescription_document");
+    expect(store.meds[0].medicationProductCategory).toBe("over_the_counter");
+    expect(store.meds[0].medicationProductCategorySource).toBe("auto");
   });
 });

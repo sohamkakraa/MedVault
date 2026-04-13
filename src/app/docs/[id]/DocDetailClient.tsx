@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/Badge";
 import { AppTopNav } from "@/components/nav/AppTopNav";
 import { LabReadingTile } from "@/components/labs/LabReadingTile";
 import { downloadMarkdownFile, downloadPdfFromBase64 } from "@/lib/downloads";
-import { buildSyntheticMarkdownArtifact, displaySummaryForDoc } from "@/lib/markdownDoc";
+import { buildSyntheticMarkdownArtifact, parseOverviewSection } from "@/lib/markdownDoc";
 import { ArrowLeft, Download } from "lucide-react";
 
 export default function DocDetailClient() {
@@ -36,17 +36,17 @@ export default function DocDetailClient() {
   if (!doc) {
     return (
       <div className="min-h-screen pb-24">
-        <AppTopNav rightSlot={<Badge>UMA Records</Badge>} />
+        <AppTopNav rightSlot={<Badge>Your files</Badge>} />
         <div className="mx-auto max-w-5xl px-4 py-6">
           <Card>
             <CardContent className="py-6">
-              <h1 className="text-lg font-semibold">Record not found</h1>
+              <h1 className="text-lg font-semibold">File not found</h1>
               <p className="text-sm mv-muted mt-1">
-                UMA could not locate this document in your saved records.
+                We could not find this file in your saved records.
               </p>
               <Link href="/dashboard" className="inline-block mt-3">
                 <Button variant="ghost" className="gap-2">
-                  <ArrowLeft className="h-4 w-4" /> Back to dashboard
+                  <ArrowLeft className="h-4 w-4" /> Back to home
                 </Button>
               </Link>
             </CardContent>
@@ -66,7 +66,14 @@ export default function DocDetailClient() {
     return `${base}.pdf`;
   })();
 
-  const summaryLine = displaySummaryForDoc(record);
+  // On the detail page show the full overview — no 280-char truncation.
+  const summaryLine = (() => {
+    if (record.markdownArtifact) {
+      const fromMd = parseOverviewSection(record.markdownArtifact);
+      if (fromMd) return fromMd.replace(/\s+/g, " ").trim();
+    }
+    return (record.summary ?? "").replace(/\s+/g, " ").trim();
+  })();
 
   function downloadSyntheticMarkdown() {
     const md = buildSyntheticMarkdownArtifact(
@@ -82,7 +89,7 @@ export default function DocDetailClient() {
 
   return (
     <div className="min-h-screen pb-24">
-      <AppTopNav rightSlot={<Badge>UMA Records</Badge>} />
+      <AppTopNav rightSlot={<Badge>Your files</Badge>} />
 
       <main className="mx-auto max-w-5xl px-4 py-8 space-y-6">
         <div className="flex items-center gap-3">
@@ -92,7 +99,7 @@ export default function DocDetailClient() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-lg font-semibold">Record details</h1>
+            <h1 className="text-lg font-semibold">File details</h1>
             <p className="text-xs mv-muted">{record.title}</p>
           </div>
         </div>
@@ -106,14 +113,14 @@ export default function DocDetailClient() {
           </CardHeader>
           <CardContent className="space-y-2">
             <p className="text-sm text-[var(--fg)] leading-relaxed">{summaryLine}</p>
-            <p className="text-xs mv-muted">Not medical advice. Talk to a clinician about your results.</p>
+            <p className="text-xs mv-muted">Not medical advice. Talk to your doctor about your results.</p>
           </CardContent>
         </Card>
 
         {record.sections?.length ? (
           <Card>
             <CardHeader>
-              <h2 className="text-sm font-medium">Highlights</h2>
+              <h2 className="text-sm font-medium">Main points</h2>
             </CardHeader>
             <CardContent className="grid gap-3 md:grid-cols-2">
               {record.sections.map((s, i) => (
@@ -133,7 +140,7 @@ export default function DocDetailClient() {
         {record.medications?.length ? (
           <Card>
             <CardHeader>
-              <h2 className="text-sm font-medium">Medications</h2>
+              <h2 className="text-sm font-medium">Medicines</h2>
             </CardHeader>
             <CardContent className="grid gap-2 md:grid-cols-2">
               {record.medications.map((m, i) => (
@@ -151,10 +158,10 @@ export default function DocDetailClient() {
         {record.labs?.length ? (
           <Card>
             <CardHeader>
-              <h2 className="text-sm font-medium">Lab values</h2>
+              <h2 className="text-sm font-medium">Test results</h2>
               <p className="text-xs mv-muted mt-1">
-                Hover or focus a row for plain-language meaning and typical ranges. Flags highlight values outside the
-                range UMA used — not a diagnosis. Not medical advice.
+                Point at or tap a row for a simple explanation and usual ranges. Highlights show values outside the
+                range UMA used—not a diagnosis. Not medical advice.
               </p>
             </CardHeader>
             <CardContent className="grid gap-2 md:grid-cols-2">
@@ -164,7 +171,6 @@ export default function DocDetailClient() {
                   lab={l}
                   extensions={store.standardLexicon}
                   showDate={false}
-                  showInteractionHint={false}
                 />
               ))}
             </CardContent>
@@ -175,7 +181,7 @@ export default function DocDetailClient() {
           <CardHeader>
             <h2 className="text-sm font-medium">Downloads</h2>
             <p className="text-xs mv-muted mt-1">
-              Files stay on this device in UMA. Not medical advice.
+              Files stay on this device inside UMA. Not medical advice.
             </p>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
@@ -187,12 +193,12 @@ export default function DocDetailClient() {
                   onClick={() => downloadMarkdownFile(record.markdownArtifact!, markdownDownloadName)}
                 >
                   <Download className="h-4 w-4" />
-                  Download agent markdown (.md)
+                  Download summary text (.md)
                 </Button>
               ) : (
                 <Button variant="ghost" className="gap-2 border border-[var(--border)]" onClick={downloadSyntheticMarkdown}>
                   <Download className="h-4 w-4" />
-                  Download markdown from stored data
+                  Download text built from saved data
                 </Button>
               )}
               {record.originalPdfBase64 ? (
@@ -208,17 +214,17 @@ export default function DocDetailClient() {
             </div>
             {!record.markdownArtifact ? (
               <p className="text-xs mv-muted">
-                Agent-generated markdown is created when you upload a PDF with OpenAI enabled. This button builds a file
-                from the structured data already saved for this record.
+                A full written summary is created when you upload a PDF. This button builds a simple text file from the
+                data already saved here.
               </p>
             ) : null}
             {record.markdownArtifact && !record.originalPdfBase64 ? (
               <p className="text-xs mv-muted">
-                Original PDF is available only for records you confirmed from an upload on this device.
+                The original PDF is only kept for files you saved from an upload on this device.
               </p>
             ) : null}
             {!record.markdownArtifact && !record.originalPdfBase64 ? (
-              <p className="text-xs mv-muted">No original PDF is stored for this record.</p>
+              <p className="text-xs mv-muted">No original PDF is stored for this file.</p>
             ) : null}
           </CardContent>
         </Card>

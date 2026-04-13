@@ -9,11 +9,13 @@ datasource db {
 }
 
 model User {
-  id         String   @id @default(cuid())
-  email      String?  @unique
-  phoneE164  String?  @unique @map("phone_e164")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  id          String   @id @default(cuid())
+  email       String?  @unique
+  phoneE164   String?  @unique @map("phone_e164")
+  googleId    String?  @unique @map("google_id")
+  googleEmail String?  @map("google_email")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   patientRecord PatientRecord?
 }

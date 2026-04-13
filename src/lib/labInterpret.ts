@@ -204,6 +204,26 @@ const REF_BY_CANONICAL: Record<string, RefRow> = {
 const DISCLAIMER =
   "Typical ranges are for learning only. Your lab’s reference interval and your clinician’s judgment matter.";
 
+/**
+ * Returns the built-in typical reference range for a canonical lab name so chart
+ * components can normalise values without re-importing the private REF_BY_CANONICAL table.
+ * Returns null when the metric is unknown or has a one-sided range (high > 500).
+ * In that case a display cap of low × 3 is used so the range is still usable.
+ */
+export function getCanonicalRefRange(
+  canonical: string
+): { low: number; high: number; unit: string } | null {
+  const ref = REF_BY_CANONICAL[canonical];
+  if (!ref) return null;
+  const low = ref.low ?? 0;
+  let high = ref.high;
+  if (high === undefined) return null;
+  // Sentinel value used for "no upper limit" metrics like HDL (high = 999).
+  // Replace with a reasonable display cap so normalisation still works.
+  if (high > 500 && low > 0) high = low * 3;
+  return { low, high, unit: ref.unit };
+}
+
 /** Remove markdown emphasis markers from model-sourced lab names (e.g. **Glucose**). */
 export function stripLabDisplayMarkdown(s: string): string {
   return s

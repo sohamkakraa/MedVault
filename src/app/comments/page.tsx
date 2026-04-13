@@ -28,7 +28,7 @@ export default async function CommentsPage() {
 
       <Card>
         <CardHeader>
-          <h1 className="text-xl font-semibold mv-title">Comments (DB demo)</h1>
+          <h1 className="text-xl font-semibold mv-title">Comments</h1>
           <p className="text-sm mv-muted">
             Inserts into the Postgres <code className="text-[var(--fg)]">comments</code> table via a
             Server Action named <code className="text-[var(--fg)]">create</code>. UMA normally uses

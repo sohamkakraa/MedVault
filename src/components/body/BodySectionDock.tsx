@@ -25,7 +25,7 @@ export function BodySectionDock({ sections, activeIndex, isLight, onGoTo }: Body
         "pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 px-3 sm:px-4",
         isLight ? "bg-[var(--panel)]/92 shadow-[0_-8px_32px_rgba(18,24,24,0.08)]" : "bg-[var(--panel)]/88 shadow-[0_-12px_40px_rgba(0,0,0,0.35)]"
       )}
-      aria-label="Body map sections"
+      aria-label="Body areas"
     >
       <div className="mx-auto max-w-6xl flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <button
@@ -49,7 +49,7 @@ export function BodySectionDock({ sections, activeIndex, isLight, onGoTo }: Body
         <div
           className="order-first sm:order-none flex items-center justify-center gap-1.5 overflow-x-auto max-w-full flex-1 min-w-0 py-0.5 px-1 [scrollbar-width:thin]"
           role="tablist"
-          aria-label="Section markers"
+          aria-label="Jump to a body area"
         >
           {sections.map((s, i) => {
             const active = i === activeIndex;

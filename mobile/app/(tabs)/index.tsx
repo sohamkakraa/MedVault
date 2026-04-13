@@ -7,12 +7,12 @@ import {
   ScrollView,
   RefreshControl,
   useWindowDimensions,
-  FlatList,
 } from 'react-native';
-import { useTheme, spacing, radius, typography } from '@/lib/theme';
+import { useTheme, spacing, radius } from '@/lib/theme';
+import { useAuthStore } from '@/lib/auth';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
-import { Heart, Calendar, Pill, Activity, TrendingUp } from 'lucide-react-native';
+import { Calendar, Pill, Activity, TrendingUp } from 'lucide-react-native';
 
 interface ProfileData {
   name: string;
@@ -36,28 +36,20 @@ interface LabValue {
 
 export default function DashboardScreen() {
   const theme = useTheme();
+  const user = useAuthStore((s) => s.user);
   const { width } = useWindowDimensions();
   const [refreshing, setRefreshing] = useState(false);
   const isTablet = width >= 768;
 
   const profileData: ProfileData = {
-    name: 'Jane Doe',
-    conditions: ['Type 2 Diabetes', 'Hypertension'],
-    allergies: ['Penicillin', 'Shellfish'],
-    nextVisit: '2026-04-18',
+    name: user?.name?.trim() || (user?.email ? user.email.split('@')[0] : '') || '',
+    conditions: [],
+    allergies: [],
+    nextVisit: undefined,
   };
 
-  const medications: MedicationItem[] = [
-    { name: 'Metformin', dose: '500mg', frequency: 'Twice daily' },
-    { name: 'Lisinopril', dose: '10mg', frequency: 'Once daily' },
-    { name: 'Atorvastatin', dose: '20mg', frequency: 'Once daily' },
-  ];
-
-  const recentLabs: LabValue[] = [
-    { name: 'HbA1c', value: '6.8', unit: '%', date: '2026-04-05' },
-    { name: 'LDL Cholesterol', value: '108', unit: 'mg/dL', date: '2026-04-05' },
-    { name: 'Blood Pressure', value: '128/82', unit: 'mmHg', date: '2026-04-05' },
-  ];
+  const medications: MedicationItem[] = [];
+  const recentLabs: LabValue[] = [];
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -77,8 +69,10 @@ export default function DashboardScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={[styles.greeting, { color: theme.fg }]}>Good morning,</Text>
-          <Text style={[styles.name, { color: theme.fg }]}>{profileData.name}</Text>
+          <Text style={[styles.greeting, { color: theme.fg }]}>Home</Text>
+          <Text style={[styles.name, { color: theme.fg }]}>
+            {profileData.name || 'Your dashboard'}
+          </Text>
         </View>
 
         {/* Quick Profile Snapshot */}
@@ -86,42 +80,50 @@ export default function DashboardScreen() {
           <View style={styles.profileContent}>
             <View style={styles.profileSection}>
               <Text style={[styles.profileLabel, { color: theme.muted }]}>Conditions</Text>
-              <View style={styles.tagList}>
-                {profileData.conditions.map((condition, i) => (
-                  <View
-                    key={i}
-                    style={[
-                      styles.tag,
-                      {
-                        backgroundColor: theme.accent + '20',
-                        borderColor: theme.accent,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.tagText, { color: theme.accent }]}>{condition}</Text>
-                  </View>
-                ))}
-              </View>
+              {profileData.conditions.length > 0 ? (
+                <View style={styles.tagList}>
+                  {profileData.conditions.map((condition, i) => (
+                    <View
+                      key={i}
+                      style={[
+                        styles.tag,
+                        {
+                          backgroundColor: theme.accent + '20',
+                          borderColor: theme.accent,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.tagText, { color: theme.accent }]}>{condition}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text style={[styles.emptyHint, { color: theme.muted }]}>None added yet.</Text>
+              )}
             </View>
 
             <View style={styles.profileSection}>
               <Text style={[styles.profileLabel, { color: theme.muted }]}>Allergies</Text>
-              <View style={styles.tagList}>
-                {profileData.allergies.map((allergy, i) => (
-                  <View
-                    key={i}
-                    style={[
-                      styles.tag,
-                      {
-                        backgroundColor: theme.error + '20',
-                        borderColor: theme.error,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.tagText, { color: theme.error }]}>{allergy}</Text>
-                  </View>
-                ))}
-              </View>
+              {profileData.allergies.length > 0 ? (
+                <View style={styles.tagList}>
+                  {profileData.allergies.map((allergy, i) => (
+                    <View
+                      key={i}
+                      style={[
+                        styles.tag,
+                        {
+                          backgroundColor: theme.error + '20',
+                          borderColor: theme.error,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.tagText, { color: theme.error }]}>{allergy}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text style={[styles.emptyHint, { color: theme.muted }]}>None added yet.</Text>
+              )}
             </View>
 
             {profileData.nextVisit && (
@@ -143,26 +145,32 @@ export default function DashboardScreen() {
               Recent Lab Values
             </Text>
           </View>
-          {recentLabs.map((lab, i) => (
-            <View
-              key={i}
-              style={[
-                styles.labRow,
-                {
-                  borderBottomColor: theme.border,
-                  borderBottomWidth: i < recentLabs.length - 1 ? 1 : 0,
-                },
-              ]}
-            >
-              <View>
-                <Text style={[styles.labName, { color: theme.fg }]}>{lab.name}</Text>
-                <Text style={[styles.labDate, { color: theme.muted }]}>{lab.date}</Text>
+          {recentLabs.length > 0 ? (
+            recentLabs.map((lab, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.labRow,
+                  {
+                    borderBottomColor: theme.border,
+                    borderBottomWidth: i < recentLabs.length - 1 ? 1 : 0,
+                  },
+                ]}
+              >
+                <View>
+                  <Text style={[styles.labName, { color: theme.fg }]}>{lab.name}</Text>
+                  <Text style={[styles.labDate, { color: theme.muted }]}>{lab.date}</Text>
+                </View>
+                <Text style={[styles.labValue, { color: theme.accent }]}>
+                  {lab.value} {lab.unit}
+                </Text>
               </View>
-              <Text style={[styles.labValue, { color: theme.accent }]}>
-                {lab.value} {lab.unit}
-              </Text>
-            </View>
-          ))}
+            ))
+          ) : (
+            <Text style={[styles.emptyHint, { color: theme.muted, paddingVertical: spacing.md }]}>
+              Lab values will show here after you add records.
+            </Text>
+          )}
         </Card>
 
         {/* Active Medications */}
@@ -173,25 +181,31 @@ export default function DashboardScreen() {
               Active Medications
             </Text>
           </View>
-          {medications.map((med, i) => (
-            <View
-              key={i}
-              style={[
-                styles.medRow,
-                {
-                  borderBottomColor: theme.border,
-                  borderBottomWidth: i < medications.length - 1 ? 1 : 0,
-                },
-              ]}
-            >
-              <View>
-                <Text style={[styles.medName, { color: theme.fg }]}>{med.name}</Text>
-                <Text style={[styles.medDetails, { color: theme.muted }]}>
-                  {med.dose} • {med.frequency}
-                </Text>
+          {medications.length > 0 ? (
+            medications.map((med, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.medRow,
+                  {
+                    borderBottomColor: theme.border,
+                    borderBottomWidth: i < medications.length - 1 ? 1 : 0,
+                  },
+                ]}
+              >
+                <View>
+                  <Text style={[styles.medName, { color: theme.fg }]}>{med.name}</Text>
+                  <Text style={[styles.medDetails, { color: theme.muted }]}>
+                    {med.dose} • {med.frequency}
+                  </Text>
+                </View>
               </View>
-            </View>
-          ))}
+            ))
+          ) : (
+            <Text style={[styles.emptyHint, { color: theme.muted, paddingVertical: spacing.md }]}>
+              No medications listed yet.
+            </Text>
+          )}
         </Card>
 
         {/* Wearable Summary */}
@@ -202,24 +216,9 @@ export default function DashboardScreen() {
               Today's Activity
             </Text>
           </View>
-          <View style={styles.wearableGrid}>
-            <View style={[styles.wearableMetric, { width: '48%' }]}>
-              <Text style={[styles.wearableValue, { color: theme.accent }]}>8,452</Text>
-              <Text style={[styles.wearableLabel, { color: theme.muted }]}>Steps</Text>
-            </View>
-            <View style={[styles.wearableMetric, { width: '48%' }]}>
-              <Text style={[styles.wearableValue, { color: theme.accent }]}>72</Text>
-              <Text style={[styles.wearableLabel, { color: theme.muted }]}>bpm</Text>
-            </View>
-            <View style={[styles.wearableMetric, { width: '48%' }]}>
-              <Text style={[styles.wearableValue, { color: theme.accent }]}>7h 24m</Text>
-              <Text style={[styles.wearableLabel, { color: theme.muted }]}>Sleep</Text>
-            </View>
-            <View style={[styles.wearableMetric, { width: '48%' }]}>
-              <Text style={[styles.wearableValue, { color: theme.accent }]}>98%</Text>
-              <Text style={[styles.wearableLabel, { color: theme.muted }]}>SpO2</Text>
-            </View>
-          </View>
+          <Text style={[styles.emptyHint, { color: theme.muted, paddingVertical: spacing.sm }]}>
+            Wearable summaries will show here when a device is connected and syncing.
+          </Text>
         </Card>
 
         {/* Action Buttons */}
@@ -298,6 +297,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     fontFamily: 'space-grotesk',
+  },
+  emptyHint: {
+    fontSize: 13,
+    fontFamily: 'space-grotesk',
+    lineHeight: 20,
   },
   nextVisitRow: {
     flexDirection: 'row',

@@ -11,6 +11,8 @@ interface UmaCharacterProps {
   className?: string;
   /** Pixel font size for the ASCII art (overrides compact’s tiny default). */
   fontPx?: number;
+  /** Short status text shown in a speech bubble above Uma (max ~40 chars). */
+  statusText?: string;
 }
 
 /* ─── Character → colour mapping ─────────────────────────── *
@@ -190,6 +192,7 @@ export function UmaCharacter({
   compact = false,
   className = "",
   fontPx,
+  statusText,
 }: UmaCharacterProps) {
   const [frameIdx, setFrameIdx] = useState(0);
 
@@ -221,10 +224,53 @@ export function UmaCharacter({
   const frame = seq.frames[frameIdx % seq.frames.length];
   const lines = compact ? frame.slice(0, 7) : frame;
 
-  /* Bounce offset for happy mood */
+  /* Bounce offset for happy mood; thinking uses CSS animation instead */
   const bounceY = mood === "happy" ? (frameIdx % 2 === 1 ? -3 : -1) : 0;
+  const thinkingStyle =
+    mood === "thinking"
+      ? { animation: "umaThinkHop 900ms cubic-bezier(0.45,0,0.55,1) infinite", transform: undefined }
+      : { transform: `translateY(${bounceY}px)`, animation: undefined };
 
   return (
+    <div className="relative inline-flex flex-col items-center">
+      {statusText && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: "calc(100% + 6px)",
+            left: "50%",
+            transform: "translateX(-50%)",
+            whiteSpace: "nowrap",
+            maxWidth: "180px",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            background: "var(--panel)",
+            border: "1px solid var(--border)",
+            borderRadius: "12px",
+            padding: "3px 8px",
+            fontSize: "10px",
+            color: "var(--fg)",
+            boxShadow: "var(--shadow)",
+            animation: "umaBubbleFade 0.2s ease-out",
+            pointerEvents: "none",
+          }}
+        >
+          {statusText}
+          <span
+            style={{
+              position: "absolute",
+              bottom: "-5px",
+              left: "50%",
+              transform: "translateX(-50%) rotate(45deg)",
+              width: "8px",
+              height: "8px",
+              background: "var(--panel)",
+              borderRight: "1px solid var(--border)",
+              borderBottom: "1px solid var(--border)",
+            }}
+          />
+        </div>
+      )}
     <pre
       className={`uma-character ${className}`}
       role="img"
@@ -242,10 +288,10 @@ export function UmaCharacter({
         margin: 0,
         padding: 0,
         userSelect: "none",
-        transform: `translateY(${bounceY}px)`,
-        transition: "transform 160ms ease-out",
+        transition: mood !== "thinking" ? "transform 160ms ease-out" : undefined,
         whiteSpace: "pre",
         overflow: "hidden",
+        ...thinkingStyle,
       }}
     >
       {lines.map((line, li) => (
@@ -259,5 +305,6 @@ export function UmaCharacter({
         </span>
       ))}
     </pre>
+    </div>
   );
 }

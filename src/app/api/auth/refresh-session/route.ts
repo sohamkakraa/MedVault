@@ -14,10 +14,29 @@ import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
+async function readJsonObject(req: Request): Promise<Record<string, unknown>> {
+  try {
+    const v = await req.json();
+    if (v === null || typeof v !== "object" || Array.isArray(v)) return {};
+    return v as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
 const bodySchema = z.object({
-  email: z.string().email().max(320).optional(),
-  phoneCountryCode: z.string().max(8).optional(),
-  phoneNational: z.string().max(32).optional(),
+  email: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? undefined : String(v).trim().toLowerCase()),
+    z.string().email().max(320).optional()
+  ),
+  phoneCountryCode: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? undefined : String(v).trim()),
+    z.string().max(16).optional()
+  ),
+  phoneNational: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? undefined : String(v).replace(/\D/g, "")),
+    z.string().max(32).optional()
+  ),
 });
 
 export async function POST(req: Request) {
@@ -31,9 +50,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Session expired." }, { status: 401 });
   }
 
-  const parsed = bodySchema.safeParse(await req.json().catch(() => ({})));
+  const parsed = bodySchema.safeParse(await readJsonObject(req));
   if (!parsed.success) {
-    return NextResponse.json({ ok: false, error: "Invalid request." }, { status: 400 });
+    const msg = parsed.error.issues[0]?.message ?? "Invalid request.";
+    return NextResponse.json({ ok: false, error: msg }, { status: 400 });
   }
   const { email, phoneCountryCode, phoneNational } = parsed.data;
 

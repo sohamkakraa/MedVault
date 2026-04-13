@@ -1,7 +1,20 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import type { ExtractedDoc, PatientStore, StandardLexiconEntry } from "@/lib/types";
+import type { ChatQuickReply, ExtractedDoc, PatientStore, StandardLexiconEntry } from "@/lib/types";
+import { medDosePrimaryLine, medDoseSecondaryLine } from "@/lib/medicationDoseUnits";
 import { extractMedicalPdfFromBuffer } from "@/lib/server/medicalPdfPipeline";
+import {
+  buildMedicationAddLLMAugment,
+  buildMedicationDiaryLLMAugmentFromPatch,
+  buildMedicationUpdateLLMAugment,
+  inferMedicationAddFromUtterance,
+  inferMedicationIntakeFromUtterance,
+  inferMedicationUpdateFromUtterance,
+  type MedicationAddChatPatch,
+  type MedicationUpdateChatPatch,
+} from "@/lib/chatMedicationIntakeInfer";
+import { inferMedicationProductCategory } from "@/lib/medicationClassification";
+import { isMedicationFormKind, medicationFormLabel } from "@/lib/medicationFormPresets";
 
 export const runtime = "nodejs";
 
@@ -34,8 +47,17 @@ function buildRetrievalContext(store: PatientStore): string {
   const p = store.profile;
   const lines: string[] = [
     "You are the **conversation agent** for UMA (Ur Medical Assistant). A parallel **records agent** may extract data from PDFs the user attaches; you will see a short note about its result appended to your context after you reply is generated — for your first reply, assume extraction may be in progress and speak only from stored records plus the user's words.",
-    "You are NOT a doctor. Never diagnose. Use plain language. One focused idea per reply when possible.",
-    "Answer from the patient context below. If something is missing, say so.",
+    "You are NOT a doctor. Never diagnose. Use plain language.",
+    "CRITICAL: You CANNOT create reminders, set notifications, update medicines, or write to the user's records. Only the app's UI can do those things. Confirm past-tense actions ONLY when the system prompt explicitly states the app already performed them. Never claim to have 'set a reminder' or 'updated your record' on your own.",
+    "Answer from the patient context below. If something is missing, say what is missing and still move them forward.",
+    "",
+    "### How to behave (proactive, not passive)",
+    "- **Do the thinking for them first:** lead with the clearest useful output (summary, comparison, checklist, or plain-language readout). Do not offload work with vague prompts like “What would you like to know?” as the main close.",
+    "- **Assume they want a path forward:** after the core answer, add a short **Next steps** section with 2–3 concrete actions they can take in UMA without guessing: e.g. attach a PDF in this chat, open **Dashboard** to review medicines and charts, use **Upload** for a new file, update **Profile** (allergies, conditions, next visit), use **Health log** for doses or blood pressure. Name these places explicitly.",
+    "- **Offer specific follow-through you can do in-chat:** e.g. “If you want to go deeper next, I can compare your last two lab dates…” or “I can turn this into a short list for your clinician.” Frame these as ready-to-run options, not homework.",
+    "- **Questions:** ask at most **one** focused question, and only if you truly need their input to continue; put it **after** you have delivered value and next steps. Prefer invitations (“Say **compare** and I’ll…”) over blank-slate questions.",
+    "- **Dose diary from chat:** When they clearly report taking, missing, skipping, or an extra dose of a **named** medicine, the app records a Health log entry automatically. Acknowledge this warmly, add any health context (e.g. missing one supplement dose is fine), then optionally ask one warm follow-up (symptoms, energy). Do NOT tell the user to navigate to Health log or to set up reminders—the UI shows clickable reminder-setup buttons automatically beneath your reply. Never dismiss with only “no problem” and a generic closer.",
+    "- Keep replies readable: one main topic, tight structure (short paragraphs or bullets), still warm and supportive.",
     "",
     "=== PATIENT PROFILE ===",
     `Name: ${p.name || "Unknown"}`,
@@ -51,8 +73,27 @@ function buildRetrievalContext(store: PatientStore): string {
   if (store.meds?.length) {
     lines.push("=== MEDICATIONS (merged list) ===");
     store.meds.slice(0, 35).forEach((m) => {
+      const meta: string[] = [];
+      if (m.medicationLineSource === "prescription_document") meta.push("from prescription file");
+      else if (m.medicationLineSource === "other_document") meta.push("from another saved file");
+      else if (m.medicationLineSource === "manual_entry") meta.push("typed in by user");
+      if (m.medicationProductCategory === "over_the_counter") meta.push("tagged OTC");
+      else if (m.medicationProductCategory === "supplement") meta.push("tagged supplement");
+      if (m.medicationProductCategorySource === "user" && m.medicationProductCategory) meta.push("category confirmed by user");
+      const tail = meta.length ? ` [${meta.join("; ")}]` : "";
+      const doseP = medDosePrimaryLine(m);
+      const doseS = medDoseSecondaryLine({
+        dose: doseP || (m.dose ?? ""),
+        doseUserEnteredLabel: m.doseUserEnteredLabel,
+      });
+      const doseStr = doseS ? `${doseP || m.dose || ""} (you entered ${doseS})` : doseP || m.dose || "";
+      const timeBit = m.usualTimeLocalHHmm?.trim() ? ` · usual time ${m.usualTimeLocalHHmm.trim()}` : "";
+      const formBit =
+        m.medicationForm && isMedicationFormKind(m.medicationForm)
+          ? ` · form ${medicationFormLabel(m.medicationForm, m.medicationFormOther)}`
+          : "";
       lines.push(
-        `• ${[m.name, m.dose, m.frequency].filter(Boolean).join(" — ")}${m.startDate ? ` (from ${m.startDate})` : ""}`
+        `• ${[m.name, doseStr, m.frequency].filter(Boolean).join(" — ")}${formBit}${timeBit}${m.startDate ? ` (from ${m.startDate})` : ""}${tail}`
       );
     });
     lines.push("");
@@ -108,9 +149,11 @@ function trimHistoryForLlm(history: ChatMsg[]): ChatMsg[] {
 async function conversationAgentLLM(
   userContent: string,
   store: PatientStore,
-  history: ChatMsg[]
+  history: ChatMsg[],
+  diaryAugment: string
 ): Promise<string> {
-  const systemPrompt = buildRetrievalContext(store);
+  const base = buildRetrievalContext(store);
+  const systemPrompt = diaryAugment ? `${base}\n\n${diaryAugment}` : base;
 
   const trimmedHistory = trimHistoryForLlm(history);
 
@@ -187,7 +230,14 @@ function answerFromStore(q: string, store: PatientStore): string {
     return `Conditions on file:\n${store.profile.conditions.map((c) => `• ${c}`).join("\n")}`;
   }
 
-  return "I can help with your saved medications, labs, and documents. Try asking about a specific test or upload a PDF in this chat.";
+  return [
+    "I can help with your saved medications, labs, and documents.",
+    "",
+    "**Next steps you can take now:**",
+    "- Open **Dashboard** to see medicines, charts, and recent files.",
+    "- Attach a PDF in this chat so UMA can read it and offer **Add to records** when ready.",
+    "- Say **catch me up** and ask for a short summary of what is on file.",
+  ].join("\n");
 }
 
 function userAskedToMergeRecords(question: string): boolean {
@@ -220,6 +270,55 @@ export async function POST(req: Request) {
       .map((d) => d.contentHash)
       .filter((h): h is string => typeof h === "string" && h.length > 0);
 
+    const medicationIntakePatch = inferMedicationIntakeFromUtterance(question, store);
+    const medName = medicationIntakePatch?.medicationName?.trim() ?? null;
+
+    // Medication add / update inference (only when no dose event was detected)
+    const medicationAddRaw = !medicationIntakePatch
+      ? inferMedicationAddFromUtterance(question)
+      : null;
+    const medicationAddPatch: MedicationAddChatPatch | null = medicationAddRaw
+      ? {
+          ...medicationAddRaw,
+          productCategory: inferMedicationProductCategory(medicationAddRaw.name),
+        }
+      : null;
+
+    // Update inference: only when no add was detected, and medication already exists in store
+    const medicationUpdatePatch: MedicationUpdateChatPatch | null =
+      !medicationIntakePatch && !medicationAddPatch
+        ? inferMedicationUpdateFromUtterance(question, store, history)
+        : null;
+
+    // Build LLM augment: intake event > update > add (in priority order).
+    let diaryAugment = buildMedicationDiaryLLMAugmentFromPatch(medicationIntakePatch, question);
+    if (medName) {
+      diaryAugment += "\n\nUI note (not for the user): clickable reminder-setup chips will appear below your reply automatically. Do not list navigation steps or mention opening Health log for this.";
+    } else if (medicationUpdatePatch) {
+      diaryAugment = buildMedicationUpdateLLMAugment(medicationUpdatePatch);
+    } else if (medicationAddPatch) {
+      diaryAugment = buildMedicationAddLLMAugment(medicationAddPatch);
+    }
+
+    // Quick-reply chips for reminder setup:
+    // Fire when a dose event, add, OR update is detected — and no active reminder already exists.
+    const reminderMedName =
+      medName ?? medicationUpdatePatch?.name ?? medicationAddPatch?.name ?? null;
+    const existingActiveReminders = (store.healthLogs?.medicationReminders ?? []).filter(
+      (r) =>
+        r.enabled &&
+        r.medicationName.trim().toLowerCase() === (reminderMedName ?? "").toLowerCase()
+    );
+    const quickReplies: ChatQuickReply[] | undefined =
+      reminderMedName && existingActiveReminders.length === 0
+        ? [
+            { emoji: "☀️", label: "Remind me at 8 AM daily", action: { type: "set_reminder", medName: reminderMedName, timeHHmm: "08:00", repeatDaily: true } },
+            { emoji: "🌙", label: "Remind me at 8 PM daily", action: { type: "set_reminder", medName: reminderMedName, timeHHmm: "20:00", repeatDaily: true } },
+            { emoji: "🕐", label: "Pick a time…", action: { type: "pick_time", medName: reminderMedName } },
+            { emoji: "✕", label: "No reminder", action: { type: "dismiss" } },
+          ]
+        : undefined;
+
     const recordsPromise =
       pdfAttachment && process.env.ANTHROPIC_API_KEY
         ? extractMedicalPdfFromBuffer({
@@ -235,7 +334,7 @@ export async function POST(req: Request) {
 
     const conversationPromise = (async () => {
       try {
-        return await conversationAgentLLM(userContent, store, history);
+        return await conversationAgentLLM(userContent, store, history, diaryAugment);
       } catch (e: unknown) {
         if (e instanceof Error && e.message === "no_llm") {
           return answerFromStore(question || userContent, store);
@@ -289,6 +388,10 @@ export async function POST(req: Request) {
       ok: true,
       answer,
       mergeProposal,
+      healthLogMedicationIntake: medicationIntakePatch,
+      medicationAddProposal: medicationAddPatch,
+      medicationUpdateProposal: medicationUpdatePatch,
+      quickReplies,
       recordsAgent: recordsResult
         ? recordsResult.ok
           ? { status: "ok" as const, title: recordsResult.doc.title }

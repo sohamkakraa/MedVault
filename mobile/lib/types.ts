@@ -19,10 +19,40 @@ export type DocType =
   | "Imaging"
   | "Other";
 
+export type MedicationLineSource = "prescription_document" | "other_document" | "manual_entry";
+export type MedicationProductCategory = "over_the_counter" | "supplement" | "unspecified";
+export type MedicationProductCategorySource = "auto" | "user";
+
+export type MedicationFormKind =
+  | "unspecified"
+  | "pill"
+  | "tablet"
+  | "capsule"
+  | "liquid"
+  | "injection"
+  | "ointment"
+  | "cream"
+  | "gel"
+  | "patch"
+  | "inhaler"
+  | "spray"
+  | "drops"
+  | "powder"
+  | "suppository"
+  | "device"
+  | "other";
+
+export type MedDoseDimension = "mass" | "volume" | "iu" | "count";
+
 export interface ExtractedMedication {
   name: string;
   dose?: string;
+  doseAmountStandard?: number;
+  doseStandardUnit?: string;
+  doseDimension?: MedDoseDimension;
+  doseUserEnteredLabel?: string;
   frequency?: string;
+  usualTimeLocalHHmm?: string;
   route?: string;
   startDate?: string;
   endDate?: string;
@@ -31,6 +61,49 @@ export interface ExtractedMedication {
   lastMissedISO?: string;
   notes?: string;
   sourceDocId?: string;
+  medicationLineSource?: MedicationLineSource;
+  medicationProductCategory?: MedicationProductCategory;
+  medicationProductCategorySource?: MedicationProductCategorySource;
+  medicationForm?: MedicationFormKind;
+  medicationFormOther?: string;
+}
+
+export interface HealthLogsBundle {
+  bloodPressure: Array<{
+    id: string;
+    loggedAtISO: string;
+    systolic: number;
+    diastolic: number;
+    pulseBpm?: number;
+    notes?: string;
+  }>;
+  medicationIntake: Array<{
+    id: string;
+    loggedAtISO: string;
+    medicationName: string;
+    action: "taken" | "skipped" | "missed" | "extra";
+    notes?: string;
+    doseAmountStandard?: number;
+    doseStandardUnit?: string;
+    doseUserEnteredLabel?: string;
+  }>;
+  sideEffects: Array<{
+    id: string;
+    loggedAtISO: string;
+    description: string;
+    relatedMedicationName?: string;
+    intensity?: "mild" | "moderate" | "strong" | "unspecified";
+  }>;
+  medicationReminders: Array<{
+    id: string;
+    medicationName: string;
+    timeLocalHHmm: string;
+    repeatDaily: boolean;
+    remindOnceAtISO?: string;
+    enabled: boolean;
+    createdAtISO: string;
+    notes?: string;
+  }>;
 }
 
 export interface ExtractedLab {
@@ -100,6 +173,8 @@ export interface PatientStore {
   docs: ExtractedDoc[];
   meds: ExtractedMedication[];
   labs: ExtractedLab[];
+  /** Optional for older mobile snapshots; web always sends this. */
+  healthLogs?: HealthLogsBundle;
   profile: PatientProfile;
   preferences: {
     theme: "dark" | "light" | "system";

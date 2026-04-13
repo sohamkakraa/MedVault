@@ -26,22 +26,7 @@ interface UploadedDocument {
 export default function UploadScreen() {
   const theme = useTheme();
   const { width } = useWindowDimensions();
-  const [documents, setDocuments] = useState<UploadedDocument[]>([
-    {
-      id: '1',
-      name: 'Lab Report - April 2026',
-      type: 'Lab Report',
-      uploadedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-      status: 'success',
-    },
-    {
-      id: '2',
-      name: 'Prescription - March 2026',
-      type: 'Prescription',
-      uploadedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-      status: 'success',
-    },
-  ]);
+  const [documents, setDocuments] = useState<UploadedDocument[]>([]);
   const [uploading, setUploading] = useState(false);
   const isTablet = width >= 768;
 

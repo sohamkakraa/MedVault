@@ -1,6 +1,25 @@
 import type { ExtractedDoc, StandardLexiconEntry } from "@/lib/types";
 import { buildDocumentMarkdown } from "@/lib/documentMarkdown";
 
+/**
+ * Remove common inline markdown markers from pasted or LLM text so print/PDF reads cleanly.
+ * Best-effort only — not a full markdown parser.
+ */
+export function stripInlineMarkdownForDisplay(input: string | undefined | null): string {
+  if (input == null) return "";
+  let s = String(input).replace(/\r\n/g, "\n");
+  for (let i = 0; i < 12; i++) {
+    const next = s
+      .replace(/\*\*([^*]*)\*\*/g, "$1")
+      .replace(/__([^_]*)__/g, "$1")
+      .replace(/\*([^*\n]+)\*/g, "$1")
+      .replace(/\b_([^_\s][^_]*)_\b/g, "$1");
+    if (next === s) break;
+    s = next;
+  }
+  return s.replace(/\*{1,2}/g, "").replace(/\s+/g, " ").trim();
+}
+
 /** Pull the ## Overview section from agent-generated markdown (source of truth for display when present). */
 export function parseOverviewSection(markdown: string): string | null {
   const normalized = markdown.replace(/\r\n/g, "\n");
