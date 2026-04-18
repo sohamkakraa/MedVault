@@ -5,7 +5,7 @@
  * Sends a gentle wellness check-in message to all users with check-ins enabled
  * who haven't received one in the last 20 hours.
  *
- * On Pro plan, switch to "*/15 * * * *" and re-enable per-user time-window logic.
+ * On Pro plan, switch to every-15-min schedule and re-enable per-user time-window logic.
  *
  * Security: protected by CRON_SECRET header (Vercel sets this automatically for cron jobs).
  */
@@ -35,7 +35,7 @@ function getRandomCheckinMessage(): string {
  * check-ins enabled and haven't received one in the last 20 hours.
  * The lastCheckinSentAt guard prevents duplicate sends.
  *
- * On Pro plan, switch schedule to "*/15 * * * *" and re-enable the
+ * On Pro plan, switch schedule to every-15-min cron and re-enable the
  * time-window check below for per-user preferred times.
  */
 // function isWithinCheckinWindow(checkinTime: string, timezone: string): boolean { ... }
