@@ -13,12 +13,14 @@ import { NotificationCenter } from "@/components/notifications/NotificationCente
 type NavItem = {
   href: string;
   label: string;
+  disabled?: boolean;
+  tooltip?: string;
 };
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/chat", label: "Chat" },
-  { href: "/body", label: "Body" },
+  { href: "/body", label: "Body", disabled: true, tooltip: "Coming soon" },
 ];
 
 export function AppTopNav({
@@ -33,10 +35,10 @@ export function AppTopNav({
   const [mobileOpen, setMobileOpen] = useState(false);
   const navRef = useRef<HTMLDivElement | null>(null);
   const activeIndex = useMemo(() => {
-    const exact = NAV_ITEMS.findIndex((item) => pathname === item.href);
+    const exact = NAV_ITEMS.findIndex((item) => !item.disabled && pathname === item.href);
     if (exact !== -1) return exact;
     const prefix = NAV_ITEMS.findIndex(
-      (item) => item.href !== "/" && pathname.startsWith(item.href + "/"),
+      (item) => !item.disabled && item.href !== "/" && pathname.startsWith(item.href + "/"),
     );
     return prefix !== -1 ? prefix : -1;
   }, [pathname]);
@@ -46,8 +48,13 @@ export function AppTopNav({
     e.preventDefault();
     const base = activeIndex >= 0 ? activeIndex : 0;
     const delta = e.key === "ArrowRight" ? 1 : -1;
-    const next = (base + delta + NAV_ITEMS.length) % NAV_ITEMS.length;
-    router.push(NAV_ITEMS[next].href);
+    let next = (base + delta + NAV_ITEMS.length) % NAV_ITEMS.length;
+    // Skip disabled items
+    let tries = NAV_ITEMS.length;
+    while (NAV_ITEMS[next].disabled && tries-- > 0) {
+      next = (next + delta + NAV_ITEMS.length) % NAV_ITEMS.length;
+    }
+    if (!NAV_ITEMS[next].disabled) router.push(NAV_ITEMS[next].href);
   }
 
   return (
@@ -86,6 +93,20 @@ export function AppTopNav({
             )}
             {NAV_ITEMS.map((item, idx) => {
               const active = idx === activeIndex;
+              if (item.disabled) {
+                return (
+                  <span
+                    key={item.href}
+                    role="tab"
+                    aria-selected={false}
+                    aria-disabled="true"
+                    title={item.tooltip}
+                    className="relative z-10 rounded-xl px-2 py-1.5 text-xs sm:px-3 sm:text-sm text-center text-[var(--muted)] opacity-50 cursor-not-allowed"
+                  >
+                    {item.label}
+                  </span>
+                );
+              }
               return (
                 <Link
                   key={item.href}

@@ -192,7 +192,7 @@ async function callLLM(
 
     const res = await client.messages.create({
       model,
-      max_tokens: 600,
+      max_tokens: 400,
       system: systemPrompt,
       messages,
     });
@@ -210,7 +210,7 @@ async function callLLM(
 
     const res = await client.chat.completions.create({
       model,
-      max_tokens: 600,
+      max_tokens: 400,
       messages: [
         { role: "system", content: systemPrompt },
         ...history.map((m) => ({
@@ -301,77 +301,60 @@ function inferCommunicationStyle(messages: Array<{ role: string; content: string
 
 // ─── Wellness extraction (LLM-based) ───────────────────────────────────────
 
-const WELLNESS_EXTRACTION_PROMPT = `You are a data extraction assistant. Given a WhatsApp conversation snippet, extract any wellness/mood check-in information the user has shared.
+// Keyword gate — only call the wellness extraction LLM when the message
+// likely contains mood/health/symptom info. Saves ~$0.001 per non-wellness message.
+const WELLNESS_KEYWORDS = /\b(feel|mood|energy|tired|exhaust|headache|pain|ache|nausea|sick|better|worse|symptom|medication|meds|took|pill|sleep|slept|stress|anxious|depress|happy|sad|okay|fine|great|terrible|awful|rough|good morning|check.?in|how am i)\b/i;
 
-Return ONLY a JSON object (no other text) with these fields. Use null for anything not mentioned:
-{
-  "mood": <1-5 integer or null, where 1=very bad, 3=okay, 5=great>,
-  "energy": <1-5 integer or null, where 1=exhausted, 5=energetic>,
-  "symptoms": <string describing any symptoms mentioned, or null>,
-  "medsTaken": <true if they said they took meds, false if they said they didn't, null if not discussed>,
-  "notes": <any other health-relevant info they shared, or null>,
-  "isWellnessResponse": <true if this message is a response about their health/mood/feelings, false otherwise>
-}`;
-
-async function extractWellnessData(
-  userMessage: string,
-  recentHistory: Array<{ role: string; content: string }>,
-): Promise<{
+/**
+ * Lightweight regex-based wellness extraction — no LLM call needed.
+ * Returns structured data only when the message clearly contains wellness info.
+ */
+function extractWellnessLocal(userMessage: string): {
   mood?: number;
   energy?: number;
   symptoms?: string;
   medsTaken?: boolean;
   notes?: string;
   isWellnessResponse: boolean;
-} | null> {
-  if (!process.env.ANTHROPIC_API_KEY) return null;
+} | null {
+  if (!WELLNESS_KEYWORDS.test(userMessage)) return null;
 
-  try {
-    const Anthropic = (await import("@anthropic-ai/sdk")).default;
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const lower = userMessage.toLowerCase();
+  const result: {
+    mood?: number;
+    energy?: number;
+    symptoms?: string;
+    medsTaken?: boolean;
+    notes?: string;
+    isWellnessResponse: boolean;
+  } = { isWellnessResponse: true };
 
-    // Only send the last few messages for context
-    const context = recentHistory.slice(-4);
-    const conversationSnippet = [
-      ...context.map((m) => `${m.role}: ${m.content}`),
-      `user: ${userMessage}`,
-    ].join("\n");
+  // Mood detection
+  if (/\b(great|amazing|wonderful|fantastic|excellent)\b/.test(lower)) result.mood = 5;
+  else if (/\b(good|happy|fine|well|better)\b/.test(lower)) result.mood = 4;
+  else if (/\b(okay|ok|alright|so.?so|meh)\b/.test(lower)) result.mood = 3;
+  else if (/\b(bad|rough|not great|not good|down|low)\b/.test(lower)) result.mood = 2;
+  else if (/\b(terrible|awful|horrible|worst|miserable)\b/.test(lower)) result.mood = 1;
 
-    const res = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 200,
-      system: WELLNESS_EXTRACTION_PROMPT,
-      messages: [{ role: "user", content: conversationSnippet }],
-    });
+  // Energy detection
+  if (/\b(energetic|energized|full of energy)\b/.test(lower)) result.energy = 5;
+  else if (/\b(tired|exhausted|fatigued|drained|no energy|sleepy)\b/.test(lower)) result.energy = 2;
 
-    const text = res.content
-      .filter((b) => b.type === "text")
-      .map((b) => ("text" in b ? (b as { text: string }).text : ""))
-      .join("");
+  // Medication adherence
+  if (/\b(took|taken|had)\b.*\b(med|pill|tablet|medicine|medication)\b/.test(lower)) result.medsTaken = true;
+  else if (/\b(forgot|missed|skip|didn'?t take)\b.*\b(med|pill|tablet|medicine|medication)\b/.test(lower)) result.medsTaken = false;
 
-    // VULN-008 fix: Use non-greedy match to avoid catastrophic backtracking
-    const jsonMatch = text.match(/\{[\s\S]*?\}/);
-    if (!jsonMatch) return null;
-
-    let parsed: Record<string, unknown>;
-    try {
-      parsed = JSON.parse(jsonMatch[0]);
-    } catch {
-      return null;
-    }
-    return {
-      mood: typeof parsed.mood === "number" ? parsed.mood : undefined,
-      energy: typeof parsed.energy === "number" ? parsed.energy : undefined,
-      symptoms: typeof parsed.symptoms === "string" ? parsed.symptoms : undefined,
-      medsTaken: typeof parsed.medsTaken === "boolean" ? parsed.medsTaken : undefined,
-      notes: typeof parsed.notes === "string" ? parsed.notes : undefined,
-      isWellnessResponse: !!parsed.isWellnessResponse,
-    };
-  } catch (err) {
-    // VULN-009: Avoid logging raw error details that may contain user health data
-    console.error("[WhatsApp] Wellness extraction failed:", err instanceof Error ? err.message : "unknown error");
-    return null;
+  // Symptom extraction — grab the whole message as symptom notes if it mentions symptoms
+  if (/\b(headache|pain|ache|nausea|dizzy|cough|fever|cramp|sore|itch|rash|vomit|fatigue|insomnia)\b/.test(lower)) {
+    result.symptoms = userMessage.slice(0, 500);
   }
+
+  // Only return if we actually extracted something useful
+  if (result.mood != null || result.energy != null || result.medsTaken != null || result.symptoms) {
+    return result;
+  }
+
+  return null;
 }
 
 // ─── Main message handler ───────────────────────────────────────────────────
@@ -472,11 +455,10 @@ export async function processIncomingMessage(
     data: { userId: user.id, waId, role: "assistant", content: reply },
   });
 
-  // ── Extract and log wellness data (non-blocking) ──
-  extractWellnessData(text, history)
-    .then(async (wellness) => {
-      if (!wellness?.isWellnessResponse) return;
-
+  // ── Extract and log wellness data (local regex, no extra LLM call) ──
+  const wellness = extractWellnessLocal(text);
+  if (wellness?.isWellnessResponse) {
+    try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
@@ -501,9 +483,11 @@ export async function processIncomingMessage(
           rawMessage: text,
         },
       });
-    })
-    // VULN-009: Don't log full error (may contain user health data)
-    .catch((err) => console.error("[WhatsApp] Wellness log save failed:", err instanceof Error ? err.message : "unknown"));
+    } catch (err) {
+      // VULN-009: Don't log full error (may contain user health data)
+      console.error("[WhatsApp] Wellness log save failed:", err instanceof Error ? err.message : "unknown");
+    }
+  }
 
   await sendText(senderPhone, reply);
 }
