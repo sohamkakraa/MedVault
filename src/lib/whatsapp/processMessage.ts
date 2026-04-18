@@ -362,9 +362,9 @@ async function extractWellnessData(
     return {
       mood: typeof parsed.mood === "number" ? parsed.mood : undefined,
       energy: typeof parsed.energy === "number" ? parsed.energy : undefined,
-      symptoms: parsed.symptoms || undefined,
+      symptoms: typeof parsed.symptoms === "string" ? parsed.symptoms : undefined,
       medsTaken: typeof parsed.medsTaken === "boolean" ? parsed.medsTaken : undefined,
-      notes: parsed.notes || undefined,
+      notes: typeof parsed.notes === "string" ? parsed.notes : undefined,
       isWellnessResponse: !!parsed.isWellnessResponse,
     };
   } catch (err) {
