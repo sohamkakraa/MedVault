@@ -8,10 +8,37 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { createHmac, timingSafeEqual } from "crypto";
 import { processIncomingMessage } from "@/lib/whatsapp/processMessage";
 import { isWhatsAppConfigured } from "@/lib/whatsapp/client";
 
 export const runtime = "nodejs";
+
+/**
+ * VULN-001 fix: Verify that the webhook payload was actually sent by Meta.
+ * Meta signs every POST with HMAC-SHA256 using the App Secret.
+ * Docs: https://developers.facebook.com/docs/graph-api/webhooks/getting-started#verification-requests
+ */
+function verifyMetaSignature(rawBody: string, signatureHeader: string | null): boolean {
+  const appSecret = process.env.WHATSAPP_APP_SECRET;
+  // If no app secret configured, reject all requests (fail closed). — VULN-001
+  if (!appSecret) {
+    console.error("[WhatsApp] WHATSAPP_APP_SECRET not set — rejecting webhook POST for security.");
+    return false;
+  }
+  if (!signatureHeader) return false;
+
+  const [algo, signature] = signatureHeader.split("=");
+  if (algo !== "sha256" || !signature) return false;
+
+  const expectedSignature = createHmac("sha256", appSecret).update(rawBody).digest("hex");
+
+  try {
+    return timingSafeEqual(Buffer.from(signature, "hex"), Buffer.from(expectedSignature, "hex"));
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Webhook verification (Meta handshake).
@@ -43,9 +70,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "WhatsApp not configured" }, { status: 503 });
   }
 
+  // VULN-001: Read raw body for signature verification before parsing
+  let rawBody: string;
+  try {
+    rawBody = await req.text();
+  } catch {
+    return NextResponse.json({ error: "Bad request" }, { status: 400 });
+  }
+
+  // VULN-004: Limit payload size to prevent DoS (1 MB max)
+  if (rawBody.length > 1_048_576) {
+    return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+  }
+
+  // VULN-001: Verify Meta signature before processing
+  const signature = req.headers.get("x-hub-signature-256");
+  if (!verifyMetaSignature(rawBody, signature)) {
+    console.warn("[WhatsApp] Webhook signature verification failed — rejecting request.");
+    return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
+  }
+
   let body: WebhookPayload;
   try {
-    body = await req.json();
+    body = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
@@ -108,15 +155,24 @@ async function handlePayload(body: WebhookPayload) {
         if (msg.type !== "text" || !msg.text?.body) continue;
 
         const senderPhone = msg.from;
+
+        // VULN-010: Validate senderPhone is digits-only and sane length
+        if (!/^\d{10,15}$/.test(senderPhone)) {
+          console.warn("[WhatsApp] Skipping message with invalid sender phone format.");
+          continue;
+        }
+
         const waId = contacts?.[0]?.wa_id ?? senderPhone;
-        const text = msg.text.body.trim();
+        // VULN-005: Limit message text length to prevent abuse (4096 = WhatsApp max)
+        const text = msg.text.body.trim().slice(0, 4096);
 
         if (!text) continue;
 
         try {
           await processIncomingMessage(waId, senderPhone, msg.id, text);
         } catch (err) {
-          console.error(`[WhatsApp] Failed to process message ${msg.id}:`, err);
+          // VULN-009: Avoid logging raw message content (may contain PII/health data)
+          console.error(`[WhatsApp] Failed to process message ${msg.id}`);
         }
       }
     }

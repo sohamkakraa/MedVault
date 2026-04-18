@@ -2142,6 +2142,9 @@ export default function ProfilePage() {
                       <span className="text-[10px] opacity-70">Standard rates</span>
                     </button>
                   </div>
+                  {waCodeError && (
+                    <p className="text-xs text-red-500 whitespace-pre-line">{waCodeError}</p>
+                  )}
                   <button
                     type="button"
                     disabled={waSending}
@@ -2158,9 +2161,11 @@ export default function ProfilePage() {
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({ phone: fullPhone }),
                         });
-                        const data = await res.json();
+                        const data = await res.json() as { error?: string; hint?: string };
                         if (!res.ok) {
-                          setWaCodeError(data.error || "Failed to send code.");
+                          setWaCodeError(
+                            [data.error, data.hint].filter(Boolean).join("\n\n") || "Failed to send code.",
+                          );
                         } else {
                           setOtpSent(true);
                           setWaCodeInput("");
@@ -2191,7 +2196,9 @@ export default function ProfilePage() {
                     onChange={(e) => { setWaCodeInput(e.target.value.replace(/\D/g, "")); setWaCodeError(null); }}
                     className="text-center text-lg tracking-widest"
                   />
-                  {waCodeError && <p className="text-xs text-red-500">{waCodeError}</p>}
+                  {waCodeError && (
+                    <p className="text-xs text-red-500 whitespace-pre-line">{waCodeError}</p>
+                  )}
                   <button
                     type="button"
                     disabled={waVerifying || waCodeInput.length !== 6}
@@ -2239,9 +2246,11 @@ export default function ProfilePage() {
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({ phone: fullPhone }),
                         });
-                        const data = await res.json();
+                        const data = await res.json() as { error?: string; hint?: string };
                         if (!res.ok) {
-                          setWaCodeError(data.error || "Failed to resend.");
+                          setWaCodeError(
+                            [data.error, data.hint].filter(Boolean).join("\n\n") || "Failed to resend.",
+                          );
                         } else {
                           setWaCodeInput("");
                         }

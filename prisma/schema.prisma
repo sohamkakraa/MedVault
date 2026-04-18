@@ -22,6 +22,67 @@ model User {
 
   patientRecord    PatientRecord?
   whatsappMessages WhatsAppMessage[]
+  whatsappPrefs    WhatsAppPreferences?
+  wellnessLogs     WellnessLog[]
+}
+
+/**
+ * Per-user WhatsApp preferences — communication style, check-in schedule,
+ * and learned personality traits so UMA mirrors how the user likes to chat.
+ */
+model WhatsAppPreferences {
+  userId             String  @id @map("user_id")
+  user               User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// "casual", "detailed", "brief", etc. — inferred from chat patterns
+  communicationStyle String? @map("communication_style")
+  /// "simple" (no jargon), "moderate", "technical"
+  languageLevel      String? @default("simple") @map("language_level")
+  /// What the user prefers to be called
+  preferredName      String? @map("preferred_name")
+  /// Daily check-in time in HH:mm (24h) format, user's local time
+  checkinTime        String? @map("checkin_time")
+  /// Whether daily check-ins are enabled
+  checkinEnabled     Boolean @default(false) @map("checkin_enabled")
+  /// IANA timezone, e.g. "Asia/Kolkata"
+  timezone           String? @default("Asia/Kolkata")
+  /// Last time a daily check-in was sent (prevents duplicates)
+  lastCheckinSentAt  DateTime? @map("last_checkin_sent_at")
+
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("whatsapp_preferences")
+}
+
+/**
+ * Structured wellness log entries — mood, energy, symptoms, medication adherence.
+ * Populated from WhatsApp check-in conversations.
+ */
+model WellnessLog {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Date of the log entry (one per day typically)
+  logDate     DateTime @map("log_date") @db.Date
+  /// 1-5 scale: 1=very low, 5=great
+  mood        Int?
+  /// 1-5 scale: 1=exhausted, 5=energetic
+  energy      Int?
+  /// Free-text symptoms mentioned
+  symptoms    String?  @db.Text
+  /// Did they take their meds? true/false/null(not asked)
+  medsTaken   Boolean? @map("meds_taken")
+  /// Raw user message that produced this log
+  rawMessage  String?  @map("raw_message") @db.Text
+  /// Any additional notes extracted by the LLM
+  notes       String?  @db.Text
+
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, logDate])
+  @@index([userId, logDate])
+  @@map("wellness_logs")
 }
 
 model WhatsAppMessage {

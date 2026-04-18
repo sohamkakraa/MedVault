@@ -1,4 +1,10 @@
 {
   "installCommand": "npm install --no-audit --no-fund",
-  "buildCommand": "node scripts/vercel-build.mjs"
+  "buildCommand": "node scripts/vercel-build.mjs",
+  "crons": [
+    {
+      "path": "/api/whatsapp/cron",
+      "schedule": "*/15 * * * *"
+    }
+  ]
 }

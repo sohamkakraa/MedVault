@@ -11,7 +11,9 @@ import { z } from "zod";
 import { randomInt, createHash } from "crypto";
 import { requireUserId } from "@/lib/server/authSession";
 import { prisma } from "@/lib/prisma";
-import { sendText, isWhatsAppConfigured } from "@/lib/whatsapp/client";
+import { sendOtpMessage, isWhatsAppConfigured } from "@/lib/whatsapp/client";
+import { normalizeWhatsAppTo } from "@/lib/whatsapp/phone";
+import { checkRateLimitDb } from "@/lib/auth/otpRateLimitDb";
 
 export const runtime = "nodejs";
 
@@ -45,12 +47,25 @@ export async function POST(req: NextRequest) {
   const userId = await requireUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  // VULN-006: Rate limit OTP requests — 5 per hour per user
+  const allowed = await checkRateLimitDb(`wa-otp-req:${userId}`, 5, 60 * 60 * 1000);
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many OTP requests. Please try again later." }, { status: 429 });
+  }
+
   const body = LinkSchema.safeParse(await req.json());
   if (!body.success) {
     return NextResponse.json({ error: "Invalid phone number." }, { status: 400 });
   }
 
   const { phone } = body.data;
+  let normalized: string;
+  try {
+    normalized = normalizeWhatsAppTo(phone);
+  } catch {
+    return NextResponse.json({ error: "Invalid phone number (include country code, e.g. 91…)." }, { status: 400 });
+  }
+
   const code = String(randomInt(100_000, 999_999));
 
   const codeHash = hashCode(code);
@@ -59,7 +74,7 @@ export async function POST(req: NextRequest) {
   await prisma.user.update({
     where: { id: userId },
     data: {
-      whatsappPhone: phone,
+      whatsappPhone: normalized,
       whatsappVerified: false,
     },
   });
@@ -71,14 +86,16 @@ export async function POST(req: NextRequest) {
   });
 
   try {
-    await sendText(
-      phone,
-      `Your UMA verification code is: *${code}*\n\nEnter this in the UMA app to link your WhatsApp. Expires in 10 minutes.`,
-    );
+    await sendOtpMessage(normalized, code);
   } catch (err) {
-    console.error("[WhatsApp link] Failed to send OTP:", err);
+    // VULN-009/012: Log error message only (no stack traces or token details)
+    console.error("[WhatsApp link] Failed to send OTP:", err instanceof Error ? err.message : "unknown");
     return NextResponse.json(
-      { error: "Could not send WhatsApp message. Check the phone number and try again." },
+      {
+        error:
+          "Could not send WhatsApp verification. Please check that you entered a valid international phone number.",
+        // VULN-012: Never expose internal error details to the client, even in dev
+      },
       { status: 502 },
     );
   }
@@ -91,12 +108,24 @@ export async function PUT(req: NextRequest) {
   const userId = await requireUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  // VULN-006: Rate limit OTP verification attempts — 10 per hour per user (prevents brute force)
+  const allowed = await checkRateLimitDb(`wa-otp-verify:${userId}`, 10, 60 * 60 * 1000);
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many verification attempts. Please request a new code." }, { status: 429 });
+  }
+
   const body = VerifySchema.safeParse(await req.json());
   if (!body.success) {
     return NextResponse.json({ error: "Invalid input." }, { status: 400 });
   }
 
   const { phone, code } = body.data;
+  let normalized: string;
+  try {
+    normalized = normalizeWhatsAppTo(phone);
+  } catch {
+    return NextResponse.json({ error: "Invalid phone number." }, { status: 400 });
+  }
 
   const challenge = await prisma.otpChallenge.findUnique({
     where: { lookupKey: `wa:${userId}` },
@@ -114,7 +143,7 @@ export async function PUT(req: NextRequest) {
 
   await prisma.user.update({
     where: { id: userId },
-    data: { whatsappPhone: phone, whatsappVerified: true },
+    data: { whatsappPhone: normalized, whatsappVerified: true },
   });
 
   return NextResponse.json({ ok: true, message: "WhatsApp linked successfully!" });
