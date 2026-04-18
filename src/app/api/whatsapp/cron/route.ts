@@ -1,12 +1,11 @@
 /**
  * Daily WhatsApp check-in cron endpoint.
  *
- * Designed to be called by Vercel Cron (or any external scheduler) every 15 minutes.
- * For each user whose preferred check-in time falls within the current window,
- * sends a gentle wellness check-in message via WhatsApp.
+ * Designed to be called by Vercel Cron once daily (Hobby plan: "0 4 * * *" = 4:00 UTC).
+ * Sends a gentle wellness check-in message to all users with check-ins enabled
+ * who haven't received one in the last 20 hours.
  *
- * Vercel Cron config (vercel.json):
- *   { "crons": [{ "path": "/api/whatsapp/cron", "schedule": "*/15 * * * *" }] }
+ * On Pro plan, switch to "*/15 * * * *" and re-enable per-user time-window logic.
  *
  * Security: protected by CRON_SECRET header (Vercel sets this automatically for cron jobs).
  */
@@ -31,33 +30,15 @@ function getRandomCheckinMessage(): string {
 }
 
 /**
- * Check if the current time (in the user's timezone) is within the check-in window.
- * We use a 15-minute window since the cron runs every 15 minutes.
+ * On the Vercel Hobby plan, cron runs once daily (0 4 * * * = 4:00 UTC).
+ * We skip the time-of-day check and simply send to all users who have
+ * check-ins enabled and haven't received one in the last 20 hours.
+ * The lastCheckinSentAt guard prevents duplicate sends.
+ *
+ * On Pro plan, switch schedule to "*/15 * * * *" and re-enable the
+ * time-window check below for per-user preferred times.
  */
-function isWithinCheckinWindow(checkinTime: string, timezone: string): boolean {
-  try {
-    const now = new Date();
-    const formatter = new Intl.DateTimeFormat("en-GB", {
-      timeZone: timezone,
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-    const localTime = formatter.format(now); // "HH:mm"
-
-    const [targetH, targetM] = checkinTime.split(":").map(Number);
-    const [nowH, nowM] = localTime.split(":").map(Number);
-
-    const targetMinutes = targetH * 60 + targetM;
-    const nowMinutes = nowH * 60 + nowM;
-
-    // Within a 15-minute window
-    const diff = nowMinutes - targetMinutes;
-    return diff >= 0 && diff < 15;
-  } catch {
-    return false;
-  }
-}
+// function isWithinCheckinWindow(checkinTime: string, timezone: string): boolean { ... }
 
 export async function GET(req: NextRequest) {
   // VULN-007 fix: Always require auth — fail closed if CRON_SECRET is not set.
@@ -96,13 +77,7 @@ export async function GET(req: NextRequest) {
       continue;
     }
 
-    const tz = pref.timezone || "Asia/Kolkata";
-    if (!isWithinCheckinWindow(pref.checkinTime!, tz)) {
-      skipped++;
-      continue;
-    }
-
-    // Check if we already sent a check-in today
+    // Check if we already sent a check-in today (20h dedup window)
     if (pref.lastCheckinSentAt) {
       const lastSent = new Date(pref.lastCheckinSentAt);
       const now = new Date();
