@@ -14,7 +14,7 @@ function blankStore(): PatientStore {
     docs: [],
     meds: [],
     labs: [],
-    healthLogs: {},
+    healthLogs: { bloodPressure: [], medicationIntake: [], sideEffects: [], medicationReminders: [] },
     profile: {
       name: "",
       firstName: "",
