@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, Pencil, Check, User, Users, Heart, Baby, UserCircle, Link2 } from "lucide-react";
 import { cn } from "@/components/ui/cn";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/Select";
@@ -296,6 +297,7 @@ function Connector({ fromRef, toRef, containerRef }: ConnectorProps) {
 
 export function FamilyTreeView({ onClose }: { onClose: () => void }) {
   const [store, setStoreState] = useState(() => getHydrationSafeStore());
+  const [mounted, setMounted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [, forceRender] = useState(0);
 
@@ -308,9 +310,28 @@ export function FamilyTreeView({ onClose }: { onClose: () => void }) {
       setStoreState(getStore());
     }
     refresh();
+    setMounted(true);
     window.addEventListener("mv-store-update", refresh);
     return () => window.removeEventListener("mv-store-update", refresh);
   }, []);
+
+  // Lock body scroll while the modal is open so the viewport doesn't jump.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  // Close on Escape
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   // Force a re-render after mount so connectors can measure DOM positions
   useEffect(() => {
@@ -374,13 +395,18 @@ export function FamilyTreeView({ onClose }: { onClose: () => void }) {
     }
   }
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50"
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50 p-4 overflow-y-auto"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Family tree"
     >
       <div
-        className="relative max-w-3xl w-full max-h-[90vh] overflow-y-auto rounded-3xl bg-[var(--panel)] border border-[var(--border)] shadow-2xl"
+        className="relative my-auto max-w-3xl w-full max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-3xl bg-[var(--panel)] border border-[var(--border)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* header */}
@@ -592,6 +618,7 @@ export function FamilyTreeView({ onClose }: { onClose: () => void }) {
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

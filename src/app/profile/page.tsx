@@ -24,6 +24,7 @@ import {
   updateFamilyMemberMeta,
 } from "@/lib/store";
 import { FAMILY_RELATION_LABELS } from "@/lib/types";
+import { COUNTRY_CODES } from "@/lib/countryCodes";
 import type {
   FamilyMemberMeta,
   FamilyRelation,
@@ -66,50 +67,6 @@ const RELATION_OPTIONS: FamilyRelation[] = [
   "son", "daughter", "child", "other",
 ];
 
-const COUNTRY_CODES = [
-  { dial: "+91", name: "India", flag: "🇮🇳" },
-  { dial: "+1", name: "US / Canada", flag: "🇺🇸" },
-  { dial: "+44", name: "UK", flag: "🇬🇧" },
-  { dial: "+61", name: "Australia", flag: "🇦🇺" },
-  { dial: "+27", name: "South Africa", flag: "🇿🇦" },
-  { dial: "+234", name: "Nigeria", flag: "🇳🇬" },
-  { dial: "+92", name: "Pakistan", flag: "🇵🇰" },
-  { dial: "+880", name: "Bangladesh", flag: "🇧🇩" },
-  { dial: "+94", name: "Sri Lanka", flag: "🇱🇰" },
-  { dial: "+60", name: "Malaysia", flag: "🇲🇾" },
-  { dial: "+65", name: "Singapore", flag: "🇸🇬" },
-  { dial: "+971", name: "UAE", flag: "🇦🇪" },
-  { dial: "+966", name: "Saudi Arabia", flag: "🇸🇦" },
-  { dial: "+20", name: "Egypt", flag: "🇪🇬" },
-  { dial: "+254", name: "Kenya", flag: "🇰🇪" },
-  { dial: "+233", name: "Ghana", flag: "🇬🇭" },
-  { dial: "+49", name: "Germany", flag: "🇩🇪" },
-  { dial: "+33", name: "France", flag: "🇫🇷" },
-  { dial: "+55", name: "Brazil", flag: "🇧🇷" },
-  { dial: "+52", name: "Mexico", flag: "🇲🇽" },
-  { dial: "+81", name: "Japan", flag: "🇯🇵" },
-  { dial: "+82", name: "South Korea", flag: "🇰🇷" },
-  { dial: "+86", name: "China", flag: "🇨🇳" },
-  { dial: "+62", name: "Indonesia", flag: "🇮🇩" },
-  { dial: "+63", name: "Philippines", flag: "🇵🇭" },
-  { dial: "+64", name: "New Zealand", flag: "🇳🇿" },
-  { dial: "+7", name: "Russia", flag: "🇷🇺" },
-  { dial: "+34", name: "Spain", flag: "🇪🇸" },
-  { dial: "+39", name: "Italy", flag: "🇮🇹" },
-  { dial: "+31", name: "Netherlands", flag: "🇳🇱" },
-  { dial: "+46", name: "Sweden", flag: "🇸🇪" },
-  { dial: "+47", name: "Norway", flag: "🇳🇴" },
-  { dial: "+45", name: "Denmark", flag: "🇩🇰" },
-  { dial: "+41", name: "Switzerland", flag: "🇨🇭" },
-  { dial: "+48", name: "Poland", flag: "🇵🇱" },
-  { dial: "+90", name: "Turkey", flag: "🇹🇷" },
-  { dial: "+98", name: "Iran", flag: "🇮🇷" },
-  { dial: "+212", name: "Morocco", flag: "🇲🇦" },
-  { dial: "+213", name: "Algeria", flag: "🇩🇿" },
-  { dial: "+256", name: "Uganda", flag: "🇺🇬" },
-  { dial: "+255", name: "Tanzania", flag: "🇹🇿" },
-  { dial: "+251", name: "Ethiopia", flag: "🇪🇹" },
-] as const;
 
 const COMMON_ALLERGIES = [
   "Penicillin", "Amoxicillin", "Aspirin", "Ibuprofen", "Sulfa drugs",
@@ -748,10 +705,10 @@ export default function ProfilePage() {
   };
   const [countryCodeInput, setCountryCodeInput] = useState(() => sanitiseCountryCode(store.profile.countryCode));
   const [phoneSaved, setPhoneSaved] = useState(false);
+  const [phoneDraftDirty, setPhoneDraftDirty] = useState(false);
   const [waCodeInput, setWaCodeInput] = useState("");
   const [waCodeError, setWaCodeError] = useState<string | null>(null);
   const [showOtpModal, setShowOtpModal] = useState(false);
-  const [otpChannel, setOtpChannel] = useState<"whatsapp" | "sms">("whatsapp");
   const [otpSent, setOtpSent] = useState(false);
   const [waSending, setWaSending] = useState(false);
   const [waVerifying, setWaVerifying] = useState(false);
@@ -825,6 +782,12 @@ export default function ProfilePage() {
     document.addEventListener("mousedown", onMouseDown);
     return () => document.removeEventListener("mousedown", onMouseDown);
   }, [ccDropOpen]);
+
+  useEffect(() => {
+    if (!hydrated || phoneDraftDirty) return;
+    setPhoneInput(store.profile.phone ?? "");
+    setCountryCodeInput(sanitiseCountryCode(store.profile.countryCode));
+  }, [hydrated, phoneDraftDirty, store.profile.phone, store.profile.countryCode]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -1161,6 +1124,7 @@ export default function ProfilePage() {
                                     setCcDropOpen(false);
                                     setCcSearch("");
                                     setPhoneSaved(false);
+                                    setPhoneDraftDirty(true);
                                   }}
                                   className={`w-full flex items-center gap-3 px-3 py-2 text-xs text-left transition-colors hover:bg-[var(--panel-2)] ${countryCodeInput === c.dial ? "bg-[var(--accent)]/8 text-[var(--accent)]" : "text-[var(--fg)]"}`}
                                 >
@@ -1178,7 +1142,11 @@ export default function ProfilePage() {
                       inputMode="numeric"
                       placeholder="Phone number"
                       value={phoneInput}
-                      onChange={(e) => { setPhoneInput(e.target.value.replace(/\D/g, "")); setPhoneSaved(false); }}
+                      onChange={(e) => {
+                        setPhoneInput(e.target.value.replace(/\D/g, ""));
+                        setPhoneSaved(false);
+                        setPhoneDraftDirty(true);
+                      }}
                       className="flex-1"
                     />
                     {/* Verify button — only shown when there's a number and it's not already verified */}
@@ -1192,9 +1160,25 @@ export default function ProfilePage() {
                       </button>
                     )}
                     {hydrated && store.profile.whatsappVerified && (
-                      <span className="shrink-0 flex items-center gap-1 text-xs text-green-600 font-medium">
-                        <Check className="h-3.5 w-3.5" /> Verified
-                      </span>
+                      <div className="shrink-0 flex items-center gap-2">
+                        <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                          <Check className="h-3.5 w-3.5" /> Verified
+                        </span>
+                        <button
+                          type="button"
+                          className="text-xs text-red-500 hover:underline"
+                          onClick={async () => {
+                            try {
+                              await fetch("/api/whatsapp/link", { method: "DELETE" });
+                            } catch {
+                              /* ignore */
+                            }
+                            updateProfile({ whatsappVerified: false, whatsappPhone: undefined });
+                          }}
+                        >
+                          Unlink
+                        </button>
+                      </div>
                     )}
                   </div>
                   {/* Save button — only shown when input differs from saved */}
@@ -1205,6 +1189,7 @@ export default function ProfilePage() {
                       onClick={() => {
                         updateProfile({ phone: phoneInput, countryCode: countryCodeInput });
                         setPhoneSaved(true);
+                        setPhoneDraftDirty(false);
                       }}
                     >
                       Save number
@@ -1212,20 +1197,6 @@ export default function ProfilePage() {
                   )}
                   {phoneSaved && (
                     <span className="text-xs text-green-600 flex items-center gap-1"><Check className="h-3 w-3" /> Saved</span>
-                  )}
-                  {store.profile.whatsappVerified && (
-                    <button
-                      type="button"
-                      className="text-xs text-red-500 hover:underline"
-                      onClick={async () => {
-                        try {
-                          await fetch("/api/whatsapp/link", { method: "DELETE" });
-                        } catch { /* ignore */ }
-                        updateProfile({ whatsappVerified: false, whatsappPhone: undefined });
-                      }}
-                    >
-                      Unlink WhatsApp
-                    </button>
                   )}
                 </div>
                 <div className="flex min-w-0 flex-col gap-1.5 text-xs mv-muted">
@@ -1300,129 +1271,149 @@ export default function ProfilePage() {
             <CardContent>
               <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-3">
                 <div className="flex min-w-0 flex-col gap-1.5 text-xs mv-muted">
-                  <div className="flex items-center justify-between gap-2">
-                    <span>Height</span>
+                  <span>Height</span>
+                  <div className="flex h-10 w-full items-center rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] focus-within:ring-2 focus-within:ring-[var(--ring)]">
+                    <input
+                      className="h-full min-w-0 flex-1 rounded-l-2xl bg-transparent px-3 text-sm text-[var(--fg)] placeholder:text-[var(--muted)] outline-none"
+                      inputMode="decimal"
+                      placeholder={store.profile.bodyMetrics?.heightUnit === "in" ? "e.g. 65" : "e.g. 165"}
+                      value={cmToLengthDisplay(
+                        store.profile.bodyMetrics?.heightCm,
+                        store.profile.bodyMetrics?.heightUnit ?? "cm"
+                      )}
+                      onChange={(e) =>
+                        updateBodyMetrics({
+                          heightCm:
+                            parseLengthToCm(
+                              e.target.value,
+                              store.profile.bodyMetrics?.heightUnit ?? "cm"
+                            ),
+                        })
+                      }
+                    />
                     <Select
                       value={store.profile.bodyMetrics?.heightUnit ?? "cm"}
                       onValueChange={(v) =>
                         updateBodyMetrics({ heightUnit: v as "cm" | "in" })
                       }
                     >
-                      <SelectTrigger className="h-8 w-[5.75rem] shrink-0 rounded-xl border border-[var(--border)] bg-[var(--panel-2)] py-1 text-[11px] text-[var(--fg)]">
-                        <SelectValue />
+                      <SelectTrigger
+                        className="uma-select shrink-0 rounded-none rounded-r-[15px] bg-[var(--panel)] px-2 text-xs text-[var(--muted)]"
+                        style={{
+                          height: "100%",
+                          width: "auto",
+                          border: "none",
+                          borderLeft: "1px solid var(--border)",
+                          gap: 4,
+                          boxShadow: "none",
+                        }}
+                      >
+                        {store.profile.bodyMetrics?.heightUnit ?? "cm"}
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="cm">cm (SI)</SelectItem>
+                        <SelectItem value="cm">cm</SelectItem>
                         <SelectItem value="in">in</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  <Input
-                    inputMode="decimal"
-                    placeholder={store.profile.bodyMetrics?.heightUnit === "in" ? "e.g. 65" : "e.g. 165"}
-                    value={cmToLengthDisplay(
-                      store.profile.bodyMetrics?.heightCm,
-                      store.profile.bodyMetrics?.heightUnit ?? "cm"
-                    )}
-                    onChange={(e) =>
-                      updateBodyMetrics({
-                        heightCm:
-                          parseLengthToCm(
-                            e.target.value,
-                            store.profile.bodyMetrics?.heightUnit ?? "cm"
-                          ),
-                      })
-                    }
-                  />
                 </div>
                 <div className="flex min-w-0 flex-col gap-1.5 text-xs mv-muted">
-                  <div className="flex items-center justify-between gap-2">
-                    <span>Weight</span>
+                  <span>Weight</span>
+                  <div className="flex h-10 w-full items-center rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] focus-within:ring-2 focus-within:ring-[var(--ring)]">
+                    <input
+                      className="h-full min-w-0 flex-1 rounded-l-2xl bg-transparent px-3 text-sm text-[var(--fg)] placeholder:text-[var(--muted)] outline-none"
+                      inputMode="decimal"
+                      placeholder={store.profile.bodyMetrics?.weightUnit === "lb" ? "e.g. 150" : "e.g. 62"}
+                      value={kgToWeightDisplay(
+                        store.profile.bodyMetrics?.weightKg,
+                        store.profile.bodyMetrics?.weightUnit ?? "kg"
+                      )}
+                      onChange={(e) =>
+                        updateBodyMetrics({
+                          weightKg:
+                            parseWeightToKg(
+                              e.target.value,
+                              store.profile.bodyMetrics?.weightUnit ?? "kg"
+                            ),
+                        })
+                      }
+                    />
                     <Select
                       value={store.profile.bodyMetrics?.weightUnit ?? "kg"}
                       onValueChange={(v) =>
                         updateBodyMetrics({ weightUnit: v as "kg" | "lb" })
                       }
                     >
-                      <SelectTrigger className="h-8 w-[5.75rem] shrink-0 rounded-xl border border-[var(--border)] bg-[var(--panel-2)] py-1 text-[11px] text-[var(--fg)]">
-                        <SelectValue />
+                      <SelectTrigger
+                        className="uma-select shrink-0 rounded-none rounded-r-[15px] bg-[var(--panel)] px-2 text-xs text-[var(--muted)]"
+                        style={{
+                          height: "100%",
+                          width: "auto",
+                          border: "none",
+                          borderLeft: "1px solid var(--border)",
+                          gap: 4,
+                          boxShadow: "none",
+                        }}
+                      >
+                        {store.profile.bodyMetrics?.weightUnit ?? "kg"}
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="kg">kg (SI)</SelectItem>
+                        <SelectItem value="kg">kg</SelectItem>
                         <SelectItem value="lb">lb</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  <Input
-                    inputMode="decimal"
-                    placeholder={store.profile.bodyMetrics?.weightUnit === "lb" ? "e.g. 150" : "e.g. 62"}
-                    value={kgToWeightDisplay(
-                      store.profile.bodyMetrics?.weightKg,
-                      store.profile.bodyMetrics?.weightUnit ?? "kg"
-                    )}
-                    onChange={(e) =>
-                      updateBodyMetrics({
-                        weightKg:
-                          parseWeightToKg(
-                            e.target.value,
-                            store.profile.bodyMetrics?.weightUnit ?? "kg"
-                          ),
-                      })
-                    }
-                  />
                 </div>
                 <div className="flex min-w-0 flex-col gap-1.5 text-xs mv-muted">
-                  <div className="flex items-center justify-between gap-2">
-                    <span>Waist</span>
+                  <span>Waist</span>
+                  <div className="flex h-10 w-full items-center rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] focus-within:ring-2 focus-within:ring-[var(--ring)]">
+                    <input
+                      className="h-full min-w-0 flex-1 rounded-l-2xl bg-transparent px-3 text-sm text-[var(--fg)] placeholder:text-[var(--muted)] outline-none"
+                      inputMode="decimal"
+                      placeholder="Optional"
+                      value={cmToLengthDisplay(
+                        store.profile.bodyMetrics?.waistCm,
+                        store.profile.bodyMetrics?.waistUnit ?? "cm"
+                      )}
+                      onChange={(e) =>
+                        updateBodyMetrics({
+                          waistCm:
+                            parseLengthToCm(
+                              e.target.value,
+                              store.profile.bodyMetrics?.waistUnit ?? "cm"
+                            ),
+                        })
+                      }
+                    />
                     <Select
                       value={store.profile.bodyMetrics?.waistUnit ?? "cm"}
                       onValueChange={(v) =>
                         updateBodyMetrics({ waistUnit: v as "cm" | "in" })
                       }
                     >
-                      <SelectTrigger className="h-8 w-[5.75rem] shrink-0 rounded-xl border border-[var(--border)] bg-[var(--panel-2)] py-1 text-[11px] text-[var(--fg)]">
-                        <SelectValue />
+                      <SelectTrigger
+                        className="uma-select shrink-0 rounded-none rounded-r-[15px] bg-[var(--panel)] px-2 text-xs text-[var(--muted)]"
+                        style={{
+                          height: "100%",
+                          width: "auto",
+                          border: "none",
+                          borderLeft: "1px solid var(--border)",
+                          gap: 4,
+                          boxShadow: "none",
+                        }}
+                      >
+                        {store.profile.bodyMetrics?.waistUnit ?? "cm"}
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="cm">cm (SI)</SelectItem>
+                        <SelectItem value="cm">cm</SelectItem>
                         <SelectItem value="in">in</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  <Input
-                    inputMode="decimal"
-                    placeholder="Optional"
-                    value={cmToLengthDisplay(
-                      store.profile.bodyMetrics?.waistCm,
-                      store.profile.bodyMetrics?.waistUnit ?? "cm"
-                    )}
-                    onChange={(e) =>
-                      updateBodyMetrics({
-                        waistCm:
-                          parseLengthToCm(
-                            e.target.value,
-                            store.profile.bodyMetrics?.waistUnit ?? "cm"
-                          ),
-                      })
-                    }
-                  />
                 </div>
-                <div className="text-xs mv-muted lg:col-span-3">
-                  Blood pressure (mmHg)
-                  <div className="mt-1 grid grid-cols-2 gap-2 max-w-xs">
-                    <Input
-                      inputMode="numeric"
-                      placeholder="Systolic"
-                      value={store.profile.bodyMetrics?.bloodPressureSys ?? ""}
-                      onChange={(e) => updateBodyMetrics({ bloodPressureSys: e.target.value || undefined })}
-                    />
-                    <Input
-                      inputMode="numeric"
-                      placeholder="Diastolic"
-                      value={store.profile.bodyMetrics?.bloodPressureDia ?? ""}
-                      onChange={(e) => updateBodyMetrics({ bloodPressureDia: e.target.value || undefined })}
-                    />
-                  </div>
+                <div className="text-[11px] mv-muted lg:col-span-3">
+                  Log your blood pressure readings over time from the dashboard&apos;s Health log
+                  section — it tracks each reading with date, pulse, and notes.
                 </div>
               </div>
             </CardContent>
@@ -2113,34 +2104,8 @@ export default function ProfilePage() {
 
               {!otpSent ? (
                 <div className="space-y-3">
-                  <p className="text-xs font-medium text-[var(--fg)]">Send code via:</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setOtpChannel("whatsapp")}
-                      className={`flex flex-col items-center gap-1.5 rounded-2xl border p-3 text-xs font-medium transition-all ${
-                        otpChannel === "whatsapp"
-                          ? "border-[#25D366] bg-[#25D366]/10 text-[#25D366]"
-                          : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--fg)]/30"
-                      }`}
-                    >
-                      <span className="text-xl">💬</span>
-                      WhatsApp
-                      <span className="text-[10px] opacity-70">Free · Recommended</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setOtpChannel("sms")}
-                      className={`flex flex-col items-center gap-1.5 rounded-2xl border p-3 text-xs font-medium transition-all ${
-                        otpChannel === "sms"
-                          ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]"
-                          : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--fg)]/30"
-                      }`}
-                    >
-                      <span className="text-xl">📱</span>
-                      SMS
-                      <span className="text-[10px] opacity-70">Standard rates</span>
-                    </button>
+                  <div className="rounded-2xl border border-[#25D366]/40 bg-[#25D366]/10 px-3 py-2 text-xs text-[#25D366]">
+                    Verification codes are sent through WhatsApp only.
                   </div>
                   {waCodeError && (
                     <p className="text-xs text-red-500 whitespace-pre-line">{waCodeError}</p>
@@ -2177,16 +2142,13 @@ export default function ProfilePage() {
                       }
                     }}
                   >
-                    {waSending ? "Sending…" : `Send code via ${otpChannel === "whatsapp" ? "WhatsApp" : "SMS"}`}
+                    {waSending ? "Sending…" : "Send code on WhatsApp"}
                   </button>
                 </div>
               ) : (
                 <div className="space-y-3">
                   <p className="text-xs mv-muted">
-                    Code sent via {otpChannel === "whatsapp" ? "WhatsApp" : "SMS"}.{" "}
-                    {otpChannel === "whatsapp"
-                      ? "Check your WhatsApp messages."
-                      : "Check your text messages."}
+                    Code sent on WhatsApp. Check your WhatsApp messages.
                   </p>
                   <Input
                     maxLength={6}
@@ -2217,7 +2179,13 @@ export default function ProfilePage() {
                         if (!res.ok) {
                           setWaCodeError(data.error || "Verification failed.");
                         } else {
-                          updateProfile({ whatsappVerified: true, whatsappPhone: phoneInput });
+                          updateProfile({
+                            phone: phoneInput,
+                            countryCode: countryCodeInput,
+                            whatsappVerified: true,
+                            whatsappPhone: phoneInput,
+                          });
+                          setPhoneDraftDirty(false);
                           setShowOtpModal(false);
                           setOtpSent(false);
                           setWaCodeInput("");

@@ -42,6 +42,11 @@ export function DashboardHealthLogSection({
   const [seWhen, setSeWhen] = useState(() => new Date().toISOString().slice(0, 16));
   const [bpFormOpen, setBpFormOpen] = useState(false);
   const [seFormOpen, setSeFormOpen] = useState(false);
+  // Show the 3 most recent by default and reveal the rest on demand — keeps
+  // the dashboard free of secondary vertical scrolls on mobile.
+  const LOG_INLINE = 3;
+  const [bpExpanded, setBpExpanded] = useState(false);
+  const [seExpanded, setSeExpanded] = useState(false);
 
   const commit = useCallback(
     (next: PatientStore) => {
@@ -198,32 +203,46 @@ export function DashboardHealthLogSection({
               </form>
             ) : null}
             {bpRows.length > 0 ? (
-              <div className="max-h-[340px] overflow-y-auto pr-1 space-y-3">
-                {bpRows.map((r) => (
-                  <div key={r.id} className="rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] p-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold">
-                          {r.systolic}/{r.diastolic}
-                          {r.pulseBpm != null ? ` · pulse ${r.pulseBpm}` : ""}
-                        </p>
-                        <p className="text-xs text-[var(--muted)] mt-1">{formatLocal(r.loggedAtISO)}</p>
-                        {r.notes ? <p className="text-xs text-[var(--muted)] mt-2 line-clamp-3">{r.notes}</p> : null}
+              <>
+                <div className="space-y-3">
+                  {(bpExpanded ? bpRows : bpRows.slice(0, LOG_INLINE)).map((r) => (
+                    <div key={r.id} className="rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold">
+                            {r.systolic}/{r.diastolic}
+                            {r.pulseBpm != null ? ` · pulse ${r.pulseBpm}` : ""}
+                          </p>
+                          <p className="text-xs text-[var(--muted)] mt-1">{formatLocal(r.loggedAtISO)}</p>
+                          {r.notes ? <p className="text-xs text-[var(--muted)] mt-2 line-clamp-3">{r.notes}</p> : null}
+                        </div>
+                        <button
+                          type="button"
+                          className="h-8 w-8 shrink-0 rounded-lg border border-[var(--border)] bg-[var(--panel)] text-[var(--fg)] grid place-items-center"
+                          onClick={() => deleteBp(r.id)}
+                          aria-label="Remove reading"
+                        >
+                          <span className="text-lg leading-none" aria-hidden>
+                            ×
+                          </span>
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        className="h-8 w-8 shrink-0 rounded-lg border border-[var(--border)] bg-[var(--panel)] text-[var(--fg)] grid place-items-center"
-                        onClick={() => deleteBp(r.id)}
-                        aria-label="Remove reading"
-                      >
-                        <span className="text-lg leading-none" aria-hidden>
-                          ×
-                        </span>
-                      </button>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+                {bpRows.length > LOG_INLINE ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="mt-3 w-full"
+                    onClick={() => setBpExpanded((v) => !v)}
+                  >
+                    {bpExpanded
+                      ? "Show fewer readings"
+                      : `View all ${bpRows.length} readings`}
+                  </Button>
+                ) : null}
+              </>
             ) : null}
           </CardContent>
         </Card>
@@ -295,32 +314,46 @@ export function DashboardHealthLogSection({
               </form>
             ) : null}
             {seRows.length > 0 ? (
-              <div className="max-h-[340px] overflow-y-auto pr-1 space-y-3">
-                {seRows.map((r) => (
-                  <div key={r.id} className="rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] p-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold line-clamp-3">{r.description}</p>
-                        <p className="text-xs text-[var(--muted)] mt-1">
-                          {formatLocal(r.loggedAtISO)}
-                          {r.relatedMedicationName ? ` · ${r.relatedMedicationName}` : ""}
-                          {r.intensity && r.intensity !== "unspecified" ? ` · ${r.intensity}` : ""}
-                        </p>
+              <>
+                <div className="space-y-3">
+                  {(seExpanded ? seRows : seRows.slice(0, LOG_INLINE)).map((r) => (
+                    <div key={r.id} className="rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold line-clamp-3">{r.description}</p>
+                          <p className="text-xs text-[var(--muted)] mt-1">
+                            {formatLocal(r.loggedAtISO)}
+                            {r.relatedMedicationName ? ` · ${r.relatedMedicationName}` : ""}
+                            {r.intensity && r.intensity !== "unspecified" ? ` · ${r.intensity}` : ""}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className="h-8 w-8 shrink-0 rounded-lg border border-[var(--border)] bg-[var(--panel)] text-[var(--fg)] grid place-items-center"
+                          onClick={() => deleteSe(r.id)}
+                          aria-label="Remove note"
+                        >
+                          <span className="text-lg leading-none" aria-hidden>
+                            ×
+                          </span>
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        className="h-8 w-8 shrink-0 rounded-lg border border-[var(--border)] bg-[var(--panel)] text-[var(--fg)] grid place-items-center"
-                        onClick={() => deleteSe(r.id)}
-                        aria-label="Remove note"
-                      >
-                        <span className="text-lg leading-none" aria-hidden>
-                          ×
-                        </span>
-                      </button>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+                {seRows.length > LOG_INLINE ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="mt-3 w-full"
+                    onClick={() => setSeExpanded((v) => !v)}
+                  >
+                    {seExpanded
+                      ? "Show fewer notes"
+                      : `View all ${seRows.length} notes`}
+                  </Button>
+                ) : null}
+              </>
             ) : null}
           </CardContent>
         </Card>

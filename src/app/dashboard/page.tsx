@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
@@ -13,6 +14,13 @@ import { DateTimePicker } from "@/components/ui/DateTimePicker";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/Select";
 import { AppTopNav } from "@/components/nav/AppTopNav";
 import { DashboardHealthLogSection } from "@/components/health/DashboardHealthLogSection";
+import { BmiCard } from "@/components/health/BmiCard";
+import { DashboardGrid } from "@/components/dashboard/DashboardGrid";
+import { DashboardEditToolbar } from "@/components/dashboard/DashboardEditToolbar";
+import {
+  defaultDashboardLayout,
+  normalizeDashboardLayout,
+} from "@/lib/dashboardLayout";
 import { HealthTrendsSection } from "@/components/labs/HealthTrendsSection";
 import { LabReadingTile } from "@/components/labs/LabReadingTile";
 import { RecordNoticeToast } from "@/components/ui/RecordNoticeToast";
@@ -21,6 +29,8 @@ import { getHydrationSafeStore, getStore, saveStore, getHydrationSafeViewingStor
 import { useGlobalUpload } from "@/lib/uploadContext";
 import {
   DocType,
+  DashboardLayout,
+  DashboardWidgetId,
   ExtractionCost,
   ExtractedDoc,
   ExtractedLab,
@@ -91,6 +101,7 @@ import {
   CircleDot,
   ArrowUpRight,
   CheckCircle2,
+  Layers,
 } from "lucide-react";
 import { Combobox } from "@/components/ui/Combobox";
 
@@ -247,6 +258,9 @@ function nextDoseWindow(frequency?: string, usualTimeLocalHHmm?: string) {
 type OverlayKind = "reports" | "meds" | "labs" | "add-med" | "add-report" | "upload-report" | null;
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [store, setStore] = useState(() => getHydrationSafeViewingStore());
   const [activeMember, setActiveMemberState] = useState(() => typeof window !== "undefined" ? getActiveFamilyMember() : null);
   const [printing, setPrinting] = useState(false);
@@ -436,6 +450,18 @@ export default function DashboardPage() {
       document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }, []);
+
+  // Open the upload overlay when arriving via the sidebar's "Upload documents" shortcut
+  // (e.g. /dashboard?upload=1). We strip the query param afterwards so the modal doesn't
+  // keep re-opening on back-navigation or store refresh.
+  useEffect(() => {
+    if (searchParams?.get("upload") !== "1") return;
+    setOverlay(globalUpload.phase === "ready" && globalUpload.result ? "upload-report" : "add-report");
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("upload");
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [searchParams, router, pathname, globalUpload.phase, globalUpload.result]);
 
   // When a background extraction finishes (user may have navigated away and returned),
   // promote the result into the local preview state so the review card appears.
@@ -1268,9 +1294,34 @@ export default function DashboardPage() {
   }, [store.profile, store.meds, store.docs.length, store.labs.length, healthSnapshot]);
 
 
-  const inlineDocs = recentDocs.slice(0, 4);
-  const inlineMeds = recentMeds.slice(0, 4);
-  const inlineLabs = recentLabs.slice(0, 9);
+  // Keep inline lists short so we don't need a secondary vertical scroll on
+  // mobile — the "Show more" buttons open the full list in an overlay when
+  // users want to see everything.
+  const inlineDocs = recentDocs.slice(0, 3);
+  const inlineMeds = recentMeds.slice(0, 3);
+  const inlineLabs = recentLabs.slice(0, 6);
+
+  // Editable dashboard layout. The layout lives in preferences but is
+  // normalised on read so rows reference known widget ids, each widget
+  // appears at most once, row caps are enforced, and new widgets shipped
+  // after the user's layout was saved surface in the hidden palette.
+  const [editMode, setEditMode] = useState(false);
+  const dashboardLayout = useMemo(
+    () => normalizeDashboardLayout(store.preferences.dashboardLayout ?? defaultDashboardLayout()),
+    [store.preferences.dashboardLayout],
+  );
+  const handleDashboardLayoutChange = useCallback(
+    (next: DashboardLayout) => {
+      const updated: typeof store = {
+        ...store,
+        preferences: { ...store.preferences, dashboardLayout: next },
+        updatedAtISO: new Date().toISOString(),
+      };
+      saveViewingStore(updated);
+      setStore(updated);
+    },
+    [store],
+  );
 
   return (
     <div className="flex min-h-full flex-col">
@@ -1312,6 +1363,15 @@ export default function DashboardPage() {
             </button>
           </div>
         )}
+        {/* Dashboard grid: widgets are defined inline below as entries in
+            `widgetNodes`, then rendered in whatever order the user has
+            configured via `<DashboardGrid />`. Adding a widget means:
+             1) add a new `widgetNodes.xxx = (...);` block here,
+             2) extend `DashboardWidgetId` and `DASHBOARD_WIDGET_META`,
+             3) add the id to the default layout or hidden palette. */}
+        {(() => {
+          const widgetNodes: Partial<Record<DashboardWidgetId, React.ReactNode>> = {};
+          widgetNodes.snapshot = (
         <section className="mv-card rounded-3xl p-6 mv-surface">
           <div className="grid min-w-0 gap-5 lg:grid-cols-[1.6fr_1fr]">
             <div className="min-w-0">
@@ -1537,8 +1597,11 @@ export default function DashboardPage() {
             </Card>
           </div>
         </section>
+          );
 
-        <div className="grid gap-4 lg:grid-cols-2">
+          widgetNodes.bmi = <BmiCard store={store} />;
+
+          widgetNodes.documents = (
           <Card id="dashboard-latest-reports" className="scroll-mt-24">
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -1560,7 +1623,7 @@ export default function DashboardPage() {
                   No files yet. Upload something to start your list.
                 </div>
               ) : (
-                <div className="max-h-[340px] overflow-y-auto pr-1 space-y-3">
+                <div className="space-y-3">
                   {inlineDocs.map((d) => (
                     <div key={d.id} className="rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] p-3">
                       <div className="flex items-start justify-between gap-2">
@@ -1596,7 +1659,9 @@ export default function DashboardPage() {
               )}
             </CardContent>
           </Card>
+          );
 
+          widgetNodes.medications = (
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -1902,24 +1967,27 @@ export default function DashboardPage() {
               </div>
             </CardContent>
           </Card>
-        </div>
+          );
 
-        <DashboardHealthLogSection store={store} onStoreChange={updateStore} />
+          widgetNodes.healthLogs = (
+            <DashboardHealthLogSection store={store} onStoreChange={updateStore} />
+          );
 
-        {trendCards.length > 0 && (
-          <HealthTrendsSection
-            metrics={trendCards.map((t) => ({ name: t.name, data: t.raw }))}
-            pinnedNames={pinnedTrendMetrics}
-            onPinToggle={handlePinToggle}
-          />
-        )}
+          widgetNodes.healthTrends = trendCards.length > 0 ? (
+            <HealthTrendsSection
+              metrics={trendCards.map((t) => ({ name: t.name, data: t.raw }))}
+              pinnedNames={pinnedTrendMetrics}
+              onPinToggle={handlePinToggle}
+            />
+          ) : null;
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Activity className="h-4 w-4 text-[var(--accent)]" />
-                <h2 className="text-sm font-semibold">Recent test results</h2>
+          widgetNodes.labs = (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-[var(--accent)]" />
+                  <h2 className="text-sm font-semibold">Recent test results</h2>
               </div>
               <div className="flex items-center gap-2">
                 <Badge>{recentLabs.length} on screen</Badge>
@@ -1950,7 +2018,7 @@ export default function DashboardPage() {
                       No test results yet. Upload a file to see them here.
                     </div>
                   ) : (
-                    <div className="max-h-[300px] overflow-y-auto pr-1 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
                       {displayLabs.map((lab, idx) => (
                         <LabReadingTile key={`${lab.name}-${lab.date}-${idx}`} lab={lab} extensions={lex} />
                       ))}
@@ -1968,6 +2036,40 @@ export default function DashboardPage() {
             })()}
           </CardContent>
         </Card>
+          );
+
+          return (
+            <>
+              {editMode && (
+                <DashboardEditToolbar
+                  layout={dashboardLayout}
+                  onLayoutChange={handleDashboardLayoutChange}
+                  onDone={() => setEditMode(false)}
+                />
+              )}
+              {!editMode && (
+                <div className="flex items-center justify-end -mt-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-8 gap-1.5 px-3 text-xs"
+                    onClick={() => setEditMode(true)}
+                    title="Rearrange, add, or remove dashboard cards"
+                  >
+                    <Layers className="h-3.5 w-3.5" />
+                    Edit dashboard
+                  </Button>
+                </div>
+              )}
+              <DashboardGrid
+                layout={dashboardLayout}
+                onLayoutChange={handleDashboardLayoutChange}
+                editMode={editMode}
+                renderWidget={(id) => widgetNodes[id] ?? null}
+              />
+            </>
+          );
+        })()}
 
       </main>
 

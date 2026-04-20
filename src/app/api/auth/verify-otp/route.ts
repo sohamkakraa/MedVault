@@ -51,16 +51,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Invalid email address." }, { status: 400 });
   }
 
-  if (norm.kind === "phone") {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "Sign-in with phone is not available yet. Please use your email address.",
-      },
-      { status: 400 },
-    );
-  }
-
   let otpOk = false;
   try {
     otpOk = await verifyAndConsumeOtpDb(norm.key, code);
@@ -75,7 +65,9 @@ export async function POST(req: Request) {
       {
         ok: false,
         error:
-          "Incorrect or expired code. Check the latest email we sent, or tap Send code to get a new one.",
+          norm.kind === "phone"
+            ? "Incorrect or expired code. Check the latest WhatsApp message, or tap Send code to get a new one."
+            : "Incorrect or expired code. Check the latest email we sent, or tap Send code to get a new one.",
       },
       { status: 401 },
     );
@@ -83,9 +75,36 @@ export async function POST(req: Request) {
 
   let user: { id: string; email: string | null; phoneE164: string | null };
   try {
-    let u = await prisma.user.findUnique({ where: { email: norm.display } });
-    if (!u) u = await prisma.user.create({ data: { email: norm.display } });
-    user = u;
+    if (norm.kind === "phone") {
+      // Find-or-create a user keyed by phone. Because the code was just
+      // delivered via WhatsApp and successfully entered back, we also mark
+      // the WhatsApp link as verified so inbound chat works immediately
+      // (processMessage.ts looks up `whatsappPhone + whatsappVerified`).
+      const whatsappDigits = norm.e164.replace(/\D/g, "");
+      let u = await prisma.user.findUnique({ where: { phoneE164: norm.e164 } });
+      if (!u) {
+        u = await prisma.user.create({
+          data: {
+            phoneE164: norm.e164,
+            whatsappPhone: whatsappDigits,
+            whatsappVerified: true,
+          },
+        });
+      } else if (!u.whatsappVerified || u.whatsappPhone !== whatsappDigits) {
+        u = await prisma.user.update({
+          where: { id: u.id },
+          data: {
+            whatsappPhone: whatsappDigits,
+            whatsappVerified: true,
+          },
+        });
+      }
+      user = u;
+    } else {
+      let u = await prisma.user.findUnique({ where: { email: norm.display } });
+      if (!u) u = await prisma.user.create({ data: { email: norm.display } });
+      user = u;
+    }
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       return NextResponse.json(

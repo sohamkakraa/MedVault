@@ -1,20 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { LayoutDashboard, UserRound, FileUp, MessageCircle } from "lucide-react";
 import { cn } from "@/components/ui/cn";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/Tooltip";
 
 const ITEMS = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/profile", label: "Profile & health details", icon: UserRound },
-  { href: "/upload", label: "Upload documents", icon: FileUp },
-  { href: "/chat", label: "Chat", icon: MessageCircle },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, match: "/dashboard" },
+  { href: "/profile", label: "Profile & health details", icon: UserRound, match: "/profile" },
+  { href: "/dashboard?upload=1", label: "Upload documents", icon: FileUp, match: "upload" },
+  { href: "/chat", label: "Chat", icon: MessageCircle, match: "/chat" },
 ] as const;
 
 export function AppSideNav() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const uploadActive = searchParams?.get("upload") === "1";
 
   return (
     <aside
@@ -22,11 +24,13 @@ export function AppSideNav() {
       aria-label="Main navigation"
     >
       <nav className="flex flex-1 flex-col items-center gap-1 px-1">
-        {ITEMS.map(({ href, label, icon: Icon }) => {
+        {ITEMS.map(({ href, label, icon: Icon, match }) => {
           const active =
-            href === "/dashboard"
-              ? pathname === "/dashboard"
-              : pathname === href || pathname.startsWith(`${href}/`);
+            match === "upload"
+              ? uploadActive
+              : match === "/dashboard"
+                ? pathname === "/dashboard" && !uploadActive
+                : pathname === match || pathname.startsWith(`${match}/`);
           return (
             <Tooltip key={href} delayDuration={300}>
               <TooltipTrigger asChild>

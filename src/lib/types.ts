@@ -236,6 +236,34 @@ export type UsageLogEntry = {
   label: string;
 };
 
+/**
+ * Dashboard widget identifiers. Adding a new widget means:
+ *  1) add its id here,
+ *  2) teach `renderWidget()` in the dashboard page how to render it,
+ *  3) add a label + description entry to `DASHBOARD_WIDGET_META` in
+ *     `src/lib/dashboardLayout.ts`.
+ */
+export type DashboardWidgetId =
+  | "snapshot"
+  | "documents"
+  | "medications"
+  | "healthLogs"
+  | "healthTrends"
+  | "labs"
+  | "bmi";
+
+/** One row of the dashboard grid: 1–3 widgets rendered side-by-side. */
+export type DashboardRow = {
+  id: string;
+  widgets: DashboardWidgetId[];
+};
+
+export type DashboardLayout = {
+  rows: DashboardRow[];
+  /** Widgets the user has removed — available to re-add from the palette. */
+  hidden: DashboardWidgetId[];
+};
+
 /** Optional vitals for charts and visit summaries (strings for flexible local formats). */
 export type BodyMetrics = {
   heightCm?: string;
@@ -444,6 +472,13 @@ export type PatientStore = {
       completedAtISO?: string;
       lastStepReached?: 1 | 2;
     };
+    /**
+     * Custom dashboard grid layout. Each row holds 1–3 widgets that auto-resize
+     * to fill the row; empty rows are pruned on save. `hidden` lists widgets the
+     * user has removed but can re-add from the palette in edit mode. When
+     * undefined, the default layout (see `DEFAULT_DASHBOARD_LAYOUT`) is used.
+     */
+    dashboardLayout?: DashboardLayout;
   };
   /** Merged with `DEFAULT_LEXICON` for resolving lab keys and charts. */
   standardLexicon?: StandardLexiconEntry[];

@@ -14,6 +14,7 @@ import {
 } from "@/lib/store";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { UmaLogo } from "@/components/branding/UmaLogo";
+import { COUNTRY_CODES, findCountryByDial } from "@/lib/countryCodes";
 
 /** Local assets (Unsplash originals: wellness stretch, forest path). */
 const LOGIN_HERO = "/images/login/hero-wellness.jpg";
@@ -63,9 +64,16 @@ export default function LoginForm({ showBetaDemoGuidance }: LoginFormProps) {
   const oauthError = sp.get("error");
   const router = useRouter();
 
+  const [mode, setMode] = useState<"email" | "phone">("email");
   const [email, setEmail] = useState("");
+  const [phoneCountryCode, setPhoneCountryCode] = useState("+91");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [ccOpen, setCcOpen] = useState(false);
+  const [ccSearch, setCcSearch] = useState("");
+  const ccRef = useRef<HTMLDivElement>(null);
   const [code, setCode] = useState("");
   const [step, setStep] = useState<"enter" | "otp">("enter");
+  const [channel, setChannel] = useState<"email" | "phone">("email");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -76,7 +84,26 @@ export default function LoginForm({ showBetaDemoGuidance }: LoginFormProps) {
 
   const verifyLock = useRef(false);
 
-  const identifier = email.trim();
+  const identifier =
+    mode === "email" ? email.trim() : phoneNumber.replace(/\D/g, "");
+  const canSubmit =
+    mode === "email"
+      ? identifier.length > 0
+      : identifier.length >= 6 && identifier.length <= 14;
+  const displayIdentifier =
+    mode === "phone" ? `${phoneCountryCode} ${identifier}` : email.trim();
+
+  useEffect(() => {
+    if (!ccOpen) return;
+    function onDown(e: MouseEvent) {
+      if (ccRef.current && !ccRef.current.contains(e.target as Node)) {
+        setCcOpen(false);
+        setCcSearch("");
+      }
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [ccOpen]);
 
   const completeSignIn = useCallback(
     async (sixDigitCode: string) => {
@@ -93,6 +120,7 @@ export default function LoginForm({ showBetaDemoGuidance }: LoginFormProps) {
           body: JSON.stringify({
             identifier,
             code: normalized,
+            ...(mode === "phone" ? { phoneCountryCode } : {}),
           }),
         });
         const j = (await r.json()) as { ok?: boolean; error?: string };
@@ -120,7 +148,7 @@ export default function LoginForm({ showBetaDemoGuidance }: LoginFormProps) {
         verifyLock.current = false;
       }
     },
-    [identifier, next],
+    [identifier, mode, phoneCountryCode, next],
   );
 
   useEffect(() => {
@@ -185,17 +213,22 @@ export default function LoginForm({ showBetaDemoGuidance }: LoginFormProps) {
       const r = await fetch("/api/auth/request-otp", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ identifier }),
+        body: JSON.stringify({
+          identifier,
+          ...(mode === "phone" ? { phoneCountryCode } : {}),
+        }),
       });
       const j = (await r.json()) as {
         ok?: boolean;
         error?: string;
         message?: string;
+        channel?: "email" | "phone";
         devOtp?: string;
         betaDemoOtp?: string;
       };
       if (!j.ok) throw new Error(j.error ?? "Could not send code");
       setStep("otp");
+      setChannel(j.channel ?? mode);
       if (j.message) setInfo(j.message);
       if (typeof j.devOtp === "string") setDevOtpHint(j.devOtp);
       if (typeof j.betaDemoOtp === "string") setBetaOtpHint(j.betaDemoOtp);
@@ -337,19 +370,139 @@ export default function LoginForm({ showBetaDemoGuidance }: LoginFormProps) {
                       Continue with Google
                     </a> */}
 
-                    {/* ── Email OTP ─────────────────────────── */}
+                    {/* ── Mode toggle: Email / Phone ────────── */}
+                    <div
+                      role="tablist"
+                      className="grid grid-cols-2 gap-1 rounded-xl bg-[var(--panel-2)] p-1 text-sm"
+                    >
+                      {(["email", "phone"] as const).map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          role="tab"
+                          aria-selected={mode === m}
+                          onClick={() => {
+                            setMode(m);
+                            setErr(null);
+                            setInfo(null);
+                          }}
+                          className={`rounded-lg py-1.5 font-medium transition-colors ${
+                            mode === m
+                              ? "bg-[var(--panel)] text-[var(--fg)] shadow-sm"
+                              : "text-[var(--muted)] hover:text-[var(--fg)]"
+                          }`}
+                        >
+                          {m === "email" ? "Email" : "Phone (WhatsApp)"}
+                        </button>
+                      ))}
+                    </div>
+
                     <form onSubmit={requestOtp} className="space-y-4">
-                      <label className="text-xs mv-muted block">
-                        Email
-                        <Input
-                          type="email"
-                          className="mt-1"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder="you@example.com"
-                          autoComplete="email"
-                        />
-                      </label>
+                      {mode === "email" ? (
+                        <label className="text-xs mv-muted block">
+                          Email
+                          <Input
+                            type="email"
+                            className="mt-1"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="you@example.com"
+                            autoComplete="email"
+                          />
+                        </label>
+                      ) : (
+                        <div className="space-y-1.5">
+                          <span className="text-xs mv-muted block">Phone number</span>
+                          <div className="flex items-stretch gap-2">
+                            <div ref={ccRef} className="relative">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCcOpen((o) => !o);
+                                  setCcSearch("");
+                                }}
+                                className="flex h-10 items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--panel-2)] px-3 text-sm text-[var(--fg)] hover:border-[var(--accent)]/50 transition-colors whitespace-nowrap"
+                                aria-haspopup="listbox"
+                                aria-expanded={ccOpen}
+                              >
+                                {findCountryByDial(phoneCountryCode)?.flag ?? "🌐"}{" "}
+                                {phoneCountryCode}
+                                <svg
+                                  className="h-3 w-3 text-[var(--muted)] ml-0.5"
+                                  viewBox="0 0 12 12"
+                                  fill="currentColor"
+                                  aria-hidden
+                                >
+                                  <path
+                                    d="M2 4l4 4 4-4"
+                                    stroke="currentColor"
+                                    strokeWidth="1.5"
+                                    fill="none"
+                                    strokeLinecap="round"
+                                  />
+                                </svg>
+                              </button>
+                              {ccOpen && (
+                                <div className="absolute top-full left-0 z-50 mt-1 w-64 rounded-2xl border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow)] overflow-hidden">
+                                  <div className="p-2 border-b border-[var(--border)]">
+                                    <input
+                                      autoFocus
+                                      type="text"
+                                      placeholder="Search country or code…"
+                                      value={ccSearch}
+                                      onChange={(e) => setCcSearch(e.target.value)}
+                                      className="w-full rounded-xl border border-[var(--border)] bg-[var(--panel-2)] px-3 py-1.5 text-xs text-[var(--fg)] placeholder:text-[var(--muted)] outline-none focus:border-[var(--accent)]"
+                                    />
+                                  </div>
+                                  <div className="max-h-52 overflow-y-auto">
+                                    {COUNTRY_CODES.filter((c) => {
+                                      const q = ccSearch.toLowerCase();
+                                      return (
+                                        !q ||
+                                        c.name.toLowerCase().includes(q) ||
+                                        c.dial.includes(q)
+                                      );
+                                    }).map((c) => (
+                                      <button
+                                        key={c.dial}
+                                        type="button"
+                                        onClick={() => {
+                                          setPhoneCountryCode(c.dial);
+                                          setCcOpen(false);
+                                          setCcSearch("");
+                                        }}
+                                        className={`w-full flex items-center gap-3 px-3 py-2 text-xs text-left transition-colors hover:bg-[var(--panel-2)] ${
+                                          phoneCountryCode === c.dial
+                                            ? "bg-[var(--accent)]/8 text-[var(--accent)]"
+                                            : "text-[var(--fg)]"
+                                        }`}
+                                      >
+                                        <span className="text-base shrink-0">{c.flag}</span>
+                                        <span className="font-medium shrink-0">{c.dial}</span>
+                                        <span className="text-[var(--muted)] truncate">{c.name}</span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            <Input
+                              inputMode="numeric"
+                              autoComplete="tel-national"
+                              placeholder="Phone number"
+                              value={phoneNumber}
+                              onChange={(e) =>
+                                setPhoneNumber(e.target.value.replace(/\D/g, ""))
+                              }
+                              className="flex-1"
+                            />
+                          </div>
+                          <p className="text-[11px] mv-muted">
+                            We&apos;ll send a 6-digit code to this number on WhatsApp. New
+                            here? We&apos;ll create your account once you verify.
+                          </p>
+                        </div>
+                      )}
 
                       {info && (
                         <p className="rounded-xl border border-[var(--border)] bg-[var(--panel-2)] p-3 text-xs leading-relaxed mv-muted">
@@ -363,19 +516,21 @@ export default function LoginForm({ showBetaDemoGuidance }: LoginFormProps) {
                         </div>
                       )}
 
-                      <Button
-                        disabled={loading || !identifier}
-                        className="w-full"
-                      >
-                        {loading ? "Sending…" : "Send code"}
+                      <Button disabled={loading || !canSubmit} className="w-full">
+                        {loading
+                          ? "Sending…"
+                          : mode === "phone"
+                            ? "Send WhatsApp code"
+                            : "Send code"}
                       </Button>
                     </form>
                   </div>
                 ) : (
                   <form onSubmit={verifyOtp} className="space-y-4">
                     <p className="text-sm mv-muted">
-                      Enter the 6-digit code we sent to{" "}
-                      <span className="text-[var(--fg)]">{identifier}</span>.
+                      Enter the 6-digit code we sent{" "}
+                      {channel === "phone" ? "on WhatsApp to" : "to"}{" "}
+                      <span className="text-[var(--fg)]">{displayIdentifier}</span>.
                     </p>
                     {devOtpHint && (
                       <p className="rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 p-3 text-xs text-[var(--fg)]">

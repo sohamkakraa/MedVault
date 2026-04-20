@@ -13,6 +13,7 @@ import {
   messageForSendSignInOtpFailure,
   sendSignInOtpEmail,
 } from "@/lib/auth/sendSignInOtp";
+import { isWhatsAppConfigured, sendOtpMessage } from "@/lib/whatsapp/client";
 
 export const runtime = "nodejs";
 
@@ -67,16 +68,6 @@ export async function POST(req: Request) {
     );
   }
 
-  if (norm.kind === "phone") {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "Sign-in with phone is not available yet. Please use your email address.",
-      },
-      { status: 400 },
-    );
-  }
-
   const betaCfg = getBetaDemoConfig();
   const code =
     betaCfg && isBetaDemoIdentifier(norm) ? betaCfg.otp : String(Math.floor(100000 + Math.random() * 900000));
@@ -93,6 +84,65 @@ export async function POST(req: Request) {
   const betaExpose = isBetaDemoIdentifier(norm) && shouldExposeBetaDemoOtp();
   const emailConfigured = isOtpEmailDeliveryConfigured();
   const isBetaDemoUser = Boolean(betaCfg && isBetaDemoIdentifier(norm));
+
+  // Phone sign-in via WhatsApp. We reuse the same OtpChallenge store the email
+  // path uses, so `verify-otp` can consume the code from the same lookup key.
+  if (norm.kind === "phone") {
+    if (!isWhatsAppConfigured()) {
+      if (devReturn) {
+        return NextResponse.json({
+          ok: true,
+          channel: norm.kind,
+          devOtp: code,
+          message:
+            "WhatsApp is not configured on this server. For local or Preview testing, the sign-in code is shown below.",
+        });
+      }
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Phone sign-in is not configured. Set WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, and (ideally) WHATSAPP_OTP_TEMPLATE_NAME on the server.",
+        },
+        { status: 503 },
+      );
+    }
+
+    try {
+      // `sendOtpMessage` uses the approved template when WHATSAPP_OTP_TEMPLATE_NAME
+      // is set, otherwise falls back to plain text (which Meta usually blocks
+      // outside a 24h window — the client logs a clear warning).
+      await sendOtpMessage(norm.e164, code);
+    } catch (e) {
+      console.error("[uma-auth] WhatsApp OTP send failed", e);
+      if (devReturn) {
+        return NextResponse.json({
+          ok: true,
+          channel: norm.kind,
+          devOtp: code,
+          message:
+            "WhatsApp send failed; showing the code inline because AUTH_DEV_RETURN_OTP is enabled.",
+        });
+      }
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "We could not send the WhatsApp code. Double-check the number and try again, or sign in with email.",
+        },
+        { status: 502 },
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      channel: norm.kind,
+      message:
+        "We sent a 6-digit code to your WhatsApp. It expires in 10 minutes. If you do not see it, re-open WhatsApp or request a new code.",
+      ...(devReturn ? { devOtp: code } : {}),
+      ...(betaExpose ? { betaDemoOtp: code } : {}),
+    });
+  }
 
   if (emailConfigured) {
     const sent = await sendSignInOtpEmail(norm.display, code);
