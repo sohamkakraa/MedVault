@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { usePathname } from "next/navigation";
 import { AppSideNav } from "@/components/nav/AppSideNav";
 
@@ -14,7 +15,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex w-full min-w-0 min-h-dvh">
-      <AppSideNav />
+      <Suspense fallback={null}>
+        <AppSideNav />
+      </Suspense>
       <div className="flex min-h-dvh min-w-0 flex-1 flex-col">{children}</div>
     </div>
   );
