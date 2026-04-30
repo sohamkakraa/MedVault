@@ -1482,26 +1482,36 @@ function DashboardInner() {
                 {healthNarrative ?? "Upload a health report to get your personalised health summary."}
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  title={conditionBadgeTitle}
-                  aria-label={conditionBadgeTitle}
-                  onClick={() => { window.location.href = "/profile#profile-conditions"; }}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] px-3 py-2 text-xs font-medium text-[var(--fg)] hover:border-[var(--accent)]/50 hover:bg-[var(--accent)]/8 transition-all snapshot-badge"
-                >
-                  <Stethoscope className="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />
-                  <span>{store.profile.conditions.length > 0 ? store.profile.conditions.slice(0,2).join(", ") + (store.profile.conditions.length > 2 ? ` +${store.profile.conditions.length-2} more` : "") : "No conditions"}</span>
-                </button>
-                <button
-                  type="button"
-                  title={allergyBadgeTitle}
-                  aria-label={allergyBadgeTitle}
-                  onClick={() => { window.location.href = "/profile#profile-allergies"; }}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] px-3 py-2 text-xs font-medium text-[var(--fg)] hover:border-[var(--accent)]/50 hover:bg-[var(--accent)]/8 transition-all snapshot-badge"
-                >
-                  <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-amber-500" />
-                  <span>{store.profile.allergies.length > 0 ? store.profile.allergies.slice(0,2).join(", ") + (store.profile.allergies.length > 2 ? ` +${store.profile.allergies.length-2}` : "") : "No allergies"}</span>
-                </button>
+                {/* Hide the conditions / allergies pills entirely when the user
+                    hasn't saved any. Empty-state copy ("No conditions") was
+                    visual noise on a fresh account — the user can always reach
+                    these via the Profile page. The visit-summary export (later
+                    in this file) still shows "None" because that document is
+                    for handing to a clinician, where the absence is meaningful. */}
+                {store.profile.conditions.length > 0 ? (
+                  <button
+                    type="button"
+                    title={conditionBadgeTitle}
+                    aria-label={conditionBadgeTitle}
+                    onClick={() => { window.location.href = "/profile#profile-conditions"; }}
+                    className="inline-flex items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] px-3 py-2 text-xs font-medium text-[var(--fg)] hover:border-[var(--accent)]/50 hover:bg-[var(--accent)]/8 transition-all snapshot-badge"
+                  >
+                    <Stethoscope className="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />
+                    <span>{store.profile.conditions.slice(0,2).join(", ")}{store.profile.conditions.length > 2 ? ` +${store.profile.conditions.length-2} more` : ""}</span>
+                  </button>
+                ) : null}
+                {store.profile.allergies.length > 0 ? (
+                  <button
+                    type="button"
+                    title={allergyBadgeTitle}
+                    aria-label={allergyBadgeTitle}
+                    onClick={() => { window.location.href = "/profile#profile-allergies"; }}
+                    className="inline-flex items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] px-3 py-2 text-xs font-medium text-[var(--fg)] hover:border-[var(--accent)]/50 hover:bg-[var(--accent)]/8 transition-all snapshot-badge"
+                  >
+                    <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                    <span>{store.profile.allergies.slice(0,2).join(", ")}{store.profile.allergies.length > 2 ? ` +${store.profile.allergies.length-2}` : ""}</span>
+                  </button>
+                ) : null}
                 {store.profile.sex === "Female" &&
                 (store.profile.menstrualCycle?.lastPeriodStartISO ||
                 (store.profile.menstrualCycle?.flowLogDates?.length ?? 0) > 0) ? (

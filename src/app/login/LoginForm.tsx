@@ -392,7 +392,7 @@ export default function LoginForm({ showBetaDemoGuidance }: LoginFormProps) {
                               : "text-[var(--muted)] hover:text-[var(--fg)]"
                           }`}
                         >
-                          {m === "email" ? "Email" : "Phone (WhatsApp)"}
+                          {m === "email" ? "Email" : "Phone"}
                         </button>
                       ))}
                     </div>
@@ -498,8 +498,8 @@ export default function LoginForm({ showBetaDemoGuidance }: LoginFormProps) {
                             />
                           </div>
                           <p className="text-[11px] mv-muted">
-                            We&apos;ll send a 6-digit code to this number on WhatsApp. New
-                            here? We&apos;ll create your account once you verify.
+                            We&apos;ll send you a 6-digit code. New here? We&apos;ll create
+                            your account once you verify.
                           </p>
                         </div>
                       )}
@@ -517,21 +517,33 @@ export default function LoginForm({ showBetaDemoGuidance }: LoginFormProps) {
                       )}
 
                       <Button disabled={loading || !canSubmit} className="w-full">
-                        {loading
-                          ? "Sending…"
-                          : mode === "phone"
-                            ? "Send WhatsApp code"
-                            : "Send code"}
+                        {loading ? "Sending…" : "Send code"}
                       </Button>
                     </form>
                   </div>
                 ) : (
                   <form onSubmit={verifyOtp} className="space-y-4">
                     <p className="text-sm mv-muted">
-                      Enter the 6-digit code we sent{" "}
-                      {channel === "phone" ? "on WhatsApp to" : "to"}{" "}
+                      Enter the 6-digit code we sent to{" "}
                       <span className="text-[var(--fg)]">{displayIdentifier}</span>.
                     </p>
+                    {channel === "phone" ? (
+                      <p
+                        className="-mt-2 inline-flex items-center gap-1.5 text-[11px] font-medium"
+                        style={{ color: "#25D366" }}
+                        aria-live="polite"
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                          aria-hidden
+                          className="h-3 w-3"
+                        >
+                          <path d="M17.5 14.4c-.3-.1-1.7-.8-1.9-.9-.3-.1-.4-.1-.6.1-.2.2-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.1-1.2-.4-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6.1-.1.3-.3.4-.5.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5 0-.1-.6-1.5-.8-2-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.3.3-1 1-1 2.4 0 1.4 1 2.8 1.2 3 .1.2 2 3.1 4.9 4.3.7.3 1.2.5 1.6.6.7.2 1.3.2 1.8.1.6-.1 1.7-.7 1.9-1.3.2-.7.2-1.2.2-1.3-.1-.1-.2-.2-.5-.3M12 22a9.9 9.9 0 0 1-5-1.4l-.4-.2-3.7 1 1-3.6-.2-.4A10 10 0 1 1 22 12a10 10 0 0 1-10 10m0-22a12 12 0 0 0-10.4 18l-1.6 6 6.1-1.6A12 12 0 1 0 12 0" />
+                        </svg>
+                        Code sent via WhatsApp
+                      </p>
+                    ) : null}
                     {devOtpHint && (
                       <p className="rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 p-3 text-xs text-[var(--fg)]">
                         For developers: your code is{" "}
