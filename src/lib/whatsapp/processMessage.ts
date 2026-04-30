@@ -8,6 +8,9 @@ import { parsePatientStoreJson } from "@/lib/patientStoreApi";
 import type { PatientStore } from "@/lib/types";
 import { sendText, markRead } from "./client";
 import { parseReminderIntent, applyReminderIntent } from "./reminderIntent";
+import { parseConditionIntent, applyConditionIntent } from "./conditionIntent";
+import { classifyIntent } from "@/lib/intent/classifyIntent";
+import { applyStorePatch } from "@/lib/intent/storePatch";
 import { getOrCreateActiveThread, appendMessage, listMessages } from "@/lib/server/threads";
 
 /** Server-safe blank store — avoids importing the "use client" store.ts module. */
@@ -485,6 +488,69 @@ export async function processIncomingMessage(
       threadId: activeThread.id,
       role: "assistant",
       content: reminderReply,
+      source: "whatsapp",
+    });
+    return;
+  }
+
+  // ── Condition resolution / onset pre-pass ───────────────────────────
+  // "my headache is gone" → remove from profile.conditions and clear any
+  // matching open sideEffects entries. Mirrors the webapp's threaded chat
+  // behavior so a symptom resolved on one surface disappears on the other.
+  const conditionIntent = parseConditionIntent(text);
+  if (conditionIntent) {
+    const { store: nextStore, reply: conditionReply } = applyConditionIntent(store, conditionIntent);
+    try {
+      nextStore.updatedAtISO = new Date().toISOString();
+      await prisma.patientRecord.upsert({
+        where: { userId: user.id },
+        update: { data: nextStore as unknown as object },
+        create: { userId: user.id, data: nextStore as unknown as object },
+      });
+    } catch (err) {
+      console.error("[WhatsApp] Failed to persist condition change:", err instanceof Error ? err.message : err);
+    }
+    await sendText(senderPhone, conditionReply);
+    await appendMessage({
+      userId: user.id,
+      threadId: activeThread.id,
+      role: "assistant",
+      content: conditionReply,
+      source: "whatsapp",
+    });
+    return;
+  }
+
+  // ── Tier-3: generalised LLM-based mutation classifier ───────────────
+  // Same module the webapp threaded chat uses. Anything the deterministic
+  // parsers miss but the user clearly meant as an add/remove/set is caught
+  // here. Returns null for questions and chitchat — those fall through to
+  // the regular conversational LLM call below.
+  const generalPatch = await classifyIntent(text, store);
+  if (generalPatch && generalPatch.ops.length > 0) {
+    const { store: nextStore, applied, skipped } = applyStorePatch(store, generalPatch);
+    if (applied.length > 0) {
+      try {
+        nextStore.updatedAtISO = new Date().toISOString();
+        await prisma.patientRecord.upsert({
+          where: { userId: user.id },
+          update: { data: nextStore as unknown as object },
+          create: { userId: user.id, data: nextStore as unknown as object },
+        });
+      } catch (err) {
+        console.error("[WhatsApp] Failed to persist intent patch:", err instanceof Error ? err.message : err);
+      }
+    }
+    const replyLines: string[] = [];
+    if (applied.length > 0) replyLines.push(applied.map((a) => `• ${a}`).join("\n"));
+    if (skipped.length > 0) replyLines.push(`(Skipped: ${skipped.join(" ")})`);
+    const intentReply = replyLines.length > 0 ? replyLines.join("\n\n") : generalPatch.summary;
+    await sendText(senderPhone, intentReply);
+    await appendMessage({
+      userId: user.id,
+      threadId: activeThread.id,
+      role: "assistant",
+      content: intentReply,
       source: "whatsapp",
     });
     return;

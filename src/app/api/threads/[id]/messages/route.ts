@@ -20,6 +20,10 @@ import { requireUserId } from "@/lib/server/authSession";
 import { prisma } from "@/lib/prisma";
 import { parsePatientStoreJson } from "@/lib/patientStoreApi";
 import { listMessages, appendMessage, setActiveThread } from "@/lib/server/threads";
+import { parseReminderIntent, applyReminderIntent } from "@/lib/whatsapp/reminderIntent";
+import { parseConditionIntent, applyConditionIntent } from "@/lib/whatsapp/conditionIntent";
+import { classifyIntent } from "@/lib/intent/classifyIntent";
+import { applyStorePatch } from "@/lib/intent/storePatch";
 import type { PatientStore } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -96,6 +100,71 @@ export async function POST(
   // Load patient context + recent history.
   const record = await prisma.patientRecord.findUnique({ where: { userId } });
   const store: PatientStore | null = record ? parsePatientStoreJson(record.data) : null;
+
+  // Deterministic intent pre-pass — runs BEFORE the LLM so structured
+  // requests are predictable, free, and instant. Reminder intents
+  // ("remind me to take Metformin at 8am") and condition resolutions
+  // ("my headache is gone") both mutate the patient store and reply
+  // directly without ever calling Anthropic.
+  if (store) {
+    const reminderIntent = parseReminderIntent(content);
+    if (reminderIntent) {
+      const { store: nextStore, reply: reminderReply } = applyReminderIntent(store, reminderIntent);
+      if (reminderIntent.kind !== "list") {
+        await persistStore(userId, nextStore);
+      }
+      const assistantMessage = await appendMessage({
+        userId,
+        threadId: id,
+        role: "assistant",
+        content: reminderReply,
+        source: "web",
+      });
+      return NextResponse.json({ ok: true, userMessage, assistantMessage });
+    }
+    const conditionIntent = parseConditionIntent(content);
+    if (conditionIntent) {
+      const { store: nextStore, reply: conditionReply } = applyConditionIntent(store, conditionIntent);
+      await persistStore(userId, nextStore);
+      const assistantMessage = await appendMessage({
+        userId,
+        threadId: id,
+        role: "assistant",
+        content: conditionReply,
+        source: "web",
+      });
+      return NextResponse.json({ ok: true, userMessage, assistantMessage });
+    }
+
+    // ── Tier-3: LLM-driven structured-mutation classifier ────────────────
+    // Catches everything the deterministic parsers miss: "add peanuts to my
+    // allergies", "remove ibuprofen from my meds", "set my next appointment
+    // with Dr. Iyer at Apollo on May 15 at 10am", "I'm allergic to
+    // sulfonamides", "log a moderate headache", "change my preferred name to
+    // Sam". Returns null on plain questions or chitchat — those fall through
+    // to the conversational LLM below.
+    const patch = await classifyIntent(content, store);
+    if (patch && patch.ops.length > 0) {
+      const { store: nextStore, applied, skipped } = applyStorePatch(store, patch);
+      const reallyChanged = applied.length > 0;
+      if (reallyChanged) {
+        await persistStore(userId, nextStore);
+      }
+      const replyLines: string[] = [];
+      if (applied.length > 0) replyLines.push(applied.map((a) => `• ${a}`).join("\n"));
+      if (skipped.length > 0) replyLines.push(`(Skipped: ${skipped.join(" ")})`);
+      const finalReply = replyLines.length > 0 ? replyLines.join("\n\n") : patch.summary;
+      const assistantMessage = await appendMessage({
+        userId,
+        threadId: id,
+        role: "assistant",
+        content: finalReply,
+        source: "web",
+      });
+      return NextResponse.json({ ok: true, userMessage, assistantMessage });
+    }
+  }
+
   const recent = await listMessages(userId, id, { limit: 30 });
 
   let reply: string;
@@ -165,6 +234,28 @@ async function callConversationLLM(
     .join("\n")
     .trim();
   return text || "(no response)";
+}
+
+/**
+ * Write a mutated store back to PatientRecord. Used by both the reminder
+ * and the condition-resolution intent pre-passes so a chat-driven mutation
+ * is visible to every other surface (dashboard, profile editor, WhatsApp)
+ * the next time it loads.
+ */
+async function persistStore(userId: string, nextStore: PatientStore): Promise<void> {
+  try {
+    nextStore.updatedAtISO = new Date().toISOString();
+    await prisma.patientRecord.upsert({
+      where: { userId },
+      update: { data: nextStore as unknown as object },
+      create: { userId, data: nextStore as unknown as object },
+    });
+  } catch (err) {
+    console.error(
+      "[threads/messages] persistStore failed:",
+      err instanceof Error ? err.message : err,
+    );
+  }
 }
 
 function buildSystemPrompt(store: PatientStore | null): string {

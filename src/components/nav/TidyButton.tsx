@@ -106,29 +106,54 @@ export function TidyButton() {
     const profile: PatientStore["profile"] = { ...store.profile };
     const doctors = new Set(profile.doctorQuickPick ?? []);
     const hospitals = new Set(profile.facilityQuickPick ?? []);
+    // CRITICAL: the dropdown is computed by mergeDoctorQuickPick / mergeFacilityQuickPick,
+    // which UNION the manual quick-pick lists with names extracted from every uploaded
+    // document (doc.doctors[], doc.provider, doc.facilityName). Just removing a name
+    // from `doctorQuickPick` is not enough — the same name will be re-injected from
+    // the docs path on the next render. Adding to the *QuickPickHidden suppression
+    // list is what the merge helpers actually respect, so we do both.
+    const doctorsHidden = new Set(profile.doctorQuickPickHidden ?? []);
+    const hospitalsHidden = new Set(profile.facilityQuickPickHidden ?? []);
 
     for (const name of suggestions.moveToHospitals) {
       if (!accepted[`mh:${name}`]) continue;
       doctors.delete(name);
       hospitals.add(name);
+      // Suppress this name from the doctors dropdown even if a document
+      // mentions it as a "doctor"; un-hide it from the facility list in case
+      // it was previously suppressed there.
+      doctorsHidden.add(name);
+      hospitalsHidden.delete(name);
     }
     for (const name of suggestions.moveToDoctors) {
       if (!accepted[`md:${name}`]) continue;
       hospitals.delete(name);
       doctors.add(name);
+      hospitalsHidden.add(name);
+      doctorsHidden.delete(name);
     }
     for (const name of suggestions.removeFromDoctors) {
-      if (accepted[`rd:${name}`]) doctors.delete(name);
+      if (!accepted[`rd:${name}`]) continue;
+      doctors.delete(name);
+      doctorsHidden.add(name);
     }
     for (const name of suggestions.removeFromHospitals) {
-      if (accepted[`rh:${name}`]) hospitals.delete(name);
+      if (!accepted[`rh:${name}`]) continue;
+      hospitals.delete(name);
+      hospitalsHidden.add(name);
     }
     for (const name of suggestions.addDoctors) {
-      if (accepted[`ad:${name}`]) doctors.add(name);
+      if (!accepted[`ad:${name}`]) continue;
+      doctors.add(name);
+      // Adding explicitly means the user wants this name visible — make sure
+      // a stale hidden flag from an earlier session doesn't override it.
+      doctorsHidden.delete(name);
     }
 
     profile.doctorQuickPick = Array.from(doctors).filter(Boolean);
     profile.facilityQuickPick = Array.from(hospitals).filter(Boolean);
+    profile.doctorQuickPickHidden = Array.from(doctorsHidden).filter(Boolean);
+    profile.facilityQuickPickHidden = Array.from(hospitalsHidden).filter(Boolean);
     saveStore({ ...store, profile });
     setOpen(false);
   }
@@ -159,8 +184,15 @@ export function TidyButton() {
       </Button>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-2 sm:p-4">
-          <div className="w-full max-w-2xl rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+        // Sheet pattern: the OUTER scrolls vertically and the INNER panel is
+        // content-height. Previously the inner panel had max-h-[90vh] +
+        // overflow-y-auto with `items-end` on mobile, which on phones taller
+        // than the panel anchored it to the bottom and pushed the header off
+        // the top of the viewport. Using `min-h-full` + outer scroll keeps
+        // the close button reachable on every screen size.
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40">
+          <div className="flex min-h-full items-center justify-center p-3 sm:p-6">
+            <div className="w-full max-w-2xl rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold text-[var(--fg)]">Tidy your lists</h2>
@@ -237,6 +269,7 @@ export function TidyButton() {
                   Apply selected
                 </Button>
               ) : null}
+            </div>
             </div>
           </div>
         </div>
