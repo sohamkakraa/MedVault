@@ -20,10 +20,21 @@ model User {
   whatsappPhone    String?  @unique @map("whatsapp_phone")
   whatsappVerified Boolean  @default(false) @map("whatsapp_verified")
 
+  /**
+   * The thread that incoming WhatsApp messages and the webapp chat both write
+   * into by default. Switching threads in the webapp updates this field, so
+   * the next WA message lands in the same conversation the user is reading on
+   * the web — that is the "WA chat is the default view, switching syncs both
+   * sides" requirement. Null means "lazily create a default thread on next use".
+   */
+  activeThreadId   String?  @map("active_thread_id")
+
   patientRecord    PatientRecord?
   whatsappMessages WhatsAppMessage[]
   whatsappPrefs    WhatsAppPreferences?
   wellnessLogs     WellnessLog[]
+  threads          Thread[]
+  messages         Message[]
 }
 
 /**
@@ -160,4 +171,64 @@ model PendingLink {
   expiresAt DateTime @map("expires_at")
 
   @@map("pending_links")
+}
+
+/**
+ * A conversation thread. The same Thread is shared between the webapp chat
+ * page and the WhatsApp surface — when the user switches threads in the
+ * webapp, `User.activeThreadId` is updated and the next incoming WhatsApp
+ * message lands in the same thread. There is no per-channel partitioning;
+ * messages just carry a `source` field describing where they came from.
+ *
+ * Soft-delete is `archivedAt`. Threads are never hard-deleted so the user
+ * can always recover an old conversation.
+ */
+model Thread {
+  id            String    @id @default(cuid())
+  userId        String    @map("user_id")
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /**
+   * Display title. Falls back to a synthesized "Chat from <date>" in the UI
+   * when null. We compute a title automatically from the first user message
+   * a few turns in.
+   */
+  title         String?
+  archivedAt    DateTime? @map("archived_at")
+  /**
+   * lastMessageAt is denormalized so thread-list reads don't need a JOIN +
+   * aggregate every time the sidebar loads. Updated on every Message append.
+   */
+  lastMessageAt DateTime  @default(now()) @map("last_message_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  messages Message[]
+
+  @@index([userId, archivedAt, lastMessageAt(sort: Desc)])
+  @@map("threads")
+}
+
+/**
+ * Single message inside a thread. Source field tracks origin so the UI can
+ * show a small chip ("from WhatsApp") when a thread mixes channels.
+ *
+ * `waMessageId` is the Meta-supplied id; we keep it so the WhatsApp idempotency
+ * guard (WhatsAppDelivery) and the message log stay cross-referenceable.
+ */
+model Message {
+  id          String   @id @default(cuid())
+  threadId    String   @map("thread_id")
+  thread      Thread   @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// "user" or "assistant" — matches Anthropic message roles.
+  role        String
+  content     String   @db.Text
+  /// "web", "whatsapp", or "system" (e.g. cron-sent reminders).
+  source      String   @default("web")
+  waMessageId String?  @map("wa_message_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([threadId, createdAt])
+  @@index([userId, createdAt])
+  @@map("messages")
 }

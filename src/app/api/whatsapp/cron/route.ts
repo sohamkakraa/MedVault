@@ -15,6 +15,7 @@ import { prisma } from "@/lib/prisma";
 import { sendText, isWhatsAppConfigured } from "@/lib/whatsapp/client";
 import { parsePatientStoreJson } from "@/lib/patientStoreApi";
 import type { MedicationReminderEntry } from "@/lib/types";
+import { getOrCreateActiveThread, appendMessage } from "@/lib/server/threads";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // allow up to 60s for processing multiple users
@@ -100,14 +101,16 @@ export async function GET(req: NextRequest) {
       const message = reminderDigest ? `${checkinPart}\n\n${reminderDigest}` : checkinPart;
       await sendText(user.whatsappPhone, message);
 
-      // Log the check-in as an assistant message
-      await prisma.whatsAppMessage.create({
-        data: {
-          userId: user.id,
-          waId: user.whatsappPhone,
-          role: "assistant",
-          content: message,
-        },
+      // Log the check-in as an assistant message in the user's active thread
+      // (cron-sourced, so source="system" — this lets the webapp UI render a
+      // small "from UMA" chip distinct from a manual reply).
+      const thread = await getOrCreateActiveThread(user.id, "WhatsApp");
+      await appendMessage({
+        userId: user.id,
+        threadId: thread.id,
+        role: "assistant",
+        content: message,
+        source: "system",
       });
 
       // Mark as sent

@@ -8,6 +8,7 @@ import { parsePatientStoreJson } from "@/lib/patientStoreApi";
 import type { PatientStore } from "@/lib/types";
 import { sendText, markRead } from "./client";
 import { parseReminderIntent, applyReminderIntent } from "./reminderIntent";
+import { getOrCreateActiveThread, appendMessage, listMessages } from "@/lib/server/threads";
 
 /** Server-safe blank store — avoids importing the "use client" store.ts module. */
 function blankStore(): PatientStore {
@@ -411,15 +412,16 @@ export async function processIncomingMessage(
     });
   }
 
-  // ── Load conversation history ──
-  const recentMessages = await prisma.whatsAppMessage.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: "desc" },
-    take: MAX_HISTORY,
-  });
-  const history = recentMessages
-    .reverse()
-    .map((m) => ({ role: m.role, content: m.content }));
+  // ── Resolve the user's active thread ──
+  // Cross-channel sync: every WhatsApp message lands in whichever thread the
+  // user last picked in the webapp (via `User.activeThreadId`). If they have
+  // never used the webapp, `getOrCreateActiveThread` mints a thread on the
+  // fly so this code path stays single-track.
+  const activeThread = await getOrCreateActiveThread(user.id, "WhatsApp");
+
+  // ── Load conversation history from the unified messages table ──
+  const recentMessages = await listMessages(user.id, activeThread.id, { limit: MAX_HISTORY });
+  const history = recentMessages.map((m) => ({ role: m.role, content: m.content }));
 
   // ── Detect preference changes in user message ──
   const prefChanges = detectPreferenceChanges(text);
@@ -443,9 +445,16 @@ export async function processIncomingMessage(
     prefsRow = { ...prefsRow, communicationStyle: inferredStyle };
   }
 
-  // ── Save user message ──
-  await prisma.whatsAppMessage.create({
-    data: { userId: user.id, waId, role: "user", content: text },
+  // ── Save user message into the active thread ──
+  // (legacy `whatsapp_messages` table is no longer written to; the migration
+  // backfilled prior rows into `messages`.)
+  await appendMessage({
+    userId: user.id,
+    threadId: activeThread.id,
+    role: "user",
+    content: text,
+    source: "whatsapp",
+    waMessageId: messageId,
   });
 
   // ── Reminder intent pre-pass ────────────────────────────────────────
@@ -471,8 +480,12 @@ export async function processIncomingMessage(
       }
     }
     await sendText(senderPhone, reminderReply);
-    await prisma.whatsAppMessage.create({
-      data: { userId: user.id, waId, role: "assistant", content: reminderReply },
+    await appendMessage({
+      userId: user.id,
+      threadId: activeThread.id,
+      role: "assistant",
+      content: reminderReply,
+      source: "whatsapp",
     });
     return;
   }
@@ -493,8 +506,12 @@ export async function processIncomingMessage(
   const reply = markdownToWhatsApp(rawReply);
 
   // ── Save assistant reply ──
-  await prisma.whatsAppMessage.create({
-    data: { userId: user.id, waId, role: "assistant", content: reply },
+  await appendMessage({
+    userId: user.id,
+    threadId: activeThread.id,
+    role: "assistant",
+    content: reply,
+    source: "whatsapp",
   });
 
   // ── Extract and log wellness data (local regex, no extra LLM call) ──
