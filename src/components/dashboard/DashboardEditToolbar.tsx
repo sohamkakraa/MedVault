@@ -43,7 +43,7 @@ export function DashboardEditToolbar({
               Edit dashboard
             </p>
             <p className="text-[11px] text-[var(--muted)] leading-tight">
-              Drag cards to reorder. Each row fits up to 3.
+              Drag cards to reorder or resize them.
             </p>
           </div>
         </div>

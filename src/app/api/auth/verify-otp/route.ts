@@ -29,6 +29,8 @@ const bodySchema = z.object({
   identifier: z.string().min(3).max(320),
   code: z.string().regex(/^\d{6}$/),
   phoneCountryCode: z.string().max(8).optional(),
+  /** One-time token from `?wa=<token>` — binds the verified phone to a PendingLink. */
+  waToken: z.string().max(64).optional(),
 });
 
 export async function POST(req: Request) {
@@ -45,7 +47,7 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: "Invalid request." }, { status: 400 });
   }
-  const { identifier, code, phoneCountryCode } = parsed.data;
+  const { identifier, code, phoneCountryCode, waToken } = parsed.data;
   const norm = normalizeLoginIdentifier(identifier, phoneCountryCode);
   if (!norm) {
     return NextResponse.json({ ok: false, error: "Invalid email address." }, { status: 400 });
@@ -113,6 +115,29 @@ export async function POST(req: Request) {
       );
     }
     return NextResponse.json({ ok: false, error: "Could not create account." }, { status: 503 });
+  }
+
+  // Consume a PendingLink token if provided (from ?wa= in the login URL).
+  // Binds the verified phone number to this web account so inbound WhatsApp
+  // messages from that number are recognised as this user.
+  if (waToken) {
+    try {
+      const pending = await prisma.pendingLink.findUnique({ where: { token: waToken } });
+      if (pending && pending.expiresAt > new Date()) {
+        await prisma.$transaction([
+          prisma.user.update({
+            where: { id: user.id },
+            data: {
+              whatsappPhone: pending.phoneE164.replace(/\D/g, ""),
+              whatsappVerified: true,
+            },
+          }),
+          prisma.pendingLink.delete({ where: { token: waToken } }),
+        ]);
+      }
+    } catch {
+      // Non-critical: session still proceeds even if PendingLink consumption fails
+    }
   }
 
   const token = await signSessionToken({

@@ -171,14 +171,14 @@ function ChartLegend({
 
 // ─── gauge bar card ──────────────────────────────────────────────────────────
 
-function GaugeCard(props: {
+export function GaugeCard(props: {
   name: string;
   value: number;
   date: string;
-  ref: RefRange;
+  range: RefRange;
   color: string;
 }) {
-  const { name, value, date, ref: refData, color } = props;
+  const { name, value, date, range: refData, color } = props;
   const norm = normalizeValue(value, refData.low, refData.high);
   const status = statusFor(norm);
   // Map [-0.25 … 1.25] → [0 … 100]% for the marker
@@ -578,10 +578,10 @@ export function HealthTrendsSection({
   // XAxis height must be enough to render angled labels without clipping
   const xAxisHeight = hasAngledLabels ? 56 : 28;
 
-  // Dynamic chart height based on active metric count — includes xAxis height
+  // Dynamic chart height — capped so the card stays within one screen view
   const chartHeight = Math.min(
-    Math.max(240, activeMetrics.length * 45 + 80) + xAxisHeight,
-    400
+    Math.max(200, activeMetrics.length * 40 + 60) + xAxisHeight,
+    320
   );
 
   // Margins: generous left/right so angled labels aren't clipped
@@ -615,9 +615,7 @@ export function HealthTrendsSection({
   ].slice(0, 6);
 
   return (
-    <div className="space-y-4">
-      {/* ── header + chart in one card so they're always visually attached ── */}
-      <Card>
+    <>
         {/* header + divider (matches other dashboard cards) */}
         <div className="border-b border-[var(--border)] p-5">
           <div>
@@ -690,7 +688,7 @@ export function HealthTrendsSection({
 
         {/* ── chart ── */}
         {activeMetrics.length > 0 && (
-        <CardContent className="p-4">
+        <CardContent className="p-4 overflow-visible">
             {!ready ? (
               <div className="h-64 rounded-2xl border border-dashed border-[var(--border)] animate-pulse bg-[var(--panel-2)]" />
             ) : (
@@ -841,32 +839,7 @@ export function HealthTrendsSection({
             )}
           </CardContent>
         )}
-      </Card>
-
-      {/* ── current-value gauge bars ── */}
-      {gaugeMetricsToDisplay.length > 0 && (
-        <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
-          {gaugeMetricsToDisplay.map((v) => {
-            const ref = refMap[v.name];
-            if (!ref || v.value === null) return null;
-            const metricIndex = chartMetrics.findIndex((t) => t.name === v.name);
-            return (
-              <GaugeCard
-                key={v.name}
-                name={v.name}
-                value={v.value}
-                date={v.date}
-                ref={ref}
-                color={PALETTE[metricIndex % PALETTE.length]}
-              />
-            );
-          })}
-        </div>
-      )}
-
-      {/* ── Blood count overview (when enough CBC metrics exist) ── */}
-      <CBCOverviewCard latestValues={latestValues} refMap={refMap} />
-    </div>
+    </>
   );
 }
 

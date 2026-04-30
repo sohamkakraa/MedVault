@@ -123,13 +123,6 @@ export function applyManualMedicationDefaults(m: ExtractedMedication): Extracted
   };
 }
 
-export function medicationLineSourceLabel(source?: ExtractedMedication["medicationLineSource"]): string {
-  if (source === "prescription_document") return "Prescription";
-  if (source === "other_document") return "From file";
-  if (source === "manual_entry") return "Manual";
-  return "";
-}
-
 /** Short tag for UI chips (dashboard, lists). */
 export function medicationProductCategoryLabel(cat?: MedicationProductCategory): string {
   if (cat === "over_the_counter") return "OTC";

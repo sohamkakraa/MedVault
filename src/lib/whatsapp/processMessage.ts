@@ -376,9 +376,21 @@ export async function processIncomingMessage(
   });
 
   if (!user) {
+    // Create a one-time token so the unknown sender can complete sign-up via the web.
+    const { randomBytes } = await import("crypto");
+    const token = randomBytes(24).toString("hex");
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    const phoneE164 = senderPhone.startsWith("+") ? senderPhone : `+${senderPhone}`;
+    try {
+      await prisma.pendingLink.create({ data: { token, phoneE164, expiresAt } });
+    } catch {
+      // Best-effort — still send the reply even if the DB write fails
+    }
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://uma.sohamkakra.com";
+    const link = `${baseUrl}/login?wa=${token}`;
     await sendText(
       senderPhone,
-      "Hi! 👋 I don't recognise this number yet.\n\nTo use UMA on WhatsApp, open your UMA profile page and link your WhatsApp number first.",
+      `Hi! 👋 I don't recognise this number yet.\n\nOpen the link below to sign up or link your account, then come back here to chat:\n${link}`,
     );
     return;
   }

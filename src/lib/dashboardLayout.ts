@@ -10,11 +10,7 @@
  * this to its state/store via `useDashboardLayout`.
  */
 
-import type {
-  DashboardLayout,
-  DashboardRow,
-  DashboardWidgetId,
-} from "./types";
+import type { BentoSize, DashboardLayout, DashboardRow, DashboardWidgetId } from "./types";
 
 /** How many widgets can share a single row. */
 export const MAX_WIDGETS_PER_ROW = 3;
@@ -24,11 +20,34 @@ export const ALL_WIDGET_IDS: DashboardWidgetId[] = [
   "snapshot",
   "documents",
   "medications",
-  "healthLogs",
+  "bloodPressure",
+  "sideEffects",
   "healthTrends",
   "labs",
   "bmi",
 ];
+
+/** Default bento card size per widget. */
+export const DEFAULT_BENTO_SIZES: Record<DashboardWidgetId, BentoSize> = {
+  snapshot: "hero",
+  documents: "large",
+  medications: "large",
+  bloodPressure: "medium",
+  sideEffects: "medium",
+  healthTrends: "hero",
+  labs: "large",
+  bmi: "small",
+};
+
+/** Column span for each bento size (12-column desktop grid). */
+export const BENTO_COL_SPAN: Record<BentoSize, number> = {
+  hero: 12, large: 6, medium: 4, small: 4, micro: 2,
+};
+
+/** Row span for each bento size. */
+export const BENTO_ROW_SPAN: Record<BentoSize, number> = {
+  hero: 4, large: 3, medium: 3, small: 2, micro: 2,
+};
 
 export type DashboardWidgetMeta = {
   id: DashboardWidgetId;
@@ -59,10 +78,15 @@ export const DASHBOARD_WIDGET_META: Record<DashboardWidgetId, DashboardWidgetMet
     label: "Your medicines",
     description: "Active medications, refills, and adherence.",
   },
-  healthLogs: {
-    id: "healthLogs",
-    label: "Health log",
-    description: "Blood pressure readings and side-effect notes.",
+  bloodPressure: {
+    id: "bloodPressure",
+    label: "Blood pressure",
+    description: "Log and review your blood pressure readings.",
+  },
+  sideEffects: {
+    id: "sideEffects",
+    label: "Side effects & symptoms",
+    description: "Log and review side effects or symptoms you have noticed.",
   },
   healthTrends: {
     id: "healthTrends",
@@ -95,12 +119,13 @@ export function defaultDashboardLayout(): DashboardLayout {
     rows: [
       { id: newRowId(), widgets: ["snapshot"] },
       { id: newRowId(), widgets: ["documents", "medications"] },
-      { id: newRowId(), widgets: ["healthLogs"] },
-      { id: newRowId(), widgets: ["healthTrends"] },
+      { id: newRowId(), widgets: ["bloodPressure", "sideEffects"] },
       { id: newRowId(), widgets: ["labs"] },
+      { id: newRowId(), widgets: ["healthTrends"] },
       { id: newRowId(), widgets: ["bmi"] },
     ],
     hidden: [],
+    sizes: { ...DEFAULT_BENTO_SIZES },
   };
 }
 
@@ -148,13 +173,23 @@ export function normalizeDashboardLayout(
     if (!seen.has(w) && !hiddenSet.has(w)) hiddenSet.add(w);
   }
 
-  return { rows, hidden: Array.from(hiddenSet) };
+  // Preserve per-widget sizes, falling back to defaults for unknown entries
+  const sizes: Partial<Record<DashboardWidgetId, BentoSize>> = {};
+  for (const w of ALL_WIDGET_IDS) {
+    const stored = (raw?.sizes as Partial<Record<DashboardWidgetId, BentoSize>> | undefined)?.[w];
+    sizes[w] = stored ?? DEFAULT_BENTO_SIZES[w];
+  }
+  // Always force healthTrends to full-width for chart readability
+  sizes["healthTrends"] = "hero";
+
+  return { rows, hidden: Array.from(hiddenSet), sizes };
 }
 
 function cloneLayout(layout: DashboardLayout): DashboardLayout {
   return {
     rows: layout.rows.map((r) => ({ id: r.id, widgets: [...r.widgets] })),
     hidden: [...layout.hidden],
+    sizes: layout.sizes ? { ...layout.sizes } : undefined,
   };
 }
 
@@ -263,5 +298,16 @@ export function showWidget(
   const alreadyVisible = next.rows.some((r) => r.widgets.includes(widget));
   if (alreadyVisible) return next;
   next.rows.push({ id: newRowId(), widgets: [widget] });
+  return next;
+}
+
+/** Update the size for a single widget in the layout. */
+export function setWidgetSize(
+  layout: DashboardLayout,
+  widget: DashboardWidgetId,
+  size: BentoSize,
+): DashboardLayout {
+  const next = cloneLayout(layout);
+  next.sizes = { ...next.sizes, [widget]: size };
   return next;
 }

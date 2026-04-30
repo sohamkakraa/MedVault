@@ -108,9 +108,6 @@ function HealthInsightsCard({ record }: { record: ReturnType<typeof getStore>["d
           </div>
         )}
 
-        <p className="text-xs text-[var(--muted)] pt-2">
-          Not medical advice — always discuss with your healthcare provider.
-        </p>
       </CardContent>
     </Card>
   );
@@ -218,7 +215,6 @@ export default function DocDetailClient() {
             <div className="prose-uma text-sm text-[var(--fg)] leading-relaxed">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{summaryLine}</ReactMarkdown>
             </div>
-            <p className="text-xs mv-muted">Not medical advice. Talk to your doctor about your results.</p>
           </CardContent>
         </Card>
 
@@ -248,7 +244,7 @@ export default function DocDetailClient() {
               <h2 className="text-sm font-medium">Test results</h2>
               <p className="text-xs mv-muted mt-1">
                 Point at or tap a row for a simple explanation and usual ranges. Highlights show values outside the
-                range UMA used—not a diagnosis. Not medical advice.
+                range UMA used—not a diagnosis.
               </p>
             </CardHeader>
             <CardContent className="grid gap-2 md:grid-cols-2">
@@ -268,7 +264,7 @@ export default function DocDetailClient() {
           <CardHeader>
             <h2 className="text-sm font-medium">Downloads</h2>
             <p className="text-xs mv-muted mt-1">
-              Files stay on this device inside UMA. Not medical advice.
+              Files stay on this device inside UMA.
             </p>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">

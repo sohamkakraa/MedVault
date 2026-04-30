@@ -1,0 +1,155 @@
+name: UMA
+options:
+  bundleIdPrefix: com.sohamkakra
+  deploymentTarget:
+    iOS: "18.0"
+  xcodeVersion: "16.0"
+  generateEmptyDirectories: true
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    ENABLE_STRICT_CONCURRENCY: complete
+    SWIFT_STRICT_CONCURRENCY: complete
+    IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: SOHAMKAKRA
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+
+configFiles:
+  Debug: Config/Debug.xcconfig
+  Release: Config/Release.xcconfig
+
+packages:
+  swift-async-algorithms:
+    url: https://github.com/apple/swift-async-algorithms
+    from: "1.0.0"
+  KeychainAccess:
+    url: https://github.com/kishikawakatsuki/KeychainAccess
+    from: "4.2.2"
+  UMAShared:
+    path: UMAShared
+
+targets:
+  UMA:
+    type: application
+    platform: iOS
+    sources:
+      - path: UMA
+        excludes:
+          - "**/*.md"
+    dependencies:
+      - package: UMAShared
+        product: UMAShared
+      - package: swift-async-algorithms
+        product: AsyncAlgorithms
+      - target: UMAWidgets
+        embed: true
+      - target: UMALiveActivity
+        embed: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sohamkakra.uma
+        INFOPLIST_FILE: UMA/Info.plist
+        CODE_SIGN_ENTITLEMENTS: UMA/UMA.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks"
+        TARGETED_DEVICE_FAMILY: "1,2"
+    preBuildScripts:
+      - name: SwiftLint
+        script: |
+          if which swiftlint > /dev/null; then
+            swiftlint --config .swiftlint.yml
+          fi
+        basedOnDependencyAnalysis: false
+
+  UMAWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: UMAWidgets
+    dependencies:
+      - package: UMAShared
+        product: UMAShared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sohamkakra.uma.widgets
+        INFOPLIST_FILE: UMAWidgets/Info.plist
+        CODE_SIGN_ENTITLEMENTS: UMAWidgets/UMAWidgets.entitlements
+        TARGETED_DEVICE_FAMILY: "1,2"
+        APPLICATION_EXTENSION_API_ONLY: NO
+
+  UMALiveActivity:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: UMALiveActivity
+    dependencies:
+      - package: UMAShared
+        product: UMAShared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sohamkakra.uma.liveactivity
+        INFOPLIST_FILE: UMALiveActivity/Info.plist
+        CODE_SIGN_ENTITLEMENTS: UMALiveActivity/UMALiveActivity.entitlements
+        TARGETED_DEVICE_FAMILY: "1,2"
+        APPLICATION_EXTENSION_API_ONLY: NO
+
+  UMATests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+        includes:
+          - "UMATests.swift"
+    dependencies:
+      - target: UMA
+      - package: UMAShared
+        product: UMAShared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sohamkakra.uma.tests
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/UMA.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/UMA"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+  UMAUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Tests
+        includes:
+          - "UMAUITests.swift"
+    dependencies:
+      - target: UMA
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sohamkakra.uma.uitests
+        TEST_TARGET_NAME: UMA
+
+schemes:
+  UMA:
+    build:
+      targets:
+        UMA: all
+        UMATests: [test]
+        UMAUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - name: UMATests
+          parallelizable: true
+          randomExecutionOrder: true
+        - name: UMAUITests
+          parallelizable: false
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

@@ -307,7 +307,7 @@ export default function LoginForm({ showBetaDemoGuidance }: LoginFormProps) {
           </div>
         </aside>
 
-        <div className="flex flex-1 flex-col items-center justify-center px-4 py-10 sm:py-12 lg:py-12 min-w-0">
+        <div className="flex flex-1 flex-col items-center justify-start pt-8 pb-10 px-4 sm:pt-10 sm:pb-12 lg:justify-center lg:py-12 min-w-0">
           <div className="w-full max-w-md space-y-6">
             <div
               className="relative aspect-[2.35/1] w-full overflow-hidden rounded-2xl border border-[var(--border)] shadow-sm lg:hidden"

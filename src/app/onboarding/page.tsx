@@ -10,14 +10,10 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { DatePicker } from "@/components/ui/DatePicker";
 import { AppTopNav } from "@/components/nav/AppTopNav";
 import { getStore, saveStore } from "@/lib/store";
-// Phone feature disabled for now
-// import { buildPhoneDialOptions } from "@/lib/phoneDialOptions";
-
 const sexOptions = ["Male", "Female", "Prefer not to say"];
 
 export default function OnboardingPage() {
   const router = useRouter();
-  // const dialOptions = useMemo(() => buildPhoneDialOptions(), []);
   const [phase, setPhase] = useState<1 | 2>(1);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -258,7 +254,7 @@ export default function OnboardingPage() {
                 Go to home screen
               </Button>
               <p className="text-[11px] mv-muted leading-relaxed">
-                Not medical advice. You can upload files anytime from the home screen.
+                You can upload files anytime from the home screen.
               </p>
             </CardContent>
           </Card>

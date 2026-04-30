@@ -8,9 +8,27 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { createHmac, timingSafeEqual } from "crypto";
 import { processIncomingMessage } from "@/lib/whatsapp/processMessage";
 import { isWhatsAppConfigured } from "@/lib/whatsapp/client";
+import { prisma } from "@/lib/prisma";
+
+const WebhookBodySchema = z
+  .object({
+    object: z.string(),
+    entry: z
+      .array(
+        z.object({
+          id: z.string(),
+          changes: z
+            .array(z.object({ field: z.string(), value: z.record(z.string(), z.unknown()) }))
+            .optional(),
+        })
+      )
+      .optional(),
+  })
+  .passthrough();
 
 export const runtime = "nodejs";
 export const maxDuration = 30; // Allow up to 30s for LLM processing
@@ -56,7 +74,6 @@ export async function GET(req: NextRequest) {
   const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
 
   if (mode === "subscribe" && token === verifyToken && verifyToken) {
-    console.log("[WhatsApp] Webhook verified");
     return new NextResponse(challenge, { status: 200 });
   }
 
@@ -92,9 +109,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
   }
 
-  let body: WebhookPayload;
+  let parsed: z.infer<typeof WebhookBodySchema>;
   try {
-    body = JSON.parse(rawBody);
+    const json: unknown = JSON.parse(rawBody);
+    const result = WebhookBodySchema.safeParse(json);
+    if (!result.success) {
+      return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+    }
+    parsed = result.data;
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
@@ -103,7 +125,7 @@ export async function POST(req: NextRequest) {
   // after the response is sent, so background processing via waitUntil/catch
   // is unreliable. Meta tolerates responses up to ~20s for webhooks.
   try {
-    await handlePayload(body);
+    await handlePayload(parsed as WebhookPayload);
   } catch (err) {
     console.error("[WhatsApp] Processing error:", err instanceof Error ? err.message : "unknown");
   }
@@ -167,9 +189,24 @@ async function handlePayload(body: WebhookPayload) {
 
         if (!text) continue;
 
+        // Idempotency: create delivery row inside a transaction; skip if already present
+        let shouldProcess = false;
+        try {
+          await prisma.$transaction(async (tx) => {
+            const existing = await tx.whatsAppDelivery.findUnique({ where: { eId: msg.id } });
+            if (existing) return;
+            await tx.whatsAppDelivery.create({ data: { eId: msg.id } });
+            shouldProcess = true;
+          });
+        } catch {
+          console.error(`[WhatsApp] Idempotency check failed for ${msg.id}`);
+        }
+
+        if (!shouldProcess) continue;
+
         try {
           await processIncomingMessage(waId, senderPhone, msg.id, text);
-        } catch (err) {
+        } catch {
           // VULN-009: Avoid logging raw message content (may contain PII/health data)
           console.error(`[WhatsApp] Failed to process message ${msg.id}`);
         }

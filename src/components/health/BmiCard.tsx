@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Scale, AlertTriangle, ChevronRight, Sparkles } from "lucide-react";
-import { Card, CardContent, CardHeader } from "@/components/ui/Card";
+import { Scale, ChevronRight } from "lucide-react";
+import { CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import type { PatientStore } from "@/lib/types";
 import { getBmiInfo, type BmiCategory } from "@/lib/bmi";
@@ -57,8 +57,7 @@ export function BmiCard({ store }: { store: PatientStore }) {
 
   if (!info) {
     return (
-      <Card className="min-w-0">
-        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3 min-w-0">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[var(--panel-2)] text-[var(--muted)]">
               <Scale className="h-4 w-4" />
@@ -78,7 +77,6 @@ export function BmiCard({ store }: { store: PatientStore }) {
             Add height & weight <ChevronRight className="h-3.5 w-3.5" />
           </Link>
         </CardContent>
-      </Card>
     );
   }
 
@@ -86,104 +84,52 @@ export function BmiCard({ store }: { store: PatientStore }) {
   const isHealthy = info.category === "healthy";
 
   return (
-    <Card className="min-w-0">
-      <CardHeader>
-        <div className="flex items-center justify-between gap-3">
+      <CardContent className="space-y-3">
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <Scale className="h-4 w-4 text-[var(--accent)] shrink-0" />
-            <h3 className="text-sm font-semibold mv-title truncate">Body mass index</h3>
+            <h3 className="text-sm font-semibold mv-title truncate">BMI</h3>
           </div>
           <Badge className={colors.chip}>{info.label}</Badge>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className={`text-3xl font-semibold tracking-tight ${colors.text}`}>
+
+        <div className="flex items-baseline gap-2">
+          <span className={`text-2xl font-semibold tracking-tight ${colors.text}`}>
             {info.bmi.toFixed(1)}
           </span>
           <span className="text-xs mv-muted">kg/m²</span>
-          <span className="text-xs mv-muted">· {info.summary}</span>
         </div>
 
-        {/* Scale bar: underweight | healthy | overweight | obese */}
-        <div className="space-y-1.5">
-          <div
-            className="relative h-2.5 w-full overflow-hidden rounded-full bg-[var(--panel-2)]"
-            aria-hidden
-          >
-            {/* Healthy window highlight (18.5–25) */}
+        {/* Scale bar */}
+        <div className="space-y-1">
+          <div className="relative h-2 w-full overflow-hidden rounded-full bg-[var(--panel-2)]" aria-hidden>
             <div
               className="absolute inset-y-0 bg-emerald-500/15"
-              style={{
-                left: `${markerPercent(18.5)}%`,
-                width: `${markerPercent(25) - markerPercent(18.5)}%`,
-              }}
+              style={{ left: `${markerPercent(18.5)}%`, width: `${markerPercent(25) - markerPercent(18.5)}%` }}
             />
-            {/* Your position pill */}
             <div
-              className={`absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full ${colors.bar} ring-2 ring-[var(--panel)] shadow-sm`}
+              className={`absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full ${colors.bar} ring-2 ring-[var(--panel)] shadow-sm`}
               style={{ left: `${info.progressPercent}%` }}
               aria-label={`Your BMI is ${info.bmi.toFixed(1)}`}
             />
           </div>
           <div className="relative h-3 text-[10px] mv-muted">
             {SCALE_MARKERS.map((m) => (
-              <span
-                key={m.bmi}
-                className="absolute -translate-x-1/2"
-                style={{ left: `${markerPercent(m.bmi)}%` }}
-              >
+              <span key={m.bmi} className="absolute -translate-x-1/2" style={{ left: `${markerPercent(m.bmi)}%` }}>
                 {m.label}
               </span>
             ))}
           </div>
         </div>
 
-        {!isHealthy && (
-          <div className={`rounded-2xl border border-[var(--border)] ${colors.soft} p-3`}>
-            <div className="flex items-start gap-2">
-              {info.category === "underweight" ? (
-                <Sparkles className={`mt-0.5 h-4 w-4 shrink-0 ${colors.text}`} />
-              ) : (
-                <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${colors.text}`} />
-              )}
-              <div className="min-w-0 space-y-1.5">
-                <p className="text-xs font-semibold text-[var(--fg)]">Small steps that help</p>
-                <ul className="space-y-1 text-xs mv-muted leading-relaxed">
-                  {info.tips.map((t, i) => (
-                    <li key={i} className="flex gap-1.5">
-                      <span className={colors.text} aria-hidden>
-                        •
-                      </span>
-                      <span>{t}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
+        <p className="text-xs mv-muted">{info.summary}</p>
 
-        {isHealthy && (
-          <p className="rounded-2xl border border-emerald-500/20 bg-emerald-500/6 p-3 text-xs text-emerald-700 dark:text-emerald-300 leading-relaxed">
-            Nice work — your BMI is in the typical healthy range. Keep up your routine and check
-            back in a few months.
-          </p>
-        )}
-
-        <div className="flex items-center justify-between gap-2 pt-1">
-          <p className="text-[10px] text-[var(--muted)] italic">
-            BMI is a rough guide — it doesn&apos;t account for muscle mass, age, or pregnancy. Not
-            medical advice.
-          </p>
-          <Link
-            href="/profile#profile-patient-details"
-            className="inline-flex items-center gap-1 rounded-xl px-2 py-1 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent)]/8 transition-colors shrink-0"
-          >
-            Update <ChevronRight className="h-3 w-3" />
-          </Link>
-        </div>
+        <Link
+          href="/profile#profile-patient-details"
+          className="inline-flex items-center gap-1 rounded-xl px-2 py-1 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent)]/8 transition-colors self-start"
+        >
+          Update <ChevronRight className="h-3 w-3" />
+        </Link>
       </CardContent>
-    </Card>
   );
 }

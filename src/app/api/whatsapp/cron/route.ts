@@ -110,7 +110,7 @@ export async function GET(req: NextRequest) {
 
       sent++;
     } catch (err) {
-      console.error(`[WhatsApp Cron] Failed to send check-in to user ${user.id}:`, err);
+      console.error(`[WhatsApp Cron] Failed to send check-in to user ${user.id}:`, err instanceof Error ? err.message : "unknown");
     }
   }
 

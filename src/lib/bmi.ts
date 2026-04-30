@@ -23,8 +23,9 @@ export type BmiInfo = {
   tips: string[];
 };
 
-function parseNumber(raw: string | undefined): number | null {
-  if (!raw) return null;
+function parseNumber(raw: string | number | undefined | null): number | null {
+  if (raw === undefined || raw === null || raw === "") return null;
+  if (typeof raw === "number") return Number.isFinite(raw) && raw > 0 ? raw : null;
   const t = raw.trim().replace(",", ".");
   if (!t) return null;
   const n = parseFloat(t);
@@ -33,7 +34,7 @@ function parseNumber(raw: string | undefined): number | null {
 }
 
 /** Returns the BMI value (rounded to 1 decimal) from stored SI fields, or null. */
-export function computeBmi(heightCm?: string, weightKg?: string): number | null {
+export function computeBmi(heightCm?: string | number, weightKg?: string | number): number | null {
   const h = parseNumber(heightCm);
   const w = parseNumber(weightKg);
   if (h === null || w === null) return null;
@@ -93,7 +94,7 @@ const TIPS: Record<BmiCategory, string[]> = {
 };
 
 /** Full BMI summary for a given height/weight, or null when inputs are missing/invalid. */
-export function getBmiInfo(heightCm?: string, weightKg?: string): BmiInfo | null {
+export function getBmiInfo(heightCm?: string | number, weightKg?: string | number): BmiInfo | null {
   const bmi = computeBmi(heightCm, weightKg);
   if (bmi === null) return null;
   const category = categorizeBmi(bmi);

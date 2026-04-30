@@ -330,7 +330,7 @@ function AnnotationCard({
           opacity: isLight ? 0.85 : 1,
         }}
       >
-        Not medical advice — speak to your doctor about your results.
+        Speak to your doctor about your results.
       </p>
     </div>
   );

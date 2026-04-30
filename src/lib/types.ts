@@ -247,10 +247,13 @@ export type DashboardWidgetId =
   | "snapshot"
   | "documents"
   | "medications"
-  | "healthLogs"
+  | "bloodPressure"
+  | "sideEffects"
   | "healthTrends"
   | "labs"
   | "bmi";
+
+export type BentoSize = "hero" | "large" | "medium" | "small" | "micro";
 
 /** One row of the dashboard grid: 1–3 widgets rendered side-by-side. */
 export type DashboardRow = {
@@ -262,6 +265,8 @@ export type DashboardLayout = {
   rows: DashboardRow[];
   /** Widgets the user has removed — available to re-add from the palette. */
   hidden: DashboardWidgetId[];
+  /** Per-widget bento size. Falls back to DEFAULT_BENTO_SIZES when absent. */
+  sizes?: Partial<Record<DashboardWidgetId, BentoSize>>;
 };
 
 /** Optional vitals for charts and visit summaries (strings for flexible local formats). */
@@ -440,6 +445,8 @@ export type PatientStore = {
     whatsappVerified?: boolean;
     whatsappVerificationCode?: string;
     whatsappVerificationSentAt?: string;
+    /** Opt-in for proactive WhatsApp push notifications from UMA. */
+    whatsappNotifications?: boolean;
     countryCode?: string;
     primaryCareProvider?: string;
     nextVisitDate?: string;

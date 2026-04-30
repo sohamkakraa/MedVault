@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 import {
   PatientStore,
   ExtractedDoc,
@@ -23,6 +24,7 @@ import { mergeLexiconPatches, resolveCanonicalLabName } from "@/lib/standardized
 import { applyManualMedicationDefaults, mergeMedicationFromDocument } from "@/lib/medicationClassification";
 import { defaultHealthLogs, normalizeHealthLogs } from "@/lib/healthLogs";
 import { patientStoreForApiPayload } from "@/lib/patientStoreApi";
+import { log } from "@/lib/log";
 import { applyEffectiveThemeToDocument, resolveThemePreference } from "@/lib/themePreference";
 import { generateInternalId, registerPrimaryAccount, registerSubProfile, deregisterEntry } from "@/lib/accountRegistry";
 
@@ -506,16 +508,6 @@ function yearMonth(iso: string): string {
  * A full-panel report that is a superset of an earlier CBC will score ~100% on
  * the CBC's lab names, so even a 35% threshold catches most same-visit duplicates.
  */
-export function detectDocumentLabOverlap(
-  newDoc: ExtractedDoc,
-  existingDocs: ExtractedDoc[],
-  lex: StandardLexiconEntry[] = []
-): { overlappingDocTitle: string; overlapPct: number } | null {
-  const result = detectDocumentOverlapFull(newDoc, existingDocs, lex);
-  if (!result) return null;
-  return { overlappingDocTitle: result.existingDoc.title ?? "existing report", overlapPct: result.overlapPct };
-}
-
 /**
  * Outcome of comparing a newly uploaded document against existing docs.
  *
@@ -548,21 +540,15 @@ export function detectDocumentOverlapFull(
   const newEnriched = enrichDocFromMarkdown(newDoc, lex);
   const newLabs = newEnriched.labs ?? [];
 
-  // Debug: log what we're working with so overlap failures are diagnosable
-  if (typeof window !== "undefined") {
-    console.log(
-      "[UMA smartMerge] new doc:",
-      newDoc.title,
-      "| dateISO:", newDoc.dateISO ?? "(none)",
-      "| labs after enrich:", newLabs.length,
-      "| existing docs:", existingDocs.length
-    );
-  }
+  log.debug(
+    "[UMA smartMerge] new doc:", newDoc.title,
+    "| dateISO:", newDoc.dateISO ?? "(none)",
+    "| labs after enrich:", newLabs.length,
+    "| existing docs:", existingDocs.length
+  );
 
   if (newLabs.length < 2) {
-    if (typeof window !== "undefined") {
-      console.log("[UMA smartMerge] skipping overlap: new doc has <2 labs");
-    }
+    log.debug("[UMA smartMerge] skipping overlap: new doc has <2 labs");
     return null;
   }
 
@@ -598,14 +584,12 @@ export function detectDocumentOverlapFull(
     const existingEnriched = enrichDocFromMarkdown(existing, lex);
     const existingLabs = existingEnriched.labs ?? [];
 
-    if (typeof window !== "undefined") {
-      console.log(
-        "[UMA smartMerge]   vs existing:", existing.title,
-        "| dateISO:", existing.dateISO ?? "(none)",
-        "| sameMonth:", !!sameMonth,
-        "| existingLabs:", existingLabs.length
-      );
-    }
+    log.debug(
+      "[UMA smartMerge]   vs existing:", existing.title,
+      "| dateISO:", existing.dateISO ?? "(none)",
+      "| sameMonth:", !!sameMonth,
+      "| existingLabs:", existingLabs.length
+    );
 
     if (existingLabs.length < 2) continue;
 
@@ -632,15 +616,13 @@ export function detectDocumentOverlapFull(
     if (smallerSetSize === 0) continue;
     const overlapPct = sharedNameCount / smallerSetSize;
 
-    if (typeof window !== "undefined") {
-      console.log(
-        "[UMA smartMerge]   shared:", sharedNameCount,
-        "| newNames:", newNames.size,
-        "| existingNames:", existingNames.size,
-        "| overlapPct:", Math.round(overlapPct * 100) + "%",
-        "| threshold:", Math.round(threshold * 100) + "%"
-      );
-    }
+    log.debug(
+      "[UMA smartMerge]   shared:", sharedNameCount,
+      "| newNames:", newNames.size,
+      "| existingNames:", existingNames.size,
+      "| overlapPct:", Math.round(overlapPct * 100) + "%",
+      "| threshold:", Math.round(threshold * 100) + "%"
+    );
 
     if (overlapPct < threshold) continue;
 
@@ -657,14 +639,12 @@ export function detectDocumentOverlapFull(
     }
     const allSharedValuesMatch = sharedValueCount >= sharedNameCount;
 
-    if (typeof window !== "undefined") {
-      console.log(
-        "[UMA smartMerge]   sharedValues:", sharedValueCount,
-        "| allMatch:", allSharedValuesMatch,
-        "| newExtra:", newExtraCount,
-        "| existingExtra:", existingExtraCount
-      );
-    }
+    log.debug(
+      "[UMA smartMerge]   sharedValues:", sharedValueCount,
+      "| allMatch:", allSharedValuesMatch,
+      "| newExtra:", newExtraCount,
+      "| existingExtra:", existingExtraCount
+    );
 
     if (allSharedValuesMatch && newExtraCount === 0 && existingExtraCount === 0) {
       // Same labs, same values — exact duplicate
@@ -680,19 +660,14 @@ export function detectDocumentOverlapFull(
       kind = "partial_overlap";
     }
 
-    if (typeof window !== "undefined") {
-      console.log("[UMA smartMerge]   → kind:", kind);
-    }
+    log.debug("[UMA smartMerge]   → kind:", kind);
 
     if (!bestMatch || overlapPct > bestMatch.overlapPct) {
       bestMatch = { kind, existingDoc: existing, overlapPct, newExtraCount, existingExtraCount };
     }
   }
 
-  if (typeof window !== "undefined") {
-    console.log("[UMA smartMerge] final result:", bestMatch ? bestMatch.kind : "no overlap");
-  }
-
+  log.debug("[UMA smartMerge] final result:", bestMatch ? bestMatch.kind : "no overlap");
   return bestMatch;
 }
 
@@ -728,12 +703,10 @@ export function smartMergeExtractedDoc(
   const enriched = enrichDocFromMarkdown(doc, lex);
   const overlap = detectDocumentOverlapFull(enriched, store.docs, lex);
 
-  if (typeof window !== "undefined") {
-    console.log(
-      "[UMA smartMerge] overlap result for", enriched.title, "→",
-      overlap ? `${overlap.kind} (${Math.round(overlap.overlapPct * 100)}% match with "${overlap.existingDoc.title}")` : "no overlap"
-    );
-  }
+  log.debug(
+    "[UMA smartMerge] overlap result for", enriched.title, "→",
+    overlap ? `${overlap.kind} (${Math.round(overlap.overlapPct * 100)}% match with "${overlap.existingDoc.title}")` : "no overlap"
+  );
 
   // ── No overlap: straightforward add ────────────────────────────
   if (!overlap) {
@@ -836,29 +809,6 @@ function mergeDocProfileFields(store: PatientStore, enriched: ExtractedDoc) {
     const next = new Set([...(store.profile.conditions ?? []), ...enriched.conditions]);
     store.profile.conditions = Array.from(next).slice(0, 200);
   }
-}
-
-/**
- * Legacy merge — always adds as a new document. Kept for backward compatibility.
- * Prefer `smartMergeExtractedDoc` for the upload flow which handles duplicates.
- */
-export function mergeExtractedDoc(
-  doc: ExtractedDoc,
-  opts?: { standardLexiconPatches?: StandardLexiconEntry[] }
-) {
-  const result = smartMergeExtractedDoc(doc, opts);
-  // For backward compat, if smart merge discarded, force-add anyway
-  if (result.action === "discarded_exact" || result.action === "discarded_subset") {
-    const store = getStore();
-    const lex = store.standardLexicon ?? [];
-    const enriched = enrichDocFromMarkdown(doc, lex);
-    store.docs = [enriched, ...store.docs].slice(0, 500);
-    rebuildLabsAndMedsFromDocuments(store);
-    mergeDocProfileFields(store, enriched);
-    saveStore(store);
-    return store;
-  }
-  return result.store;
 }
 
 export function removeDoc(docId: string) {
@@ -1082,11 +1032,6 @@ export function appendUsageLogEntry(
   }
 }
 
-export function clearUsageLog(): void {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(USAGE_LOG_KEY);
-}
-
 export function getUsageSummary(): {
   totalUSD: number;
   totalInputTokens: number;
@@ -1168,23 +1113,6 @@ export function dismissNotification(id: string): void {
   saveStore({ ...store, notifications: (store.notifications ?? []).filter((n) => n.id !== id) });
 }
 
-/** Clear all notifications. */
-export function clearAllNotifications(): void {
-  if (typeof window === "undefined") return;
-  const store = getStore();
-  saveStore({ ...store, notifications: [] });
-}
-
-/** Mark a notification as unread. */
-export function markNotificationUnread(id: string): void {
-  if (typeof window === "undefined") return;
-  const store = getStore();
-  const notifications = (store.notifications ?? []).map((n) =>
-    n.id === id ? { ...n, readAtISO: undefined } : n
-  );
-  saveStore({ ...store, notifications });
-}
-
 /** Delete a set of notifications by id. */
 export function deleteNotifications(ids: Set<string>): void {
   if (typeof window === "undefined") return;
@@ -1211,12 +1139,6 @@ export function markNotificationsUnread(ids: Set<string>): void {
     ids.has(n.id) ? { ...n, readAtISO: undefined } : n
   );
   saveStore({ ...store, notifications });
-}
-
-/** Count unread notifications. */
-export function unreadNotificationCount(): number {
-  if (typeof window === "undefined") return 0;
-  return (getStore().notifications ?? []).filter((n) => !n.readAtISO).length;
 }
 
 /* ─── Auto-mode adherence helper ─────────────────────────── */
@@ -1262,4 +1184,78 @@ export function autoLogTodayDoses(): void {
       medicationIntake: [...newEntries, ...hl.medicationIntake],
     },
   });
+}
+
+// ─── Live store hook ──────────────────────────────────────────────────────────
+
+const SSE_URL = "/api/patient-store/stream";
+const BACKOFF_INIT_MS = 1_000;
+const BACKOFF_MAX_MS = 30_000;
+const JITTER = 0.2;
+const POLL_FALLBACK_MS = 30_000;
+
+function jittered(ms: number): number {
+  return ms * (1 + (Math.random() * 2 - 1) * JITTER);
+}
+
+/**
+ * Subscribes to the SSE stream at `/api/patient-store/stream` and returns
+ * the current `PatientStore` from `localStorage`, refreshed whenever the
+ * server fires a NOTIFY for this user.
+ *
+ * Reconnects with exponential backoff (1s start, 30s cap, ±20% jitter).
+ * Falls back to a 30-second polling interval when the EventSource fails
+ * repeatedly (e.g. server-side rendering or network loss).
+ */
+export function useLivePatientStore(): PatientStore {
+  const [store, setStore] = useState<PatientStore>(() => getStore());
+
+  useEffect(() => {
+    let es: EventSource | null = null;
+    let backoff = BACKOFF_INIT_MS;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
+    let destroyed = false;
+
+    function refresh() {
+      setStore(getStore());
+    }
+
+    function startPollFallback() {
+      if (pollTimer) return;
+      pollTimer = setInterval(refresh, POLL_FALLBACK_MS);
+    }
+
+    function connect() {
+      if (destroyed) return;
+      es = new EventSource(SSE_URL);
+
+      es.onmessage = (evt) => {
+        if (evt.data === "connected" || !evt.data) return;
+        backoff = BACKOFF_INIT_MS; // successful message → reset backoff
+        refresh();
+      };
+
+      es.onerror = () => {
+        es?.close();
+        es = null;
+        if (destroyed) return;
+        const delay = jittered(backoff);
+        backoff = Math.min(backoff * 2, BACKOFF_MAX_MS);
+        if (backoff >= BACKOFF_MAX_MS) startPollFallback();
+        reconnectTimer = setTimeout(connect, delay);
+      };
+    }
+
+    connect();
+
+    return () => {
+      destroyed = true;
+      es?.close();
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (pollTimer) clearInterval(pollTimer);
+    };
+  }, []);
+
+  return store;
 }

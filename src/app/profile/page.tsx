@@ -7,8 +7,6 @@ import { Input } from "@/components/ui/Input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/Select";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { Combobox } from "@/components/ui/Combobox";
-// Phone feature disabled for now
-// import { buildPhoneDialOptions } from "@/lib/phoneDialOptions";
 import { Badge } from "@/components/ui/Badge";
 import {
   clearLocalPatientStore,
@@ -820,121 +818,109 @@ export default function ProfilePage() {
   function removeDoctorSuggestion(name: string) {
     const trimmed = name.trim();
     if (!trimmed) return;
-    setStore((prev) => {
-      const qp = prev.profile.doctorQuickPick ?? [];
-      const inCustom = qp.some((x) => normPickKey(x) === normPickKey(trimmed));
-      const profile = { ...prev.profile };
-      if (inCustom) {
-        profile.doctorQuickPick = qp.filter((x) => normPickKey(x) !== normPickKey(trimmed));
-      } else {
-        const hidden = new Set([...(profile.doctorQuickPickHidden ?? [])]);
-        hidden.add(normPickKey(trimmed));
-        profile.doctorQuickPickHidden = [...hidden];
-      }
-      const next = { ...prev, profile };
-      saveViewingStore(next);
-      return next;
-    });
+    const qp = store.profile.doctorQuickPick ?? [];
+    const inCustom = qp.some((x) => normPickKey(x) === normPickKey(trimmed));
+    const profile = { ...store.profile };
+    if (inCustom) {
+      profile.doctorQuickPick = qp.filter((x) => normPickKey(x) !== normPickKey(trimmed));
+    } else {
+      const hidden = new Set([...(profile.doctorQuickPickHidden ?? [])]);
+      hidden.add(normPickKey(trimmed));
+      profile.doctorQuickPickHidden = [...hidden];
+    }
+    const next = { ...store, profile };
+    setStore(next);
+    saveViewingStore(next);
   }
 
   function appendDoctorQuickPick(name: string) {
     const t = name.trim();
     if (!t) return;
-    setStore((prev) => {
-      const qp = [...(prev.profile.doctorQuickPick ?? [])];
-      if (qp.some((x) => normPickKey(x) === normPickKey(t))) return prev;
-      qp.push(t);
-      const next = { ...prev, profile: { ...prev.profile, doctorQuickPick: qp } };
-      saveViewingStore(next);
-      return next;
-    });
+    const qp = [...(store.profile.doctorQuickPick ?? [])];
+    if (qp.some((x) => normPickKey(x) === normPickKey(t))) return;
+    qp.push(t);
+    const next = { ...store, profile: { ...store.profile, doctorQuickPick: qp } };
+    setStore(next);
+    saveViewingStore(next);
   }
 
   function renameDoctorSuggestion(from: string, to: string) {
     const f = from.trim();
     const t = to.trim();
     if (!f || !t || normPickKey(f) === normPickKey(t)) return;
-    setStore((prev) => {
-      const profile = { ...prev.profile };
-      const qp = [...(profile.doctorQuickPick ?? [])];
-      const idx = qp.findIndex((x) => normPickKey(x) === normPickKey(f));
-      if (idx >= 0) {
-        qp[idx] = t;
-        profile.doctorQuickPick = qp;
-      } else {
-        const hidden = new Set([...(profile.doctorQuickPickHidden ?? [])]);
-        hidden.add(normPickKey(f));
-        profile.doctorQuickPickHidden = [...hidden];
-        if (!qp.some((x) => normPickKey(x) === normPickKey(t))) qp.push(t);
-        profile.doctorQuickPick = qp;
-      }
-      if (normPickKey(prev.profile.primaryCareProvider ?? "") === normPickKey(f)) {
-        profile.primaryCareProvider = t;
-      }
-      const next = { ...prev, profile };
-      saveViewingStore(next);
-      return next;
-    });
+    const profile = { ...store.profile };
+    const qp = [...(profile.doctorQuickPick ?? [])];
+    const idx = qp.findIndex((x) => normPickKey(x) === normPickKey(f));
+    if (idx >= 0) {
+      qp[idx] = t;
+      profile.doctorQuickPick = qp;
+    } else {
+      const hidden = new Set([...(profile.doctorQuickPickHidden ?? [])]);
+      hidden.add(normPickKey(f));
+      profile.doctorQuickPickHidden = [...hidden];
+      if (!qp.some((x) => normPickKey(x) === normPickKey(t))) qp.push(t);
+      profile.doctorQuickPick = qp;
+    }
+    if (normPickKey(store.profile.primaryCareProvider ?? "") === normPickKey(f)) {
+      profile.primaryCareProvider = t;
+    }
+    const next = { ...store, profile };
+    setStore(next);
+    saveViewingStore(next);
   }
 
   function removeFacilitySuggestion(name: string) {
     const trimmed = name.trim();
     if (!trimmed) return;
-    setStore((prev) => {
-      const qp = prev.profile.facilityQuickPick ?? [];
-      const inCustom = qp.some((x) => normPickKey(x) === normPickKey(trimmed));
-      const profile = { ...prev.profile };
-      if (inCustom) {
-        profile.facilityQuickPick = qp.filter((x) => normPickKey(x) !== normPickKey(trimmed));
-      } else {
-        const hidden = new Set([...(profile.facilityQuickPickHidden ?? [])]);
-        hidden.add(normPickKey(trimmed));
-        profile.facilityQuickPickHidden = [...hidden];
-      }
-      const next = { ...prev, profile };
-      saveViewingStore(next);
-      return next;
-    });
+    const qp = store.profile.facilityQuickPick ?? [];
+    const inCustom = qp.some((x) => normPickKey(x) === normPickKey(trimmed));
+    const profile = { ...store.profile };
+    if (inCustom) {
+      profile.facilityQuickPick = qp.filter((x) => normPickKey(x) !== normPickKey(trimmed));
+    } else {
+      const hidden = new Set([...(profile.facilityQuickPickHidden ?? [])]);
+      hidden.add(normPickKey(trimmed));
+      profile.facilityQuickPickHidden = [...hidden];
+    }
+    const next = { ...store, profile };
+    setStore(next);
+    saveViewingStore(next);
   }
 
   function appendFacilityQuickPick(name: string) {
     const t = name.trim();
     if (!t) return;
-    setStore((prev) => {
-      const qp = [...(prev.profile.facilityQuickPick ?? [])];
-      if (qp.some((x) => normPickKey(x) === normPickKey(t))) return prev;
-      qp.push(t);
-      const next = { ...prev, profile: { ...prev.profile, facilityQuickPick: qp } };
-      saveViewingStore(next);
-      return next;
-    });
+    const qp = [...(store.profile.facilityQuickPick ?? [])];
+    if (qp.some((x) => normPickKey(x) === normPickKey(t))) return;
+    qp.push(t);
+    const next = { ...store, profile: { ...store.profile, facilityQuickPick: qp } };
+    setStore(next);
+    saveViewingStore(next);
   }
 
   function renameFacilitySuggestion(from: string, to: string) {
     const f = from.trim();
     const t = to.trim();
     if (!f || !t || normPickKey(f) === normPickKey(t)) return;
-    setStore((prev) => {
-      const profile = { ...prev.profile };
-      const qp = [...(profile.facilityQuickPick ?? [])];
-      const idx = qp.findIndex((x) => normPickKey(x) === normPickKey(f));
-      if (idx >= 0) {
-        qp[idx] = t;
-        profile.facilityQuickPick = qp;
-      } else {
-        const hidden = new Set([...(profile.facilityQuickPickHidden ?? [])]);
-        hidden.add(normPickKey(f));
-        profile.facilityQuickPickHidden = [...hidden];
-        if (!qp.some((x) => normPickKey(x) === normPickKey(t))) qp.push(t);
-        profile.facilityQuickPick = qp;
-      }
-      if (normPickKey(prev.profile.nextVisitHospital ?? "") === normPickKey(f)) {
-        profile.nextVisitHospital = t;
-      }
-      const next = { ...prev, profile };
-      saveViewingStore(next);
-      return next;
-    });
+    const profile = { ...store.profile };
+    const qp = [...(profile.facilityQuickPick ?? [])];
+    const idx = qp.findIndex((x) => normPickKey(x) === normPickKey(f));
+    if (idx >= 0) {
+      qp[idx] = t;
+      profile.facilityQuickPick = qp;
+    } else {
+      const hidden = new Set([...(profile.facilityQuickPickHidden ?? [])]);
+      hidden.add(normPickKey(f));
+      profile.facilityQuickPickHidden = [...hidden];
+      if (!qp.some((x) => normPickKey(x) === normPickKey(t))) qp.push(t);
+      profile.facilityQuickPick = qp;
+    }
+    if (normPickKey(store.profile.nextVisitHospital ?? "") === normPickKey(f)) {
+      profile.nextVisitHospital = t;
+    }
+    const next = { ...store, profile };
+    setStore(next);
+    saveViewingStore(next);
   }
 
   function updateBodyMetrics(patch: Partial<NonNullable<typeof store.profile.bodyMetrics>>) {
@@ -1427,7 +1413,7 @@ export default function ProfilePage() {
                   <h2 className="text-sm font-medium">Period tracker</h2>
                 </div>
                 <p className="text-xs mv-muted mt-1">
-                  Estimates only — not medical advice. Predictions are based on your average cycle. Speak to your doctor about symptoms or irregular cycles.
+                  Estimates only — predictions are based on your average cycle. Speak to your doctor about symptoms or irregular cycles.
                 </p>
               </CardHeader>
               <CardContent className="flex flex-col gap-5">

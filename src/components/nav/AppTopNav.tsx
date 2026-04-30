@@ -68,7 +68,7 @@ export function AppTopNav({
         <div className="flex min-w-0 items-center justify-start">
           <Link href="/dashboard" className="shrink-0">
             <UmaLogo compact className="sm:hidden" />
-            <UmaLogo className="hidden sm:inline-flex" />
+            <UmaLogo className="max-sm:hidden sm:inline-flex" />
           </Link>
         </div>
 

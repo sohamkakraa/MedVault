@@ -293,7 +293,7 @@ export function DatePicker({
   function formatDisplay(ds: string) {
     const d = parseDate(ds);
     if (!d) return ds;
-    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" });
   }
 
   return (

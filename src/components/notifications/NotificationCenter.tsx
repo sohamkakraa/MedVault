@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, Check, CheckCheck, ExternalLink, List, X } from "lucide-react";
+import { Bell, CheckCheck, X } from "lucide-react";
 import {
   Popover,
   PopoverTrigger,
@@ -13,9 +13,6 @@ import {
   markNotificationRead,
   markAllNotificationsRead,
   dismissNotification,
-  deleteNotifications,
-  markNotificationsRead,
-  markNotificationsUnread,
 } from "@/lib/store";
 import type { UmaNotification } from "@/lib/types";
 
@@ -47,8 +44,6 @@ function kindIcon(kind: UmaNotification["kind"]) {
 export function NotificationCenter() {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<UmaNotification[]>([]);
-  const [selectionMode, setSelectionMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const listRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -71,15 +66,15 @@ export function NotificationCenter() {
     };
   }, []);
 
-  // Auto-mark-read on open after 600ms delay
+  // Auto-mark-read on open after 600 ms
   useEffect(() => {
-    if (!open || selectionMode) return;
+    if (!open) return;
     const timer = setTimeout(() => {
       markAllNotificationsRead();
       refresh();
     }, 600);
     return () => clearTimeout(timer);
-  }, [open, selectionMode]);
+  }, [open]);
 
   // Scroll indicator
   useEffect(() => {
@@ -96,44 +91,19 @@ export function NotificationCenter() {
 
   const unread = notifications.filter((n) => !n.readAtISO).length;
 
-  function handleRead(id: string) {
-    markNotificationRead(id);
+  function handleDismiss(id: string) {
+    dismissNotification(id);
     refresh();
   }
 
-  function handleDismiss(id: string) {
-    dismissNotification(id);
+  function handleRead(id: string) {
+    markNotificationRead(id);
     refresh();
   }
 
   function handleMarkAll() {
     markAllNotificationsRead();
     refresh();
-  }
-
-  function handleSelectToggle(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function handleSelectAll() {
-    if (selectedIds.size === notifications.length) setSelectedIds(new Set());
-    else setSelectedIds(new Set(notifications.map((n) => n.id)));
-  }
-
-  function handleMarkSelectedRead() { markNotificationsRead(selectedIds); refresh(); }
-  function handleMarkSelectedUnread() { markNotificationsUnread(selectedIds); refresh(); }
-  function handleDeleteSelected() { deleteNotifications(selectedIds); setSelectedIds(new Set()); refresh(); }
-  function exitSelectionMode() { setSelectionMode(false); setSelectedIds(new Set()); }
-
-  function handleRowClick(id: string, e: React.MouseEvent) {
-    const target = e.target as HTMLElement;
-    if (target.closest("a") || target.closest("button")) return;
-    handleSelectToggle(id);
   }
 
   return (
@@ -158,191 +128,95 @@ export function NotificationCenter() {
       <PopoverContent
         align="end"
         sideOffset={8}
-        className="w-[340px] max-w-[calc(100vw-1rem)] p-0 flex flex-col overflow-hidden"
-        style={{ maxHeight: "min(520px, 80dvh)" }}
+        className="w-[360px] max-w-[calc(100vw-1rem)] p-0 flex flex-col overflow-hidden"
+        style={{ maxHeight: "min(540px, 80dvh)" }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] shrink-0">
-          <span className="text-sm font-semibold">
-            {selectionMode ? `${selectedIds.size} selected` : "Notifications"}
-          </span>
+          <span className="text-sm font-semibold">Notifications</span>
           <div className="flex items-center gap-1">
-            {!selectionMode && unread > 0 && (
+            {unread > 0 && (
               <button
                 type="button"
                 onClick={handleMarkAll}
                 title="Mark all as read"
-                className="h-7 w-7 rounded-lg flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel-2)] transition-colors"
+                className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel-2)] transition-colors"
               >
                 <CheckCheck className="h-3.5 w-3.5" />
+                Mark all read
               </button>
             )}
-            {!selectionMode && notifications.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setSelectionMode(true)}
-                title="Select notifications"
-                className="h-7 w-7 rounded-lg flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel-2)] transition-colors"
-              >
-                <List className="h-3.5 w-3.5" />
-              </button>
-            )}
-            {selectionMode && (
-              <>
-                <button
-                  type="button"
-                  onClick={handleMarkSelectedRead}
-                  disabled={selectedIds.size === 0}
-                  title="Mark selected as read"
-                  className="h-7 px-2 rounded-lg flex items-center justify-center text-xs font-medium text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel-2)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Check className="h-3 w-3 mr-1" />
-                  Read
-                </button>
-                <button
-                  type="button"
-                  onClick={handleMarkSelectedUnread}
-                  disabled={selectedIds.size === 0}
-                  title="Mark selected as unread"
-                  className="h-7 px-2 rounded-lg flex items-center justify-center text-xs font-medium text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel-2)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  <X className="h-3 w-3 mr-1" />
-                  Unread
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDeleteSelected}
-                  disabled={selectedIds.size === 0}
-                  title="Delete selected"
-                  className="h-7 px-2 rounded-lg flex items-center justify-center text-xs font-medium text-[var(--muted)] hover:text-red-400 hover:bg-[var(--panel-2)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  Delete
-                </button>
-                <button
-                  type="button"
-                  onClick={exitSelectionMode}
-                  title="Cancel selection"
-                  className="h-7 w-7 rounded-lg flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel-2)] transition-colors"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </>
-            )}
-            {!selectionMode && (
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="h-7 w-7 rounded-lg flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel-2)] transition-colors"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Select-all toggle bar */}
-        {selectionMode && notifications.length > 0 && (
-          <div className="px-4 py-2 border-b border-[var(--border)] bg-[var(--panel-2)]/40 shrink-0">
             <button
               type="button"
-              onClick={handleSelectAll}
-              className="text-xs text-[var(--accent)] hover:underline font-medium"
+              onClick={() => setOpen(false)}
+              aria-label="Close notifications"
+              className="h-8 w-8 rounded-lg flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel-2)] transition-colors"
             >
-              {selectedIds.size === notifications.length ? "Deselect all" : "Select all"}
+              <X className="h-4 w-4" />
             </button>
           </div>
-        )}
+        </div>
 
         {/* List */}
         <div className="overflow-y-auto flex-1 relative" ref={listRef}>
           {notifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-12 text-center px-6">
-              <Bell className="h-8 w-8 text-[var(--muted)] opacity-40" />
-              <p className="text-sm text-[var(--muted)]">You&apos;re all caught up</p>
+            <div className="flex flex-col items-center justify-center gap-3 py-14 text-center px-6">
+              <span className="text-4xl" aria-hidden>🔔</span>
+              <p className="text-sm font-medium text-[var(--fg)]">You&apos;re all caught up</p>
+              <p className="text-xs text-[var(--muted)]">No new notifications right now.</p>
             </div>
           ) : (
             <>
               {notifications.map((n) => (
                 <div
                   key={n.id}
-                  onClick={(e) => { if (selectionMode) handleRowClick(n.id, e); }}
                   className={[
-                    "group relative flex gap-3 px-4 py-3 border-b border-[var(--border)] transition-colors cursor-pointer",
-                    n.readAtISO ? "opacity-60" : "bg-[var(--accent)]/5",
-                    selectionMode && selectedIds.has(n.id) ? "bg-[var(--accent)]/10 border-l-2 border-l-[var(--accent)]" : "",
+                    "flex gap-3 px-4 py-4 border-b border-[var(--border)] transition-colors",
+                    !n.readAtISO ? "bg-[var(--accent)]/5" : "",
                   ].join(" ")}
                 >
-                  {selectionMode && (
-                    <div className="flex items-start mt-0.5">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(n.id)}
-                        onChange={() => handleSelectToggle(n.id)}
-                        className="h-4 w-4 rounded border border-[var(--border)] checked:bg-[var(--accent)] cursor-pointer"
-                      />
-                    </div>
+                  {/* Unread dot */}
+                  {!n.readAtISO && (
+                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[var(--accent)]" aria-label="Unread" />
                   )}
+                  {n.readAtISO && <span className="mt-1.5 h-2 w-2 shrink-0" />}
 
-                  {!selectionMode && !n.readAtISO && (
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
-                  )}
+                  {/* Icon */}
+                  <span className="text-xl shrink-0 mt-0.5" aria-hidden>{kindIcon(n.kind)}</span>
 
-                  <span className="text-lg shrink-0 mt-0.5">{kindIcon(n.kind)}</span>
-
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-[var(--fg)] leading-snug">{n.title}</p>
-                    <p className="text-xs text-[var(--muted)] mt-0.5 leading-snug">{n.body}</p>
-                    <p className="text-[10px] text-[var(--muted)] mt-1 opacity-60">{timeAgo(n.createdAtISO)}</p>
-                    {n.actionHref && n.actionLabel && !selectionMode && (
+                  {/* Text content */}
+                  <div className="flex-1 min-w-0" onClick={() => !n.readAtISO && handleRead(n.id)}>
+                    <p className="text-sm font-semibold text-[var(--fg)] leading-snug">{n.title}</p>
+                    <p className="text-sm text-[var(--muted)] mt-0.5 leading-snug">{n.body}</p>
+                    <p className="text-xs text-[var(--muted)] mt-1 opacity-70">{timeAgo(n.createdAtISO)}</p>
+                    {n.actionHref && n.actionLabel && (
                       <Link
                         href={n.actionHref}
                         onClick={() => { handleRead(n.id); setOpen(false); }}
-                        className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-medium text-[var(--accent)] hover:underline"
+                        className="inline-flex items-center gap-1 mt-2 text-sm font-medium text-[var(--accent)] hover:underline"
                       >
-                        {n.actionLabel} <ExternalLink className="h-2.5 w-2.5" />
+                        {n.actionLabel} →
                       </Link>
                     )}
                   </div>
 
-                  {!selectionMode && (
-                    <div className="shrink-0 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {!n.readAtISO && (
-                        <button
-                          type="button"
-                          onClick={() => handleRead(n.id)}
-                          title="Mark as read"
-                          className="h-6 w-6 rounded-md flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel-2)]"
-                        >
-                          <Check className="h-3 w-3" />
-                        </button>
-                      )}
-                      {n.readAtISO && (
-                        <button
-                          type="button"
-                          onClick={() => handleRead(n.id)}
-                          title="Mark as unread"
-                          className="h-6 w-6 rounded-md flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel-2)]"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => handleDismiss(n.id)}
-                        title="Dismiss"
-                        className="h-6 w-6 rounded-md flex items-center justify-center text-[var(--muted)] hover:text-red-400 hover:bg-[var(--panel-2)]"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )}
+                  {/* Single dismiss button — always visible, large tap target */}
+                  <button
+                    type="button"
+                    onClick={() => handleDismiss(n.id)}
+                    aria-label={`Dismiss notification: ${n.title}`}
+                    title="Dismiss"
+                    className="shrink-0 self-start mt-0.5 h-9 w-9 rounded-xl flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--panel-2)] transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
               ))}
               <div ref={sentinelRef} style={{ height: 1 }} />
             </>
           )}
 
-          {/* Scroll indicator */}
+          {/* Scroll-more indicator */}
           {hasMore && (
             <div
               className="absolute bottom-0 left-0 right-0 h-8 pointer-events-none"

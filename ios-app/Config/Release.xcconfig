@@ -1,0 +1,26 @@
+#include "Base.xcconfig"
+
+// Release configuration
+SWIFT_ACTIVE_COMPILATION_CONDITIONS =
+GCC_PREPROCESSOR_DEFINITIONS = $(inherited)
+
+DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
+ONLY_ACTIVE_ARCH = NO
+ENABLE_TESTABILITY = NO
+
+// Optimization
+SWIFT_OPTIMIZATION_LEVEL = -O
+GCC_OPTIMIZATION_LEVEL = s
+
+// Strip debug symbols
+STRIP_INSTALLED_PRODUCT = YES
+STRIP_STYLE = all
+
+// Assertions disabled in release
+ENABLE_NS_ASSERTIONS = NO
+
+// Bitcode (disabled for Xcode 16+)
+ENABLE_BITCODE = NO
+
+// Code signing
+CODE_SIGN_IDENTITY = iPhone Distribution

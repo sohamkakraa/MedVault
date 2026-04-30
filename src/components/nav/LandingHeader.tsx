@@ -10,7 +10,7 @@ export function LandingHeader() {
     <header className="border-b border-[var(--border)] bg-[var(--panel)]/90 backdrop-blur sticky top-0 z-30">
       <div className="mx-auto max-w-6xl px-4 h-14 flex items-center justify-between gap-4">
         <Link href="/" className="shrink-0">
-          <UmaLogo className="hidden sm:inline-flex" />
+          <UmaLogo className="max-sm:hidden sm:inline-flex" />
           <UmaLogo compact className="sm:hidden" />
         </Link>
         <div className="flex items-center gap-1 sm:gap-2">

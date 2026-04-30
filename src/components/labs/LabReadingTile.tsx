@@ -73,7 +73,7 @@ function LabTooltipBody({
         )}
       </div>
       <p className="mt-2 text-[10px] leading-snug text-[var(--muted)] border-t border-[var(--border)] pt-2">
-        {it.disclaimer} Not medical advice.
+        {it.disclaimer}
       </p>
     </>
   );

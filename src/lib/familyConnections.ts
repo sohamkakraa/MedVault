@@ -5,7 +5,6 @@
  */
 
 import { FamilyConnectionRequest, FamilyLink, FamilyLinkVisibility, FamilyRelation } from "@/lib/types";
-import { lookupByEmail, isEmailOnPlatform, type AccountRegistryEntry } from "@/lib/accountRegistry";
 
 /**
  * Generates a stable key for storing requests to a specific email.
@@ -313,17 +312,3 @@ export function getSentFamilyRequests(): FamilyConnectionRequest[] {
   }
 }
 
-/**
- * Look up all profiles (primary + sub-profiles) associated with an email address.
- * Returns [] if the email is not on the platform.
- */
-export function lookupAccountProfiles(email: string): AccountRegistryEntry[] {
-  return lookupByEmail(email);
-}
-
-/**
- * Check if an email address has a UMA account on this device.
- */
-export function checkEmailOnPlatform(email: string): boolean {
-  return isEmailOnPlatform(email);
-}

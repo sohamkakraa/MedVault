@@ -114,7 +114,7 @@ export async function POST(req: Request) {
       // outside a 24h window — the client logs a clear warning).
       await sendOtpMessage(norm.e164, code);
     } catch (e) {
-      console.error("[uma-auth] WhatsApp OTP send failed", e);
+      console.error("[uma-auth] WhatsApp OTP send failed:", e instanceof Error ? e.message : "unknown");
       if (devReturn) {
         return NextResponse.json({
           ok: true,

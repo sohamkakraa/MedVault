@@ -18,12 +18,12 @@ export function doctorNamesFromDocs(docs: ExtractedDoc[]): string[] {
 }
 
 export function facilityNamesFromDocs(docs: ExtractedDoc[]): string[] {
-  const names = new Set<string>();
+  const seen = new Map<string, string>(); // lowercase key → preferred casing
   for (const doc of docs) {
     const f = doc.facilityName?.trim();
-    if (f) names.add(f);
+    if (f && !seen.has(f.toLowerCase())) seen.set(f.toLowerCase(), f);
   }
-  return [...names];
+  return [...seen.values()];
 }
 
 type DoctorPickProfile = Pick<
@@ -33,18 +33,21 @@ type DoctorPickProfile = Pick<
 
 export function mergeDoctorQuickPick(profile: DoctorPickProfile, fromDocuments: string[]): string[] {
   const hidden = new Set((profile.doctorQuickPickHidden ?? []).map(normPickKey));
-  const out = new Set<string>();
+  const seen = new Map<string, string>();
   for (const raw of fromDocuments) {
     const t = raw.trim();
     if (!t || hidden.has(normPickKey(t))) continue;
-    out.add(t);
+    if (!seen.has(normPickKey(t))) seen.set(normPickKey(t), t);
   }
   for (const raw of profile.doctorQuickPick ?? []) {
     const t = raw.trim();
-    if (t) out.add(t);
+    if (t && !seen.has(normPickKey(t))) seen.set(normPickKey(t), t);
   }
-  if (profile.primaryCareProvider?.trim()) out.add(profile.primaryCareProvider.trim());
-  return Array.from(out).sort((a, b) => a.localeCompare(b));
+  if (profile.primaryCareProvider?.trim()) {
+    const t = profile.primaryCareProvider.trim();
+    if (!seen.has(normPickKey(t))) seen.set(normPickKey(t), t);
+  }
+  return [...seen.values()].sort((a, b) => a.localeCompare(b));
 }
 
 type FacilityPickProfile = Pick<
@@ -54,16 +57,19 @@ type FacilityPickProfile = Pick<
 
 export function mergeFacilityQuickPick(profile: FacilityPickProfile, fromDocuments: string[]): string[] {
   const hidden = new Set((profile.facilityQuickPickHidden ?? []).map(normPickKey));
-  const out = new Set<string>();
+  const seen = new Map<string, string>();
   for (const raw of fromDocuments) {
     const t = raw.trim();
     if (!t || hidden.has(normPickKey(t))) continue;
-    out.add(t);
+    if (!seen.has(normPickKey(t))) seen.set(normPickKey(t), t);
   }
   for (const raw of profile.facilityQuickPick ?? []) {
     const t = raw.trim();
-    if (t) out.add(t);
+    if (t && !seen.has(normPickKey(t))) seen.set(normPickKey(t), t);
   }
-  if (profile.nextVisitHospital?.trim()) out.add(profile.nextVisitHospital.trim());
-  return Array.from(out).sort((a, b) => a.localeCompare(b));
+  if (profile.nextVisitHospital?.trim()) {
+    const t = profile.nextVisitHospital.trim();
+    if (!seen.has(normPickKey(t))) seen.set(normPickKey(t), t);
+  }
+  return [...seen.values()].sort((a, b) => a.localeCompare(b));
 }

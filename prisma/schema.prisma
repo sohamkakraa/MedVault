@@ -136,3 +136,28 @@ model Comment {
 
   @@map("comments")
 }
+
+/**
+ * Idempotency guard for incoming WhatsApp messages.
+ * Created inside a transaction before processIncomingMessage runs.
+ * A duplicate messageId → row already exists → skip processing.
+ */
+model WhatsAppDelivery {
+  eId        String   @id @map("e_id")
+  receivedAt DateTime @default(now()) @map("received_at")
+
+  @@map("whatsapp_deliveries")
+}
+
+/**
+ * One-time token sent to an unknown WhatsApp sender so they can
+ * complete sign-up via the web login page (`?wa=<token>`).
+ * Consumed on success; expires after 15 minutes.
+ */
+model PendingLink {
+  token     String   @id
+  phoneE164 String   @map("phone_e164")
+  expiresAt DateTime @map("expires_at")
+
+  @@map("pending_links")
+}

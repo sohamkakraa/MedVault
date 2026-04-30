@@ -52,7 +52,7 @@ export default function HomePage() {
               </Link>
             </div>
             <p className="mt-8 text-[11px] mv-muted leading-relaxed max-w-xl">
-              Not medical advice. UMA does not diagnose or replace your doctor. It helps you understand and
+              UMA does not diagnose or replace your doctor. It helps you understand and
               organise your own health information.
             </p>
           </div>
@@ -305,7 +305,7 @@ export default function HomePage() {
 
       <footer className="border-t border-[var(--border)] py-8 text-center text-[11px] mv-muted">
         <div className="mx-auto max-w-6xl px-4">
-          UMA — Ur Medical Assistant. Your data stays on this device unless you connect other services. Not medical advice.
+          UMA — Ur Medical Assistant. Your data stays on this device unless you connect other services.
         </div>
       </footer>
     </div>

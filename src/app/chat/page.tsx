@@ -51,7 +51,6 @@ const INITIAL_GREETING: Msg = {
     "- Tap a suggestion below, or attach a PDF here—I read it in parallel and you can **Add to records** when it looks right.",
     "- Say **catch me up** for a short rundown of your records plus two sensible next moves.",
     "",
-    "Not medical advice; use your care team for diagnosis and treatment decisions.",
   ].join("\n"),
 };
 
@@ -922,7 +921,7 @@ export default function ChatPage() {
                 </div>
               </div>
               <p className="mt-2 text-[11px] mv-muted">
-                Not medical advice. If you attach a PDF, we read it at the same time as your message. Very large files
+                If you attach a PDF, we read it at the same time as your message. Very large files
                 work better from the home screen upload button.
               </p>
             </div>

@@ -20,14 +20,16 @@ import { DashboardEditToolbar } from "@/components/dashboard/DashboardEditToolba
 import {
   defaultDashboardLayout,
   normalizeDashboardLayout,
+  setWidgetSize,
 } from "@/lib/dashboardLayout";
-import { HealthTrendsSection } from "@/components/labs/HealthTrendsSection";
+import { HealthTrendsSection, GaugeCard } from "@/components/labs/HealthTrendsSection";
 import { LabReadingTile } from "@/components/labs/LabReadingTile";
 import { RecordNoticeToast } from "@/components/ui/RecordNoticeToast";
 import { Footer } from "@/components/ui/Footer";
 import { getHydrationSafeStore, getStore, saveStore, getHydrationSafeViewingStore, getViewingStore, saveViewingStore, getActiveFamilyMember, setActiveFamilyMember, removeDoc, smartMergeExtractedDoc, rebuildLabsAndMedsFromDocuments, pushNotification } from "@/lib/store";
 import { useGlobalUpload } from "@/lib/uploadContext";
 import {
+  BentoSize,
   DocType,
   DashboardLayout,
   DashboardWidgetId,
@@ -257,6 +259,62 @@ function nextDoseWindow(frequency?: string, usualTimeLocalHHmm?: string) {
 
 type OverlayKind = "reports" | "meds" | "labs" | "add-med" | "add-report" | "upload-report" | null;
 
+function getDemoSeed() {
+  return {
+    docs: [
+      {
+        id: "demo-doc-1",
+        type: "Lab report" as const,
+        title: "Annual Blood Panel",
+        dateISO: "2024-11-15",
+        provider: "City Health Lab",
+        summary: "Comprehensive metabolic panel with lipid profile.",
+        medications: [],
+        labs: [
+          { name: "HbA1c", value: "5.9", unit: "%", date: "2024-11-15" },
+          { name: "LDL", value: "118", unit: "mg/dL", date: "2024-11-15" },
+          { name: "HDL", value: "62", unit: "mg/dL", date: "2024-11-15" },
+        ],
+        tags: [],
+        allergies: [],
+        conditions: [],
+        sections: [],
+      },
+    ],
+    meds: [
+      { name: "Metformin", dose: "500 mg", frequency: "Twice daily", startDate: "2023-01-10" },
+      { name: "Lisinopril", dose: "10 mg", frequency: "Once daily", startDate: "2022-06-01" },
+    ],
+    labs: [
+      { name: "HbA1c", value: "5.9", unit: "%", date: "2024-11-15", sourceDocId: "demo-doc-1" },
+      { name: "LDL", value: "118", unit: "mg/dL", date: "2024-11-15", sourceDocId: "demo-doc-1" },
+    ],
+    healthLogs: {
+      bloodPressure: [
+        { id: "demo-bp-1", systolic: 128, diastolic: 82, loggedAtISO: "2024-11-14T09:00:00.000Z" },
+      ],
+      medicationIntake: [],
+      sideEffects: [],
+      medicationReminders: [],
+    },
+    profile: {
+      name: "Demo Patient",
+      firstName: "Demo",
+      lastName: "Patient",
+      dob: "1975-04-22",
+      sex: "Female",
+      conditions: ["Type 2 Diabetes", "Hypertension"],
+      allergies: ["Penicillin"],
+      trends: ["HbA1c", "LDL"],
+      internalId: "demo-internal",
+      countryCode: "+1",
+    },
+    preferences: { theme: "system" as const },
+    standardLexicon: [],
+    updatedAtISO: "2024-11-15T12:00:00.000Z",
+  };
+}
+
 export default function DashboardPage() {
   return (
     <Suspense fallback={null}>
@@ -269,6 +327,7 @@ function DashboardInner() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const isDemo = searchParams.get("demo") === "1";
   const [store, setStore] = useState(() => getHydrationSafeViewingStore());
   const [activeMember, setActiveMemberState] = useState(() => typeof window !== "undefined" ? getActiveFamilyMember() : null);
   const [printing, setPrinting] = useState(false);
@@ -319,6 +378,7 @@ function DashboardInner() {
   const [newMedForm, setNewMedForm] = useState<MedicationFormKind>("unspecified");
   const [newMedFormOther, setNewMedFormOther] = useState("");
   const [addMedFormError, setAddMedFormError] = useState<string | null>(null);
+  const [addMedSubmitting, setAddMedSubmitting] = useState(false);
   const [panelMedForm, setPanelMedForm] = useState<MedicationFormKind>("unspecified");
   const [panelMedFormOther, setPanelMedFormOther] = useState("");
   const [panelIntakeWhen, setPanelIntakeWhen] = useState("");
@@ -355,6 +415,13 @@ function DashboardInner() {
   useLayoutEffect(() => {
     setPrintPortalEl(document.body);
   }, []);
+
+  useEffect(() => {
+    if (!isDemo) return;
+    // Deterministic demo seed for screenshot diffs
+    const demoStore = getDemoSeed();
+    setStore(demoStore as typeof store);
+  }, [isDemo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (activeMedInfo === null) {
@@ -1010,7 +1077,7 @@ function DashboardInner() {
         ? ` Estimated ovulation in ${s.daysUntilOvulation} day${s.daysUntilOvulation === 1 ? "" : "s"}.`
         : ""
       : "";
-    return `${s.headline}. ${s.detail}.${phase}${fertile}${ov}${recentFlow} Estimates only, not medical advice. Tap Profile to edit.`;
+    return `${s.headline}. ${s.detail}.${phase}${fertile}${ov}${recentFlow} Estimates only. Tap Profile to edit.`;
   }, [store.profile.menstrualCycle, cycleSummary]);
 
   const conditionBadgeTitle = useMemo(() => {
@@ -1331,6 +1398,22 @@ function DashboardInner() {
     [store],
   );
 
+  const handleDashboardSizeChange = useCallback(
+    (id: DashboardWidgetId, size: BentoSize) => {
+      const updated: typeof store = {
+        ...store,
+        preferences: {
+          ...store.preferences,
+          dashboardLayout: setWidgetSize(dashboardLayout, id, size),
+        },
+        updatedAtISO: new Date().toISOString(),
+      };
+      saveViewingStore(updated);
+      setStore(updated);
+    },
+    [store, dashboardLayout],
+  );
+
   return (
     <div className="flex min-h-full flex-col">
       <style>{`
@@ -1350,7 +1433,7 @@ function DashboardInner() {
       `}</style>
       <AppTopNav />
 
-      <main className="mx-auto w-full max-w-6xl flex-1 space-y-6 px-4 py-8 pb-12 no-print">
+      <main className="mx-auto w-full max-w-[1440px] flex-1 space-y-6 bento-page-padding py-8 pb-12 no-print">
         {activeMember && (
           <div className="flex items-center gap-3 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/8 px-4 py-3">
             <span className="text-xl" aria-hidden>👤</span>
@@ -1380,7 +1463,7 @@ function DashboardInner() {
         {(() => {
           const widgetNodes: Partial<Record<DashboardWidgetId, React.ReactNode>> = {};
           widgetNodes.snapshot = (
-        <section className="mv-card rounded-3xl p-6 mv-surface">
+        <section className="p-6 h-full mv-surface">
           <div className="grid min-w-0 gap-5 lg:grid-cols-[1.6fr_1fr]">
             <div className="min-w-0">
               <p className="text-xs uppercase tracking-[0.16em] mv-muted">At a glance</p>
@@ -1467,7 +1550,6 @@ function DashboardInner() {
                       </div>
                     </div>
                   )}
-                  <span className="text-[10px] text-[var(--muted)] italic">Based on your latest results · Not medical advice</span>
                 </div>
               )}
             </div>
@@ -1610,7 +1692,7 @@ function DashboardInner() {
           widgetNodes.bmi = <BmiCard store={store} />;
 
           widgetNodes.documents = (
-          <Card id="dashboard-latest-reports" className="scroll-mt-24">
+          <div id="dashboard-latest-reports" className="scroll-mt-24">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 min-w-0">
@@ -1666,11 +1748,11 @@ function DashboardInner() {
                 </div>
               )}
             </CardContent>
-          </Card>
+          </div>
           );
 
           widgetNodes.medications = (
-          <Card>
+          <div>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1974,12 +2056,16 @@ function DashboardInner() {
                 )}
               </div>
             </CardContent>
-          </Card>
+          </div>
           );
 
-          widgetNodes.healthLogs = (
-            <DashboardHealthLogSection store={store} onStoreChange={updateStore} />
-          );
+          widgetNodes.bloodPressure = (store.healthLogs?.bloodPressure?.length ?? 0) > 0
+            ? <DashboardHealthLogSection store={store} onStoreChange={updateStore} variant="bloodPressure" />
+            : null;
+
+          widgetNodes.sideEffects = (store.healthLogs?.sideEffects?.length ?? 0) > 0
+            ? <DashboardHealthLogSection store={store} onStoreChange={updateStore} variant="sideEffects" />
+            : null;
 
           widgetNodes.healthTrends = trendCards.length > 0 ? (
             <HealthTrendsSection
@@ -1989,90 +2075,49 @@ function DashboardInner() {
             />
           ) : null;
 
-          widgetNodes.labs = (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-[var(--accent)]" />
-                  <h2 className="text-sm font-semibold">Recent test results</h2>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge>{recentLabs.length} on screen</Badge>
-                <div className="flex rounded-xl border border-[var(--border)] overflow-hidden text-xs">
-                  <button type="button" onClick={() => setLabFilter("flagged")}
-                    className={["px-2.5 py-1 font-medium transition-colors", labFilter === "flagged" ? "bg-[var(--accent)] text-[var(--accent-contrast)]" : "bg-transparent text-[var(--muted)] hover:text-[var(--fg)]"].join(" ")}>
-                    Flagged
-                  </button>
-                  <button type="button" onClick={() => setLabFilter("all")}
-                    className={["px-2.5 py-1 font-medium transition-colors", labFilter === "all" ? "bg-[var(--accent)] text-[var(--accent-contrast)]" : "bg-transparent text-[var(--muted)] hover:text-[var(--fg)]"].join(" ")}>
-                    All
-                  </button>
+          {
+            // Build unique-by-canonical-name flagged labs with ref ranges for GaugeCard
+            const flaggedGaugeItems = (() => {
+              const seen = new Map<string, { lab: typeof flaggedLabs[0]; canonical: string }>();
+              for (const lab of flaggedLabs) {
+                const canonical = resolveCanonicalLabName(lab.name, lex);
+                if (!seen.has(canonical)) seen.set(canonical, { lab, canonical });
+              }
+              return [...seen.values()].map(({ lab, canonical }, idx) => {
+                const ref = getCanonicalRefRange(canonical);
+                const rawVal = typeof lab.value === "number" ? lab.value : parseFloat(String(lab.value ?? ""));
+                if (!ref || isNaN(rawVal)) return null;
+                return { lab, canonical, ref, rawVal, color: ["#f59e0b","#ef4444","#8b5cf6","#06b6d4","#ec4899","#f97316"][idx % 6] };
+              }).filter(Boolean) as Array<{ lab: typeof flaggedLabs[0]; canonical: string; ref: { low: number; high: number; unit: string }; rawVal: number; color: string }>;
+            })();
+            widgetNodes.labs = flaggedGaugeItems.length > 0 ? (
+              <div className="p-5 space-y-3">
+                <div className="flex items-center gap-2 pb-1">
+                  <Activity className="h-4 w-4 text-amber-500 shrink-0" />
+                  <h2 className="text-sm font-semibold">Lab results to discuss with your doctor</h2>
+                </div>
+                <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
+                  {flaggedGaugeItems.map(({ lab, canonical, ref, rawVal, color }) => (
+                    <GaugeCard
+                      key={canonical}
+                      name={canonical}
+                      value={rawVal}
+                      date={lab.date ?? ""}
+                      range={ref}
+                      color={color}
+                    />
+                  ))}
                 </div>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {(() => {
-              const displayLabs = labFilter === "flagged" ? flaggedLabs.slice(0, 9) : inlineLabs;
-              return (
-                <>
-                  {labFilter === "flagged" && flaggedLabs.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-emerald-500/30 bg-emerald-500/5 p-4 text-sm text-emerald-600">
-                      ✓ All your latest results look normal.
-                    </div>
-                  ) : displayLabs.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-[var(--border)] p-6 text-sm mv-muted">
-                      No test results yet. Upload a file to see them here.
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
-                      {displayLabs.map((lab, idx) => (
-                        <LabReadingTile key={`${lab.name}-${lab.date}-${idx}`} lab={lab} extensions={lex} />
-                      ))}
-                    </div>
-                  )}
-                  {labFilter === "all" && recentLabs.length > inlineLabs.length && (
-                    <div className="mt-3">
-                      <Button variant="ghost" className="w-full" onClick={() => setOverlay("labs")}>
-                        Show more test results
-                      </Button>
-                    </div>
-                  )}
-                </>
-              );
-            })()}
-          </CardContent>
-        </Card>
-          );
+            ) : null;
+          }
 
           return (
             <>
-              {editMode && (
-                <DashboardEditToolbar
-                  layout={dashboardLayout}
-                  onLayoutChange={handleDashboardLayoutChange}
-                  onDone={() => setEditMode(false)}
-                />
-              )}
-              {!editMode && (
-                <div className="flex items-center justify-end -mt-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-8 gap-1.5 px-3 text-xs"
-                    onClick={() => setEditMode(true)}
-                    title="Rearrange, add, or remove dashboard cards"
-                  >
-                    <Layers className="h-3.5 w-3.5" />
-                    Edit dashboard
-                  </Button>
-                </div>
-              )}
               <DashboardGrid
                 layout={dashboardLayout}
                 onLayoutChange={handleDashboardLayoutChange}
-                editMode={editMode}
+                editMode={false}
                 renderWidget={(id) => widgetNodes[id] ?? null}
               />
             </>
@@ -2329,15 +2374,24 @@ function DashboardInner() {
                     </div>
                   </div>
                   <Button
+                    disabled={addMedSubmitting}
                     onClick={() => {
+                      if (addMedSubmitting) return;
                       if (!newMed.name?.trim()) return;
-                      if (!addMed()) return;
-                      setOverlay(null);
+                      setAddMedSubmitting(true);
+                      setTimeout(() => {
+                        try {
+                          if (!addMed()) return;
+                          setOverlay(null);
+                        } finally {
+                          setAddMedSubmitting(false);
+                        }
+                      }, 0);
                     }}
                     className="w-full gap-2"
                   >
                     <Plus className="h-4 w-4" />
-                    Save medicine
+                    {addMedSubmitting ? "Saving…" : "Save medicine"}
                   </Button>
                 </div>
               )}

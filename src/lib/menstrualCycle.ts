@@ -215,18 +215,6 @@ export function summarizeMenstrualCycle(
   };
 }
 
-export function parseHeightCm(raw: string): number | null {
-  const n = parseFloat(String(raw).replace(/,/g, ".").trim());
-  if (!Number.isFinite(n) || n <= 0 || n > 300) return null;
-  return n;
-}
-
-export function parseWeightKg(raw: string): number | null {
-  const n = parseFloat(String(raw).replace(/,/g, ".").trim());
-  if (!Number.isFinite(n) || n <= 0 || n > 500) return null;
-  return n;
-}
-
 /** BMI from metric inputs; returns null if invalid. */
 export function bmiFromMetric(heightCm: number, weightKg: number): number | null {
   if (heightCm <= 0) return null;

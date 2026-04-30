@@ -135,7 +135,7 @@ export async function GET(req: Request) {
       // Rare race: two concurrent sign-ins trying to create the same user
       return loginRedirect(origin, "Account conflict. Please try signing in again.");
     }
-    console.error("[google/callback] db error:", e);
+    console.error("[google/callback] db error:", e instanceof Error ? e.message : "unknown");
     return loginRedirect(origin, "Could not create or find your account. Please try again.");
   }
 
