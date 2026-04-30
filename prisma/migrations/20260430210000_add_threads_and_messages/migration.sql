@@ -1,5 +1,5 @@
 -- AlterTable
-ALTER TABLE "users" ADD COLUMN "active_thread_id" TEXT;
+ALTER TABLE "User" ADD COLUMN "active_thread_id" TEXT;
 
 -- CreateTable
 CREATE TABLE "threads" (
@@ -37,13 +37,13 @@ CREATE INDEX "messages_thread_id_created_at_idx" ON "messages"("thread_id", "cre
 CREATE INDEX "messages_user_id_created_at_idx" ON "messages"("user_id", "created_at");
 
 -- AddForeignKey
-ALTER TABLE "threads" ADD CONSTRAINT "threads_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "threads" ADD CONSTRAINT "threads_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "messages" ADD CONSTRAINT "messages_thread_id_fkey" FOREIGN KEY ("thread_id") REFERENCES "threads"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "messages" ADD CONSTRAINT "messages_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "messages" ADD CONSTRAINT "messages_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- ──────────────────────────────────────────────────────────────────────────
 -- Backfill: bring existing `whatsapp_messages` into the new threads/messages
@@ -67,7 +67,7 @@ SELECT
   'WhatsApp',
   COALESCE(MAX(m.created_at), NOW()),
   COALESCE(MIN(m.created_at), NOW())
-FROM "users" u
+FROM "User" u
 JOIN "whatsapp_messages" m ON m.user_id = u.id
 GROUP BY u.id
 ON CONFLICT ("id") DO NOTHING;
@@ -88,7 +88,7 @@ WHERE EXISTS (SELECT 1 FROM "threads" t WHERE t.id = 'wa-' || m.user_id)
 ON CONFLICT ("id") DO NOTHING;
 
 -- 3. Default each user's active thread to their WhatsApp thread (if any).
-UPDATE "users" u
+UPDATE "User" u
 SET "active_thread_id" = 'wa-' || u.id
 WHERE u."active_thread_id" IS NULL
   AND EXISTS (SELECT 1 FROM "threads" t WHERE t.id = 'wa-' || u.id);
