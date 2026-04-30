@@ -86,10 +86,12 @@ function parseLengthToCm(raw: string, unit: "cm" | "in"): string | undefined {
   return String(Math.round(cm * 10) / 10);
 }
 
-function cmToLengthDisplay(cmStr: string | undefined, unit: "cm" | "in"): string {
-  if (!cmStr?.trim()) return "";
-  const cm = parseFloat(cmStr.replace(",", "."));
-  if (!Number.isFinite(cm)) return cmStr.trim();
+function cmToLengthDisplay(cmStr: string | number | undefined, unit: "cm" | "in"): string {
+  if (cmStr === undefined || cmStr === null || cmStr === "") return "";
+  const s = String(cmStr).trim();
+  if (!s) return "";
+  const cm = parseFloat(s.replace(",", "."));
+  if (!Number.isFinite(cm)) return s;
   if (unit === "in") return String(Math.round((cm / CM_PER_IN) * 10) / 10);
   return String(Math.round(cm * 10) / 10);
 }
@@ -103,10 +105,12 @@ function parseWeightToKg(raw: string, unit: "kg" | "lb"): string | undefined {
   return String(Math.round(kg * 10) / 10);
 }
 
-function kgToWeightDisplay(kgStr: string | undefined, unit: "kg" | "lb"): string {
-  if (!kgStr?.trim()) return "";
-  const kg = parseFloat(kgStr.replace(",", "."));
-  if (!Number.isFinite(kg)) return kgStr.trim();
+function kgToWeightDisplay(kgStr: string | number | undefined, unit: "kg" | "lb"): string {
+  if (kgStr === undefined || kgStr === null || kgStr === "") return "";
+  const s = String(kgStr).trim();
+  if (!s) return "";
+  const kg = parseFloat(s.replace(",", "."));
+  if (!Number.isFinite(kg)) return s;
   if (unit === "lb") return String(Math.round(kg * LB_PER_KG * 10) / 10);
   return String(Math.round(kg * 10) / 10);
 }
@@ -749,13 +753,14 @@ export default function ProfilePage() {
     }
     refresh();
     setHydrated(true);
-    const onFocus = refresh;
+    // The `focus` listener was a duplicate path with `mv-store-update` and is
+    // dropped here for the same reason as the dashboard: every mutation already
+    // dispatches mv-store-update synchronously, so the focus path was just
+    // re-running expensive reads on every tab switch with no benefit.
     const onStoreUpdate = refresh;
-    window.addEventListener("focus", onFocus);
     window.addEventListener("mv-store-update", onStoreUpdate as EventListener);
     window.addEventListener("mv-active-member-changed", onStoreUpdate as EventListener);
     return () => {
-      window.removeEventListener("focus", onFocus);
       window.removeEventListener("mv-store-update", onStoreUpdate as EventListener);
       window.removeEventListener("mv-active-member-changed", onStoreUpdate as EventListener);
     };

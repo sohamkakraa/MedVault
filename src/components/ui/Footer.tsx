@@ -17,7 +17,7 @@ export function Footer() {
         </div>
 
         {/* Divider */}
-        <div className="border-t border-[var(--border)]" />
+        <div className="w-full border-t border-[var(--border)]" />
 
         {/* Bottom row: copyright + legal links */}
         <div className="flex w-full flex-col items-center justify-center gap-3 text-center md:flex-row md:justify-between md:text-left">

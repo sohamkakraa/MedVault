@@ -572,7 +572,7 @@ export default function ChatPage() {
             <div className="flex items-center gap-3 min-w-0">
               <div className="min-w-0">
                 <p className="text-sm font-semibold truncate">{companionLabel}</p>
-                <p className="text-xs mv-muted truncate">Chat here, or add a PDF to save to your records</p>
+                <p className="text-xs mv-muted">Chat here, or add a PDF to save to your records</p>
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -821,7 +821,7 @@ export default function ChatPage() {
                     <button
                       key={s}
                       type="button"
-                      className="group inline-flex w-max max-w-full items-center gap-2 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--panel)]/40 px-3 py-2.5 text-left text-xs leading-tight text-[var(--fg)] transition-[transform,box-shadow,border-color,background-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--accent)_28%,var(--border))] hover:bg-[var(--panel-2)] hover:shadow-[var(--shadow)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] sm:whitespace-nowrap sm:py-2"
+                      className="group inline-flex w-max max-w-full items-center gap-2 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--panel)]/40 px-3 py-2.5 text-left text-sm leading-tight text-[var(--fg)] transition-[transform,box-shadow,border-color,background-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--accent)_28%,var(--border))] hover:bg-[var(--panel-2)] hover:shadow-[var(--shadow)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] sm:whitespace-nowrap sm:py-2"
                       onClick={() => sendSuggestion(s)}
                     >
                       <Sparkles
@@ -835,7 +835,7 @@ export default function ChatPage() {
                 )}
               </div>
 
-              <div className="sticky bottom-0 z-[2] mt-auto flex justify-center pt-2 pb-1 [mask-image:linear-gradient(to_top,black_65%,transparent)]">
+              <div className="hidden sm:flex sticky bottom-0 z-[2] mt-auto justify-center pt-2 pb-1 [mask-image:linear-gradient(to_top,black_65%,transparent)]">
                 <div
                   className="relative rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] px-3 py-2 shadow-[var(--shadow)]"
                   style={{

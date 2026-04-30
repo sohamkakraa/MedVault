@@ -393,7 +393,33 @@ function labDedupeKey(l: ExtractedLab): string {
  * Rebuilds `store.labs` and `store.meds` from remaining documents (plus tracker labs and manually added meds).
  * Call after removing a document or when fixing drift.
  */
+/**
+ * Cheap content fingerprint used to skip rebuild work when docs haven't
+ * meaningfully changed since the last call. We hash doc IDs, lab counts,
+ * medication counts, and the lexicon length — that's enough to catch the
+ * focus/storage/custom-event re-entry case that was causing the dashboard
+ * to re-rebuild on every event without any actual data change.
+ */
+let _lastRebuildFingerprint = "";
+
+function rebuildFingerprint(store: PatientStore): string {
+  const docKey = (store.docs ?? [])
+    .map((d) => `${d.id}:${(d.labs ?? []).length}:${(d.medications ?? []).length}`)
+    .join("|");
+  const lexLen = (store.standardLexicon ?? []).length;
+  const trackerLabCount = (store.labs ?? []).filter((l) => l.sourceDocId === UMA_TRACKER_LAB_SOURCE).length;
+  return `${docKey}#${lexLen}#${trackerLabCount}`;
+}
+
 export function rebuildLabsAndMedsFromDocuments(store: PatientStore) {
+  // Short-circuit: if nothing observable has changed since the last rebuild,
+  // skip the O(docs × labs) work entirely. This is the single biggest win
+  // for first-paint and tab-focus latency on accounts with many reports.
+  const fp = rebuildFingerprint(store);
+  if (fp === _lastRebuildFingerprint && (store.labs?.length ?? 0) > 0) {
+    return;
+  }
+  _lastRebuildFingerprint = fp;
   const lex = store.standardLexicon ?? [];
 
   /** Strip inline markdown bold/italic/code markers the LLM sometimes leaks into field values. */
@@ -480,17 +506,46 @@ export function getStore(): PatientStore {
   }
 }
 
-export function saveStore(store: PatientStore) {
+/**
+ * Save the store to localStorage.
+ *
+ * Performance: when `silent` is true, we skip dispatching `mv-store-update`
+ * and skip the remote push. Use silent for derived-state writes that the UI
+ * has already reflected (e.g. the on-mount idempotent rebuild) — otherwise
+ * every save fans out to ~10 listeners and re-triggers the same load handler
+ * that originated the write, creating a render storm.
+ */
+export function saveStore(store: PatientStore, opts: { silent?: boolean } = {}) {
   const blank = createBlankPatientStore();
   if (!store.profile) store.profile = blank.profile;
   if (!store.preferences) store.preferences = blank.preferences;
   if (!store.healthLogs) store.healthLogs = defaultHealthLogs();
   store.updatedAtISO = new Date().toISOString();
-  localStorage.setItem(KEY, JSON.stringify(store));
+  const serialized = JSON.stringify(store);
+  // Skip the write entirely if the serialized payload is byte-identical to
+  // what's already in localStorage (modulo updatedAtISO, which always changes).
+  // This is a cheap-but-effective short-circuit for the rebuild loop.
   try {
-    window.dispatchEvent(new CustomEvent("mv-store-update", { detail: store }));
-  } catch {}
-  scheduleRemotePush();
+    const existing = localStorage.getItem(KEY);
+    if (existing && stripUpdatedAt(existing) === stripUpdatedAt(serialized)) {
+      // No effective change — don't dispatch, don't push.
+      return;
+    }
+  } catch {
+    // fall through to write
+  }
+  localStorage.setItem(KEY, serialized);
+  if (!opts.silent) {
+    try {
+      window.dispatchEvent(new CustomEvent("mv-store-update", { detail: store }));
+    } catch {}
+    scheduleRemotePush();
+  }
+}
+
+/** Strip the `updatedAtISO` field from a stringified store for equality checks. */
+function stripUpdatedAt(s: string): string {
+  return s.replace(/"updatedAtISO":"[^"]*"/g, "");
 }
 
 /**
@@ -972,22 +1027,26 @@ export function getHydrationSafeViewingStore(): PatientStore {
 /**
  * Save the PatientStore for whoever is currently being viewed.
  * Routes to either the primary store or the active family member's store.
+ *
+ * `silent` suppresses the `mv-store-update` event — used for derived-state
+ * writes from rebuilds, where the originating UI already reflects the value.
  */
-export function saveViewingStore(store: PatientStore): void {
+export function saveViewingStore(store: PatientStore, opts: { silent?: boolean } = {}): void {
   const root = getStore();
   const activeId = root.activeFamilyMemberId;
   if (!activeId) {
-    saveStore(store);
+    saveStore(store, opts);
     return;
   }
   const member = (root.familyMembers ?? []).find((m) => m.id === activeId);
   if (!member) {
-    saveStore(store);
+    saveStore(store, opts);
     return;
   }
   saveFamilyMemberStore(activeId, store);
-  // Notify listeners so UI refreshes
-  window.dispatchEvent(new CustomEvent("mv-store-update", { detail: store }));
+  if (!opts.silent) {
+    window.dispatchEvent(new CustomEvent("mv-store-update", { detail: store }));
+  }
 }
 
 /** Get the currently active family member's meta (or null if viewing self). */

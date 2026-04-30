@@ -13,6 +13,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendText, isWhatsAppConfigured } from "@/lib/whatsapp/client";
+import { parsePatientStoreJson } from "@/lib/patientStoreApi";
+import type { MedicationReminderEntry } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // allow up to 60s for processing multiple users
@@ -89,7 +91,13 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-      const message = getRandomCheckinMessage();
+      // Compose a single message that combines the wellness check-in with
+      // today's reminder digest. On the Hobby plan this is the only outbound
+      // we'll send today, so packing both signals into one message is the
+      // honest UX choice — one notification, one read.
+      const checkinPart = getRandomCheckinMessage();
+      const reminderDigest = await buildReminderDigestForUser(user.id);
+      const message = reminderDigest ? `${checkinPart}\n\n${reminderDigest}` : checkinPart;
       await sendText(user.whatsappPhone, message);
 
       // Log the check-in as an assistant message
@@ -121,3 +129,29 @@ export async function GET(req: NextRequest) {
     total: eligibleUsers.length,
   });
 }
+
+/**
+ * Build a one-line-per-reminder digest of every active medication reminder
+ * the user has set, ordered by time-of-day. Returns null if the user has
+ * none — caller decides whether to fall back to a pure check-in message.
+ *
+ * Vercel Hobby plan only allows once-daily cron, so we surface the user's
+ * full schedule once per morning. Reminders set on WhatsApp via
+ * `parseReminderIntent` and reminders set on the webapp both flow through
+ * `PatientRecord.data.healthLogs.medicationReminders`, so this digest is
+ * authoritative across both surfaces.
+ */
+async function buildReminderDigestForUser(userId: string): Promise<string | null> {
+  const record = await prisma.patientRecord.findUnique({ where: { userId } });
+  if (!record) return null;
+  const store = parsePatientStoreJson(record.data);
+  if (!store) return null;
+  const reminders: MedicationReminderEntry[] = store.healthLogs?.medicationReminders ?? [];
+  const active = reminders
+    .filter((r) => r.enabled && r.repeatDaily && /^\d{2}:\d{2}$/.test(r.timeLocalHHmm))
+    .sort((a, b) => a.timeLocalHHmm.localeCompare(b.timeLocalHHmm));
+  if (active.length === 0) return null;
+  const lines = active.map((r) => `• ${r.timeLocalHHmm} — ${r.medicationName}`);
+  return `📋 Today's reminders:\n${lines.join("\n")}\n\nReply "taken metformin" or "skipped vitamin d" to log a dose.`;
+}
+

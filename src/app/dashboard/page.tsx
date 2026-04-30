@@ -491,27 +491,37 @@ function DashboardInner() {
   }, [activeMedInfo, store.meds]);
 
   useEffect(() => {
-    function loadActiveStore() {
+    // `loadActiveStore` previously fired on mount AND on every focus, storage,
+    // mv-store-update, and mv-active-member-changed event — and inside it
+    // called `saveViewingStore`, which dispatched `mv-store-update`, which
+    // re-fired this same handler. With many docs that loop dominated the main
+    // thread. Two changes removed the lag:
+    //   1. The rebuild is now content-fingerprinted (see store.ts) and
+    //      saveViewingStore short-circuits identical writes, so the loop can't
+    //      ping-pong even if it tries.
+    //   2. We dropped the `focus` listener (the `storage` event already
+    //      covers cross-tab sync) and we pass {silent: true} when writing back
+    //      a derived rebuild so it doesn't re-trigger this very effect.
+    function loadActiveStore(opts: { rebuild?: boolean } = {}) {
       const s = getViewingStore();
-      if (s.docs.length > 0) {
+      if (opts.rebuild && s.docs.length > 0) {
         rebuildLabsAndMedsFromDocuments(s);
-        saveViewingStore(s);
+        saveViewingStore(s, { silent: true });
       }
       setStore(s);
       setActiveMemberState(getActiveFamilyMember());
     }
-    loadActiveStore();
-    const onFocus = () => loadActiveStore();
+    // Run the rebuild exactly once at mount; afterwards we trust that mutators
+    // (PDF upload, doc removal, manual edits) call rebuild themselves.
+    loadActiveStore({ rebuild: true });
     const onStorage = (e: StorageEvent) => {
       if (e.key?.startsWith("mv_patient_store")) loadActiveStore();
     };
     const onCustom = () => loadActiveStore();
-    window.addEventListener("focus", onFocus);
     window.addEventListener("storage", onStorage);
     window.addEventListener("mv-store-update", onCustom as EventListener);
     window.addEventListener("mv-active-member-changed", onCustom as EventListener);
     return () => {
-      window.removeEventListener("focus", onFocus);
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("mv-store-update", onCustom as EventListener);
       window.removeEventListener("mv-active-member-changed", onCustom as EventListener);
@@ -1556,7 +1566,7 @@ function DashboardInner() {
             <Card className="min-w-0 rounded-2xl">
               <CardContent className="min-w-0 space-y-3">
                 <p className="text-xs uppercase tracking-[0.14em] mv-muted">Next appointment</p>
-                <div className="grid grid-cols-2 gap-x-2 gap-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-2 gap-y-3">
                   <div className="min-w-0">
                     <p className="mb-1 text-xs font-medium mv-muted">Doctor</p>
                     <Combobox

@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { parsePatientStoreJson } from "@/lib/patientStoreApi";
 import type { PatientStore } from "@/lib/types";
 import { sendText, markRead } from "./client";
+import { parseReminderIntent, applyReminderIntent } from "./reminderIntent";
 
 /** Server-safe blank store — avoids importing the "use client" store.ts module. */
 function blankStore(): PatientStore {
@@ -446,6 +447,35 @@ export async function processIncomingMessage(
   await prisma.whatsAppMessage.create({
     data: { userId: user.id, waId, role: "user", content: text },
   });
+
+  // ── Reminder intent pre-pass ────────────────────────────────────────
+  // Before paying for an LLM call, check whether the user is plainly asking
+  // to set, cancel, or list reminders. If so, mutate the patient store and
+  // reply directly. The webapp picks this up the next time it loads its
+  // patient-store snapshot, so reminders set on WhatsApp appear in the
+  // dashboard's Medication reminders list automatically.
+  const reminderIntent = parseReminderIntent(text);
+  if (reminderIntent) {
+    const { store: nextStore, reply: reminderReply } = applyReminderIntent(store, reminderIntent);
+    if (reminderIntent.kind !== "list") {
+      // Persist the mutation server-side so the webapp sees it on next load.
+      try {
+        nextStore.updatedAtISO = new Date().toISOString();
+        await prisma.patientRecord.upsert({
+          where: { userId: user.id },
+          update: { data: nextStore as unknown as object },
+          create: { userId: user.id, data: nextStore as unknown as object },
+        });
+      } catch (err) {
+        console.error("[WhatsApp] Failed to persist reminder change:", err instanceof Error ? err.message : err);
+      }
+    }
+    await sendText(senderPhone, reminderReply);
+    await prisma.whatsAppMessage.create({
+      data: { userId: user.id, waId, role: "assistant", content: reminderReply },
+    });
+    return;
+  }
 
   // ── Build system prompt with preferences and call LLM ──
   const prefs: UserPrefs = {

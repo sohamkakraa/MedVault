@@ -9,6 +9,7 @@ import { UmaLogo } from "@/components/branding/UmaLogo";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { FamilySwitcher } from "@/components/family/FamilySwitcher";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { TidyButton } from "@/components/nav/TidyButton";
 
 type NavItem = {
   href: string;
@@ -101,7 +102,7 @@ export function AppTopNav({
                     aria-selected={false}
                     aria-disabled="true"
                     title={item.tooltip}
-                    className="relative z-10 rounded-xl px-2 py-1.5 text-xs sm:px-3 sm:text-sm text-center text-[var(--muted)] opacity-50 cursor-not-allowed"
+                    className="relative z-10 rounded-xl px-2 py-1.5 text-sm text-center text-[var(--muted)] opacity-50 cursor-not-allowed"
                   >
                     {item.label}
                   </span>
@@ -114,7 +115,7 @@ export function AppTopNav({
                   role="tab"
                   aria-selected={active}
                   className={cn(
-                    "relative z-10 rounded-xl px-2 py-1.5 text-xs sm:px-3 sm:text-sm transition text-center",
+                    "relative z-10 rounded-xl px-2 py-1.5 text-sm transition text-center",
                     active
                       ? "font-semibold text-[var(--fg)]"
                       : "text-[var(--muted)] hover:text-[var(--fg)]"
@@ -129,6 +130,7 @@ export function AppTopNav({
 
         <div className="flex min-w-0 items-center justify-end gap-2">
           <div className="hidden sm:flex items-center justify-end gap-2">
+            <TidyButton />
             <FamilySwitcher />
             <NotificationCenter />
             <ThemeToggle />
@@ -137,7 +139,7 @@ export function AppTopNav({
           <button
             type="button"
             onClick={() => setMobileOpen((v) => !v)}
-            className="sm:hidden h-8 w-8 shrink-0 rounded-lg border border-[var(--border)] bg-[var(--panel-2)] text-[var(--fg)] grid place-items-center"
+            className="sm:hidden h-11 w-11 shrink-0 rounded-xl border border-[var(--border)] bg-[var(--panel-2)] text-[var(--fg)] grid place-items-center"
             aria-label="Toggle mobile actions"
           >
             <ChevronDown className={cn("h-4 w-4 transition-transform", mobileOpen && "rotate-180")} />
@@ -156,6 +158,7 @@ export function AppTopNav({
               Profile
             </Link>
             <div className="flex items-center gap-2">
+              <TidyButton />
               <FamilySwitcher />
               <NotificationCenter />
               <ThemeToggle />
