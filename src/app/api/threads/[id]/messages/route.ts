@@ -275,26 +275,120 @@ async function persistStore(userId: string, nextStore: PatientStore): Promise<vo
 }
 
 function buildSystemPrompt(store: PatientStore | null): string {
-  const lines: string[] = [
+  const header = [
     "You are UMA, a calm, plain-language health companion. You are NOT a doctor and never diagnose.",
-    "Use the patient context below. If a fact is missing, say so plainly and move forward.",
+    "Use the patient context below to give specific, personalised answers. Never say \"I don't have access to your health data\" — the data is in the context below.",
     "Replies are read in both the webapp and on WhatsApp, so keep formatting simple — short paragraphs and the occasional bulleted list.",
+    "Always end with: \"Not medical advice — talk to your doctor before acting on this.\"",
   ];
-  if (store) {
-    const profile = store.profile;
-    if (profile?.name) lines.push(`Patient: ${profile.name}.`);
-    if (profile?.conditions?.length) lines.push(`Conditions: ${profile.conditions.slice(0, 8).join(", ")}.`);
-    if (profile?.allergies?.length) lines.push(`Allergies: ${profile.allergies.slice(0, 8).join(", ")}.`);
-    if (store.meds?.length) {
-      const m = store.meds.slice(0, 6).map((med) => `${med.name}${med.dose ? ` (${med.dose})` : ""}`);
-      lines.push(`Current medications: ${m.join("; ")}.`);
-    }
-    if (store.labs?.length) {
-      lines.push(`Recent lab values on file: ${store.labs.length} total.`);
-    }
-  } else {
-    lines.push("No patient record loaded — answer generally and nudge the user to upload a report when relevant.");
+
+  if (!store) {
+    return [
+      ...header,
+      "",
+      "No patient record loaded — answer generally and nudge the user to upload a report when relevant.",
+    ].join("\n");
   }
-  lines.push("Always end with: \"Not medical advice — talk to your doctor before acting on this.\"");
-  return lines.join("\n");
+
+  const sections: string[] = [...header, ""];
+  const profile = store.profile;
+
+  // ── Demographics ──
+  const demos: string[] = [];
+  if (profile?.name) demos.push(`Name: ${profile.name}`);
+  if (profile?.dob) demos.push(`DOB: ${profile.dob}`);
+  if (profile?.sex) demos.push(`Sex: ${profile.sex}`);
+  if (demos.length) sections.push(`## Patient\n${demos.join(" | ")}`);
+
+  if (profile?.conditions?.length)
+    sections.push(`Conditions: ${profile.conditions.slice(0, 12).join(", ")}`);
+  if (profile?.allergies?.length)
+    sections.push(`Allergies: ${profile.allergies.slice(0, 12).join(", ")}`);
+
+  // ── Medications ──
+  const activeMeds = (store.meds ?? []).filter((m) => !m.endDate).slice(0, 12);
+  if (activeMeds.length) {
+    sections.push(
+      `\n## Current medications\n` +
+        activeMeds
+          .map((m) => `- ${m.name}${m.dose ? ` ${m.dose}` : ""}${m.frequency ? ` (${m.frequency})` : ""}`)
+          .join("\n"),
+    );
+  }
+
+  // ── Lab values ──
+  const recentLabs = (store.labs ?? [])
+    .filter((l) => l.value != null && l.value !== "")
+    .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""))
+    .slice(0, 20);
+  if (recentLabs.length) {
+    sections.push(
+      `\n## Recent lab results\n` +
+        recentLabs
+          .map(
+            (l) =>
+              `- ${l.name}: ${l.value}${l.unit ? ` ${l.unit}` : ""}${l.refRange ? ` (ref: ${l.refRange})` : ""}${l.date ? ` — ${l.date}` : ""}`,
+          )
+          .join("\n"),
+    );
+  }
+
+  // ── Reminders ──
+  const hl = store.healthLogs;
+  if (hl) {
+    const medR = (hl.medicationReminders ?? []).filter((r) => r.enabled);
+    const intR = (hl.intervalReminders ?? []).filter((r) => r.enabled);
+    const genR = (hl.generalReminders ?? []).filter((r) => r.enabled);
+    const allR = [
+      ...medR.map((r) => `${r.medicationName} at ${r.timeLocalHHmm}${r.repeatDaily ? " daily" : " (once)"}`),
+      ...intR.map((r) => `${r.label} every ${r.intervalMinutes}min (${r.windowStartHHmm}–${r.windowEndHHmm})`),
+      ...genR.map((r) => {
+        if (r.recurrence === "once") return `${r.label} — once on ${r.triggerAtISO?.slice(0, 16) ?? "?"}`;
+        if (r.recurrence === "daily") return `${r.label} — daily at ${r.dailyTimeHHmm ?? "?"}`;
+        if (r.recurrence === "weekly") return `${r.label} — weekly on ${(r.weekdays ?? []).map((d) => ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d]).join(", ")} at ${r.weeklyTimeHHmm ?? "?"}`;
+        return `${r.label} — every ${r.intervalMinutes}min (${r.windowStartHHmm}–${r.windowEndHHmm})`;
+      }),
+    ];
+    if (allR.length) {
+      sections.push(`\n## Active reminders\n` + allR.slice(0, 10).map((r) => `- ${r}`).join("\n"));
+    }
+
+    // ── Blood pressure ──
+    const recentBP = (hl.bloodPressure ?? [])
+      .sort((a, b) => b.loggedAtISO.localeCompare(a.loggedAtISO))
+      .slice(0, 5);
+    if (recentBP.length) {
+      sections.push(
+        `\n## Blood pressure log\n` +
+          recentBP
+            .map(
+              (bp) =>
+                `- ${bp.systolic}/${bp.diastolic} mmHg${bp.pulseBpm ? `, pulse ${bp.pulseBpm}` : ""} — ${bp.loggedAtISO.slice(0, 10)}`,
+            )
+            .join("\n"),
+      );
+    }
+
+    // ── Side effects / symptoms ──
+    const recentSE = (hl.sideEffects ?? [])
+      .sort((a, b) => b.loggedAtISO.localeCompare(a.loggedAtISO))
+      .slice(0, 6);
+    if (recentSE.length) {
+      sections.push(
+        `\n## Recent symptoms / side effects\n` +
+          recentSE
+            .map((se) => `- ${se.description} (${se.intensity ?? "unspecified"}) — ${se.loggedAtISO.slice(0, 10)}`)
+            .join("\n"),
+      );
+    }
+  }
+
+  // ── Provider / appointment ──
+  const providerParts: string[] = [];
+  if (profile?.primaryCareProvider) providerParts.push(`Doctor: ${profile.primaryCareProvider}`);
+  if (profile?.nextVisitHospital) providerParts.push(`Hospital: ${profile.nextVisitHospital}`);
+  if (profile?.nextVisitDate) providerParts.push(`Next appointment: ${profile.nextVisitDate}`);
+  if (providerParts.length) sections.push(`\n## Healthcare providers\n` + providerParts.map((p) => `- ${p}`).join("\n"));
+
+  return sections.join("\n");
 }

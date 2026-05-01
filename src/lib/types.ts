@@ -167,12 +167,46 @@ export type MedicationReminderEntry = {
   notes?: string;
 };
 
+/**
+ * General-purpose reminder — covers one-time, daily, weekly, and interval
+ * recurrences. Replaces the narrower IntervalReminderEntry for new reminders;
+ * legacy IntervalReminderEntry records are preserved for backward compat.
+ */
+export type GeneralReminderRecurrence = "once" | "daily" | "weekly" | "interval";
+
+export type GeneralReminderEntry = {
+  id: string;
+  label: string;
+  recurrence: GeneralReminderRecurrence;
+  enabled: boolean;
+  createdAtISO: string;
+  lastFiredAtISO?: string;
+  // "once" — fire at a specific moment
+  triggerAtISO?: string;
+  // "daily" — every day at a specific time
+  dailyTimeHHmm?: string;
+  // "weekly" — specific days of the week (0=Sun … 6=Sat)
+  weekdays?: number[];
+  weeklyTimeHHmm?: string;
+  // "interval" — periodic within a daily window
+  intervalMinutes?: number;
+  windowStartHHmm?: string;
+  windowEndHHmm?: string;
+  /** On the creation day: don't fire before this time */
+  startingFromHHmm?: string;
+  // Optional extras
+  /** ml per event — for hydration tracking */
+  amountMl?: number;
+  notes?: string;
+};
+
 export type HealthLogsBundle = {
   bloodPressure: BloodPressureLogEntry[];
   medicationIntake: MedicationIntakeLogEntry[];
   sideEffects: SideEffectLogEntry[];
   medicationReminders: MedicationReminderEntry[];
   intervalReminders?: IntervalReminderEntry[];
+  generalReminders?: GeneralReminderEntry[];
 };
 
 export type ExtractedLab = {

@@ -129,13 +129,36 @@ export function applyReminderIntent(
   const reminders = hl.medicationReminders ?? [];
 
   if (intent.kind === "list") {
-    if (reminders.filter((r) => r.enabled).length === 0) {
-      return { store, reply: "You don't have any active reminders right now. Try: \"remind me to take Metformin at 8am every day\"." };
+    const lines: string[] = [];
+    // Medication reminders
+    for (const r of reminders.filter((r) => r.enabled)) {
+      lines.push(`• ${r.medicationName} at ${r.timeLocalHHmm}${r.repeatDaily ? " daily" : " (once)"}`);
     }
-    const lines = reminders
-      .filter((r) => r.enabled)
-      .map((r) => `• ${r.medicationName} at ${r.timeLocalHHmm}${r.repeatDaily ? " daily" : " (once)"}`);
-    return { store, reply: `Your reminders:\n${lines.join("\n")}` };
+    // Interval reminders
+    const intR = (hl as { intervalReminders?: { label: string; intervalMinutes: number; windowStartHHmm: string; windowEndHHmm: string; enabled?: boolean }[] }).intervalReminders ?? [];
+    for (const r of intR.filter((r) => r.enabled !== false)) {
+      const every = r.intervalMinutes >= 60 ? `every ${r.intervalMinutes / 60}h` : `every ${r.intervalMinutes}min`;
+      lines.push(`• ${r.label} — ${every} (${r.windowStartHHmm}–${r.windowEndHHmm})`);
+    }
+    // General reminders
+    const genR = (hl as { generalReminders?: { label: string; recurrence: string; dailyTimeHHmm?: string; triggerAtISO?: string; intervalMinutes?: number; windowStartHHmm?: string; windowEndHHmm?: string; weekdays?: number[]; weeklyTimeHHmm?: string; enabled?: boolean }[] }).generalReminders ?? [];
+    for (const r of genR.filter((r) => r.enabled !== false)) {
+      let detail = r.recurrence;
+      if (r.recurrence === "daily" && r.dailyTimeHHmm) detail = `daily at ${r.dailyTimeHHmm}`;
+      else if (r.recurrence === "once" && r.triggerAtISO) detail = `once on ${r.triggerAtISO.slice(0, 16).replace("T", " at ")}`;
+      else if (r.recurrence === "interval" && r.intervalMinutes) {
+        const every = r.intervalMinutes >= 60 ? `every ${r.intervalMinutes / 60}h` : `every ${r.intervalMinutes}min`;
+        detail = `${every} (${r.windowStartHHmm}–${r.windowEndHHmm})`;
+      } else if (r.recurrence === "weekly" && r.weekdays) {
+        const days = r.weekdays.map((d) => ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d] ?? d).join(", ");
+        detail = `weekly on ${days} at ${r.weeklyTimeHHmm ?? "?"}`;
+      }
+      lines.push(`• ${r.label} — ${detail}`);
+    }
+    if (lines.length === 0) {
+      return { store, reply: "You don't have any active reminders right now.\n\nTry saying:\n• \"Remind me to take Metformin at 8am daily\"\n• \"Remind me to drink water every hour from 8am to 10pm\"\n• \"Remind me about my blood pressure check on Monday at 9am\"" };
+    }
+    return { store, reply: `Your active reminders:\n${lines.join("\n")}` };
   }
 
   if (intent.kind === "cancel") {

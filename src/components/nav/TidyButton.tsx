@@ -360,6 +360,18 @@ function describeOp(op: StorePatchOp): string {
       return `Interval reminder: "${op.label}" every ${op.intervalMinutes}min, ${op.windowStartHHmm}–${op.windowEndHHmm}`;
     case "cancel_interval_reminder":
       return `Cancel interval reminder: "${op.label}"`;
+    case "set_general_reminder": {
+      const rec = op.recurrence;
+      if (rec === "once") return `One-time reminder: "${op.label}" on ${op.triggerAtISO?.slice(0, 16) ?? "?"}`;
+      if (rec === "daily") return `Daily reminder: "${op.label}" at ${op.dailyTimeHHmm ?? "?"}`;
+      if (rec === "weekly") {
+        const days = (op.weekdays ?? []).map((d) => ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d] ?? d).join(", ");
+        return `Weekly reminder: "${op.label}" on ${days} at ${op.weeklyTimeHHmm ?? "?"}`;
+      }
+      return `Interval reminder: "${op.label}" every ${op.intervalMinutes}min, ${op.windowStartHHmm}–${op.windowEndHHmm}`;
+    }
+    case "cancel_general_reminder":
+      return `Cancel reminder: "${op.label}"`;
     case "set_profile_field":
       return `Set ${op.field} to ${op.value}`;
     default: {

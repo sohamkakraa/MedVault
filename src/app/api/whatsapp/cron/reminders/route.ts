@@ -1,44 +1,34 @@
 /**
  * Hourly interval-reminder cron.
  *
- * Called by Vercel Cron on "0 * * * *" (every hour). For each user with
- * verified WhatsApp and at least one enabled interval reminder, checks
- * whether a reminder should fire this hour and sends it via WhatsApp.
+ * Called by Vercel Cron on "0 * * * *" (every hour, Pro plan).
+ * For each verified WhatsApp user, fires any due reminder (interval,
+ * daily, weekly, or one-time) and updates lastFiredAtISO in the store.
  *
- * Fire logic:
- *   1. Current local time (in user's timezone) must be within the reminder's
- *      windowStartHHmm–windowEndHHmm.
- *   2. On the day the reminder was created, current local time must be >= startingFromHHmm.
- *   3. Either: reminder has never fired, OR >= intervalMinutes have elapsed since lastFiredAtISO.
- *
- * After sending, updates lastFiredAtISO in the PatientRecord JSON.
- *
- * Security: protected by x-vercel-signature or CRON_SECRET header.
+ * Security: protected by CRON_SECRET header (Vercel sets it automatically).
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendText, isWhatsAppConfigured } from "@/lib/whatsapp/client";
 import { parsePatientStoreJson } from "@/lib/patientStoreApi";
-import type { IntervalReminderEntry } from "@/lib/types";
+import type { GeneralReminderEntry, IntervalReminderEntry } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 function verifyCronSecret(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true; // dev — no secret configured
+  if (!secret) return true;
   const auth = req.headers.get("authorization");
   return auth === `Bearer ${secret}`;
 }
 
-/** Convert HH:mm string to minutes-since-midnight. */
 function toMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(":").map(Number);
   return h * 60 + m;
 }
 
-/** Get current HH:mm in a given IANA timezone (or UTC fallback). */
 function localHHmm(timezone: string): string {
   try {
     return new Intl.DateTimeFormat("en-GB", {
@@ -62,48 +52,100 @@ function localHHmm(timezone: string): string {
   }
 }
 
-/** Get current date string (YYYY-MM-DD) in a given IANA timezone. */
 function localDateISO(timezone: string): string {
   try {
-    return new Intl.DateTimeFormat("en-CA", { timeZone: timezone })
-      .format(new Date());
+    return new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(new Date());
   } catch {
     return new Date().toISOString().slice(0, 10);
   }
 }
 
-function shouldFire(reminder: IntervalReminderEntry, timezone: string): boolean {
+/** Day-of-week in given timezone (0=Sun…6=Sat). */
+function localDayOfWeek(timezone: string): number {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", { timeZone: timezone, weekday: "short" })
+      .format(new Date());
+    return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(parts);
+  } catch {
+    return new Date().getDay();
+  }
+}
+
+function inWindow(nowMin: number, startMin: number, endMin: number): boolean {
+  return startMin <= endMin
+    ? nowMin >= startMin && nowMin < endMin
+    : nowMin >= startMin || nowMin < endMin;
+}
+
+function intervalShouldFire(r: IntervalReminderEntry, timezone: string): boolean {
   const nowHHmm = localHHmm(timezone);
   const nowMin = toMinutes(nowHHmm);
-  const startMin = toMinutes(reminder.windowStartHHmm);
-  const endMin = toMinutes(reminder.windowEndHHmm);
+  if (!inWindow(nowMin, toMinutes(r.windowStartHHmm), toMinutes(r.windowEndHHmm))) return false;
+  if (r.startingFromHHmm && r.createdAtISO.slice(0, 10) === localDateISO(timezone)) {
+    if (nowMin < toMinutes(r.startingFromHHmm)) return false;
+  }
+  if (r.lastFiredAtISO) {
+    const minSince = (Date.now() - new Date(r.lastFiredAtISO).getTime()) / 60000;
+    if (minSince < r.intervalMinutes - 5) return false;
+  }
+  return true;
+}
 
-  // Must be within the window (handles midnight-spanning windows)
-  const inWindow =
-    startMin <= endMin
-      ? nowMin >= startMin && nowMin < endMin
-      : nowMin >= startMin || nowMin < endMin;
+function generalShouldFire(r: GeneralReminderEntry, timezone: string): boolean {
+  const nowHHmm = localHHmm(timezone);
+  const nowMin = toMinutes(nowHHmm);
+  const todayISO = localDateISO(timezone);
 
-  if (!inWindow) return false;
-
-  // On the creation day, enforce startingFromHHmm
-  if (reminder.startingFromHHmm) {
-    const creationDate = reminder.createdAtISO.slice(0, 10);
-    const todayDate = localDateISO(timezone);
-    if (creationDate === todayDate) {
-      const startFromMin = toMinutes(reminder.startingFromHHmm);
-      if (nowMin < startFromMin) return false;
+  switch (r.recurrence) {
+    case "once": {
+      if (!r.triggerAtISO) return false;
+      const fireDate = r.triggerAtISO.slice(0, 10);
+      const fireHHmm = r.triggerAtISO.slice(11, 16);
+      if (fireDate !== todayISO) return false;
+      if (r.lastFiredAtISO) return false; // already fired
+      return nowMin >= toMinutes(fireHHmm);
+    }
+    case "daily": {
+      if (!r.dailyTimeHHmm) return false;
+      const target = toMinutes(r.dailyTimeHHmm);
+      // Fire if we're within the same hour-slot as the target time
+      if (nowMin < target || nowMin >= target + 60) return false;
+      // Don't re-fire today
+      if (r.lastFiredAtISO && r.lastFiredAtISO.slice(0, 10) === todayISO) return false;
+      return true;
+    }
+    case "weekly": {
+      if (!r.weekdays?.length || !r.weeklyTimeHHmm) return false;
+      const dow = localDayOfWeek(timezone);
+      if (!r.weekdays.includes(dow)) return false;
+      const target = toMinutes(r.weeklyTimeHHmm);
+      if (nowMin < target || nowMin >= target + 60) return false;
+      if (r.lastFiredAtISO && r.lastFiredAtISO.slice(0, 10) === todayISO) return false;
+      return true;
+    }
+    case "interval": {
+      if (!r.intervalMinutes || !r.windowStartHHmm || !r.windowEndHHmm) return false;
+      if (!inWindow(nowMin, toMinutes(r.windowStartHHmm), toMinutes(r.windowEndHHmm))) return false;
+      if (r.startingFromHHmm && r.createdAtISO.slice(0, 10) === todayISO) {
+        if (nowMin < toMinutes(r.startingFromHHmm)) return false;
+      }
+      if (r.lastFiredAtISO) {
+        const minSince = (Date.now() - new Date(r.lastFiredAtISO).getTime()) / 60000;
+        if (minSince < r.intervalMinutes - 5) return false;
+      }
+      return true;
     }
   }
+}
 
-  // Check interval gate
-  if (reminder.lastFiredAtISO) {
-    const msSinceFired = Date.now() - new Date(reminder.lastFiredAtISO).getTime();
-    const minSinceFired = msSinceFired / 60000;
-    if (minSinceFired < reminder.intervalMinutes - 5) return false; // 5min grace
-  }
-
-  return true;
+function buildReminderMessage(r: GeneralReminderEntry): string {
+  const base = `⏰ Reminder: *${r.label}*`;
+  const extra = r.notes ? `\n${r.notes}` : "";
+  const waterNote =
+    r.amountMl
+      ? `\n\nWhen done, reply _done_ and I'll log your ${r.amountMl}ml.`
+      : "";
+  return `${base}${extra}${waterNote}`;
 }
 
 export async function GET(req: NextRequest) {
@@ -129,40 +171,54 @@ export async function GET(req: NextRequest) {
       const store = parsePatientStoreJson(record.data);
       if (!store) continue;
 
-      const intervalReminders = (
-        (store.healthLogs as { intervalReminders?: IntervalReminderEntry[] })?.intervalReminders ?? []
-      ).filter((r) => r.enabled);
+      const hl = store.healthLogs as {
+        intervalReminders?: IntervalReminderEntry[];
+        generalReminders?: GeneralReminderEntry[];
+      };
+      const intervalReminders = (hl?.intervalReminders ?? []).filter((r) => r.enabled);
+      const generalReminders = (hl?.generalReminders ?? []).filter((r) => r.enabled);
 
-      if (intervalReminders.length === 0) continue;
+      if (intervalReminders.length === 0 && generalReminders.length === 0) continue;
 
       const prefs = await prisma.whatsAppPreferences.findUnique({ where: { userId: user.id } });
       const timezone = prefs?.timezone ?? "Asia/Kolkata";
 
       let storeChanged = false;
 
+      // ── Legacy interval reminders ──
       for (const reminder of intervalReminders) {
-        if (!shouldFire(reminder, timezone)) continue;
-
-        const bottleNote =
-          reminder.bottleMl
-            ? ` (${reminder.bottleMl}ml bottle)`
-            : "";
-        const msg = `💧 Time for your water reminder! "${reminder.label}"${bottleNote}\n\nHave your water and reply _done_ when you finish — I'll log it for you.`;
-
+        if (!intervalShouldFire(reminder, timezone)) continue;
+        const bottleNote = reminder.bottleMl ? ` (${reminder.bottleMl}ml bottle)` : "";
+        const msg = `💧 Reminder: *${reminder.label}*${bottleNote}\n\nHave your water and reply _done_ when you finish — I'll log it for you.`;
         try {
           await sendText(user.whatsappPhone!, msg);
           reminder.lastFiredAtISO = new Date().toISOString();
           storeChanged = true;
           fired++;
         } catch (err) {
-          console.error(`[reminders cron] sendText failed for user ${user.id}:`, err instanceof Error ? err.message : err);
+          console.error(`[reminders cron] interval fire failed for ${user.id}:`, err instanceof Error ? err.message : err);
+          errors++;
+        }
+      }
+
+      // ── General reminders ──
+      for (const reminder of generalReminders) {
+        if (!generalShouldFire(reminder, timezone)) continue;
+        const msg = buildReminderMessage(reminder);
+        try {
+          await sendText(user.whatsappPhone!, msg);
+          reminder.lastFiredAtISO = new Date().toISOString();
+          storeChanged = true;
+          fired++;
+        } catch (err) {
+          console.error(`[reminders cron] general fire failed for ${user.id}:`, err instanceof Error ? err.message : err);
           errors++;
         }
       }
 
       if (storeChanged) {
-        (store.healthLogs as { intervalReminders?: IntervalReminderEntry[] }).intervalReminders =
-          intervalReminders;
+        hl.intervalReminders = intervalReminders;
+        hl.generalReminders = generalReminders;
         store.updatedAtISO = new Date().toISOString();
         await prisma.patientRecord.update({
           where: { userId: user.id },
@@ -170,7 +226,7 @@ export async function GET(req: NextRequest) {
         });
       }
     } catch (err) {
-      console.error(`[reminders cron] Error processing user ${user.id}:`, err instanceof Error ? err.message : err);
+      console.error(`[reminders cron] Error for user ${user.id}:`, err instanceof Error ? err.message : err);
       errors++;
     }
   }

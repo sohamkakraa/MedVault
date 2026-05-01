@@ -15,6 +15,7 @@ export function defaultHealthLogs(): HealthLogsBundle {
     sideEffects: [],
     medicationReminders: [],
     intervalReminders: [],
+    generalReminders: [],
   };
 }
 
@@ -155,6 +156,12 @@ export function normalizeHealthLogs(raw: unknown): HealthLogsBundle {
       ? (o.intervalReminders as unknown[]).filter(
           (r): r is import("@/lib/types").IntervalReminderEntry =>
             typeof r === "object" && r !== null && "id" in r && "label" in r,
+        )
+      : [],
+    generalReminders: Array.isArray(o.generalReminders)
+      ? (o.generalReminders as unknown[]).filter(
+          (r): r is import("@/lib/types").GeneralReminderEntry =>
+            typeof r === "object" && r !== null && "id" in r && "label" in r && "recurrence" in r,
         )
       : [],
   };

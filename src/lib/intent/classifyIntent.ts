@@ -108,6 +108,25 @@ const TOOL_INPUT_SCHEMA = {
           ),
           opLeaf("cancel_interval_reminder", { label: stringLeaf(120) }),
           opLeaf(
+            "set_general_reminder",
+            {
+              label: stringLeaf(200),
+              recurrence: { type: "string", enum: ["once", "daily", "weekly", "interval"] },
+              triggerAtISO: { type: "string", description: "Full ISO datetime for one-time reminders, e.g. 2026-05-20T15:00:00" },
+              dailyTimeHHmm: { type: "string", pattern: "^\\d{2}:\\d{2}$" },
+              weekdays: { type: "array", items: { type: "number", minimum: 0, maximum: 6 }, maxItems: 7, description: "0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat" },
+              weeklyTimeHHmm: { type: "string", pattern: "^\\d{2}:\\d{2}$" },
+              intervalMinutes: { type: "number" as const, minimum: 1, maximum: 10080 },
+              windowStartHHmm: { type: "string", pattern: "^\\d{2}:\\d{2}$" },
+              windowEndHHmm: { type: "string", pattern: "^\\d{2}:\\d{2}$" },
+              startingFromHHmm: { type: "string", pattern: "^\\d{2}:\\d{2}$" },
+              amountMl: { type: "number" as const, minimum: 1, maximum: 10000 },
+              notes: stringLeaf(400, true),
+            },
+            ["label", "recurrence"],
+          ),
+          opLeaf("cancel_general_reminder", { label: stringLeaf(200) }),
+          opLeaf(
             "set_profile_field",
             {
               field: {
@@ -194,6 +213,13 @@ Hard rules:
 5. Be conservative — if you're unsure whether the user is asking for a change or just chatting, do not call the tool.
 6. Times must be 24-hour HH:mm. Convert "8am" to "08:00", "8:30 pm" to "20:30".
 7. Dates must be ISO YYYY-MM-DD. If the user says a relative date ("tomorrow", "next Friday"), pass the absolute date computed from today.
+
+For reminder ops (set_general_reminder):
+- "Remind me to [X] at [time]" → recurrence="daily", dailyTimeHHmm
+- "Remind me to [X] on [date] at [time]" or "one-time" → recurrence="once", triggerAtISO
+- "Remind me every [N] hours/minutes [from X to Y]" → recurrence="interval", intervalMinutes, windowStartHHmm, windowEndHHmm
+- "Remind me every [day of week] at [time]" → recurrence="weekly", weekdays array, weeklyTimeHHmm
+- "starting from [time] today" → set startingFromHHmm
 
 If you call the tool, the patch is applied automatically and the user gets a deterministic confirmation. So one well-formed tool call is enough — do NOT also write a long natural-language reply.`;
 

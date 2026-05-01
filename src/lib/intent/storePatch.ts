@@ -20,6 +20,7 @@ import { randomUUID } from "crypto";
 import { z } from "zod";
 import type {
   ExtractedMedication,
+  GeneralReminderEntry,
   MedicationReminderEntry,
   PatientStore,
   SideEffectLogEntry,
@@ -57,6 +58,8 @@ export const STORE_PATCH_OP_KINDS = [
   "cancel_reminder",
   "set_interval_reminder",
   "cancel_interval_reminder",
+  "set_general_reminder",
+  "cancel_general_reminder",
   "set_profile_field",
 ] as const;
 
@@ -115,6 +118,27 @@ export const StorePatchOpSchema = z.discriminatedUnion("kind", [
     startingFromHHmm: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   }),
   z.object({ kind: z.literal("cancel_interval_reminder"), label: z.string().min(1).max(120) }),
+  z.object({
+    kind: z.literal("set_general_reminder"),
+    label: z.string().min(1).max(200),
+    recurrence: z.enum(["once", "daily", "weekly", "interval"]),
+    // "once"
+    triggerAtISO: z.string().max(40).optional(),
+    // "daily"
+    dailyTimeHHmm: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+    // "weekly"
+    weekdays: z.array(z.number().int().min(0).max(6)).max(7).optional(),
+    weeklyTimeHHmm: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+    // "interval"
+    intervalMinutes: z.number().int().min(1).max(10080).optional(),
+    windowStartHHmm: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+    windowEndHHmm: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+    startingFromHHmm: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+    // metadata
+    amountMl: z.number().int().min(1).max(10000).optional(),
+    notes: z.string().max(400).optional(),
+  }),
+  z.object({ kind: z.literal("cancel_general_reminder"), label: z.string().min(1).max(200) }),
   z.object({
     kind: z.literal("set_profile_field"),
     field: z.enum([
@@ -402,6 +426,51 @@ function applyOp(
         applied: `Stopped interval reminders for "${op.label}".`,
       };
     }
+    case "set_general_reminder": {
+      const hl = healthLogsOrDefault(store);
+      const existing = hl.generalReminders ?? [];
+      const targetLabel = op.label.trim().toLowerCase();
+      // Disable any existing reminder with the same label first (replace semantics)
+      const filtered = existing.map((r) =>
+        r.label.trim().toLowerCase() === targetLabel ? { ...r, enabled: false } : r,
+      );
+      const entry: GeneralReminderEntry = {
+        id: randomUUID(),
+        label: op.label.trim(),
+        recurrence: op.recurrence,
+        enabled: true,
+        createdAtISO: new Date().toISOString(),
+        triggerAtISO: op.triggerAtISO,
+        dailyTimeHHmm: op.dailyTimeHHmm,
+        weekdays: op.weekdays,
+        weeklyTimeHHmm: op.weeklyTimeHHmm,
+        intervalMinutes: op.intervalMinutes,
+        windowStartHHmm: op.windowStartHHmm,
+        windowEndHHmm: op.windowEndHHmm,
+        startingFromHHmm: op.startingFromHHmm,
+        amountMl: op.amountMl,
+        notes: op.notes,
+      };
+      const when = describeRecurrence(entry);
+      return {
+        store: { ...store, healthLogs: { ...hl, generalReminders: [...filtered, entry] } },
+        applied: `Reminder set: "${op.label}" — ${when}.`,
+      };
+    }
+    case "cancel_general_reminder": {
+      const hl = healthLogsOrDefault(store);
+      const target = op.label.trim().toLowerCase();
+      const existing = hl.generalReminders ?? [];
+      const next = existing.map((r) =>
+        r.label.trim().toLowerCase() === target ? { ...r, enabled: false } : r,
+      );
+      const changed = next.some((r, i) => r.enabled !== existing[i].enabled);
+      if (!changed) return { store, skipped: `No active reminder matching "${op.label}".` };
+      return {
+        store: { ...store, healthLogs: { ...hl, generalReminders: next } },
+        applied: `Stopped reminder "${op.label}".`,
+      };
+    }
     case "set_profile_field": {
       // Only allow exactly-listed fields. The Zod schema already enforces this.
       const profile = { ...store.profile, [op.field]: op.value.trim() };
@@ -434,6 +503,7 @@ function healthLogsOrDefault(store: PatientStore) {
     sideEffects: [],
     medicationReminders: [],
     intervalReminders: [],
+    generalReminders: [],
   };
   return {
     bloodPressure: hl.bloodPressure ?? [],
@@ -441,7 +511,32 @@ function healthLogsOrDefault(store: PatientStore) {
     sideEffects: hl.sideEffects ?? [],
     medicationReminders: hl.medicationReminders ?? [],
     intervalReminders: (hl as { intervalReminders?: import("@/lib/types").IntervalReminderEntry[] }).intervalReminders ?? [],
+    generalReminders: (hl as { generalReminders?: GeneralReminderEntry[] }).generalReminders ?? [],
   };
+}
+
+const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function describeRecurrence(r: GeneralReminderEntry): string {
+  switch (r.recurrence) {
+    case "once":
+      return r.triggerAtISO
+        ? `once on ${r.triggerAtISO.slice(0, 16).replace("T", " at ")}`
+        : "once (no time set)";
+    case "daily":
+      return `daily at ${r.dailyTimeHHmm ?? "?"}`;
+    case "weekly": {
+      const days = (r.weekdays ?? []).map((d) => WEEKDAY_NAMES[d] ?? d).join(", ");
+      return `weekly on ${days || "?"} at ${r.weeklyTimeHHmm ?? "?"}`;
+    }
+    case "interval": {
+      const every =
+        (r.intervalMinutes ?? 0) >= 60
+          ? `every ${(r.intervalMinutes ?? 0) / 60}h`
+          : `every ${r.intervalMinutes}min`;
+      return `${every}, ${r.windowStartHHmm ?? "?"}–${r.windowEndHHmm ?? "?"}`;
+    }
+  }
 }
 
 function containsCI(list: string[], v: string): boolean {
