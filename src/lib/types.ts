@@ -132,6 +132,26 @@ export type SideEffectLogEntry = {
   intensity?: "mild" | "moderate" | "strong" | "unspecified";
 };
 
+/**
+ * Interval-based reminder — fires every `intervalMinutes` within a daily
+ * time window. Used for water reminders, exercise nudges, etc.
+ */
+export type IntervalReminderEntry = {
+  id: string;
+  label: string;
+  intervalMinutes: number;
+  windowStartHHmm: string;
+  windowEndHHmm: string;
+  /** ml per event — used to compute daily intake totals */
+  bottleMl?: number;
+  enabled: boolean;
+  createdAtISO: string;
+  /** Only honour on the calendar day of creation — skip until this time */
+  startingFromHHmm?: string;
+  /** ISO string of the last time the cron fired this reminder */
+  lastFiredAtISO?: string;
+};
+
 /** Local-only nudge for a medicine; not a medical device or guaranteed alarm. */
 export type MedicationReminderEntry = {
   id: string;
@@ -152,6 +172,7 @@ export type HealthLogsBundle = {
   medicationIntake: MedicationIntakeLogEntry[];
   sideEffects: SideEffectLogEntry[];
   medicationReminders: MedicationReminderEntry[];
+  intervalReminders?: IntervalReminderEntry[];
 };
 
 export type ExtractedLab = {

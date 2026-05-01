@@ -11,7 +11,8 @@ import { parseReminderIntent, applyReminderIntent } from "./reminderIntent";
 import { parseConditionIntent, applyConditionIntent } from "./conditionIntent";
 import { classifyIntent } from "@/lib/intent/classifyIntent";
 import { applyStorePatch } from "@/lib/intent/storePatch";
-import { getOrCreateActiveThread, appendMessage, listMessages } from "@/lib/server/threads";
+import { getOrCreateActiveThread, appendMessage, listMessages, updateContextSummary } from "@/lib/server/threads";
+import { buildContextWindow, summarizeOlderMessages, SUMMARY_THRESHOLD, UPDATE_EVERY } from "@/lib/intent/cavemanSummarize";
 
 /** Server-safe blank store — avoids importing the "use client" store.ts module. */
 function blankStore(): PatientStore {
@@ -19,7 +20,7 @@ function blankStore(): PatientStore {
     docs: [],
     meds: [],
     labs: [],
-    healthLogs: { bloodPressure: [], medicationIntake: [], sideEffects: [], medicationReminders: [] },
+    healthLogs: { bloodPressure: [], medicationIntake: [], sideEffects: [], medicationReminders: [], intervalReminders: [] },
     profile: {
       name: "",
       firstName: "",
@@ -423,8 +424,9 @@ export async function processIncomingMessage(
   const activeThread = await getOrCreateActiveThread(user.id, "WhatsApp");
 
   // ── Load conversation history from the unified messages table ──
-  const recentMessages = await listMessages(user.id, activeThread.id, { limit: MAX_HISTORY });
-  const history = recentMessages.map((m) => ({ role: m.role, content: m.content }));
+  const recentMessages = await listMessages(user.id, activeThread.id, { limit: 60 });
+  const allHistory = recentMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+  const history = buildContextWindow(allHistory, (activeThread as { contextSummary?: string | null }).contextSummary ?? null);
 
   // ── Detect preference changes in user message ──
   const prefChanges = detectPreferenceChanges(text);
@@ -556,6 +558,52 @@ export async function processIncomingMessage(
     return;
   }
 
+  // ── Water intake detection ───────────────────────────────────────────────
+  // Matches "done", "finished", "had water", "drank my bottle", etc.
+  // Writes a WaterLog row and replies with a daily count.
+  const WATER_DONE_RE =
+    /^(done|finished|had it|had water|had my water|all done|drank it|drank my water|water done|bottle done)[\s.!]*$/i;
+  const WATER_PHRASE_RE =
+    /\b(done|finished|had|drank|drunk|completed)\b.{0,30}\b(water|bottle|glass)\b|\b(water|bottle)\b.{0,15}\b(done|finished|had|drank|drunk)\b/i;
+
+  if (WATER_DONE_RE.test(text.trim()) || WATER_PHRASE_RE.test(text)) {
+    try {
+      const activeReminders = (store.healthLogs?.intervalReminders ?? []).filter(
+        (r) => (r as { enabled?: boolean }).enabled !== false,
+      );
+      const waterReminder = activeReminders.find(
+        (r) => /water|bottle|hydrat/i.test(r.label),
+      );
+      const amountMl = (waterReminder as { bottleMl?: number } | undefined)?.bottleMl ?? 800;
+
+      await prisma.waterLog.create({
+        data: { userId: user.id, amountMl, notes: text.slice(0, 200) },
+      });
+
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayLogs = await prisma.waterLog.findMany({
+        where: { userId: user.id, loggedAt: { gte: todayStart } },
+      });
+      const totalMl = todayLogs.reduce((sum, l) => sum + l.amountMl, 0);
+      const bottles = todayLogs.length;
+
+      const waterReply = `Great work! 💧 Logged ${amountMl}ml of water.\nYou've had ${bottles} bottle${bottles !== 1 ? "s" : ""} (${totalMl}ml) today. Keep it up!`;
+      await sendText(senderPhone, waterReply);
+      await appendMessage({
+        userId: user.id,
+        threadId: activeThread.id,
+        role: "assistant",
+        content: waterReply,
+        source: "whatsapp",
+      });
+      return;
+    } catch (err) {
+      console.error("[WhatsApp] Water log failed:", err instanceof Error ? err.message : err);
+      // Fall through to normal LLM response on error
+    }
+  }
+
   // ── Build system prompt with preferences and call LLM ──
   const prefs: UserPrefs = {
     communicationStyle: prefsRow.communicationStyle ?? undefined,
@@ -579,6 +627,16 @@ export async function processIncomingMessage(
     content: reply,
     source: "whatsapp",
   });
+
+  // Async caveman compression — fire-and-forget after every UPDATE_EVERY messages
+  const totalCount = recentMessages.length + 1;
+  if (totalCount > SUMMARY_THRESHOLD && totalCount % UPDATE_EVERY === 0) {
+    summarizeOlderMessages(allHistory, (activeThread as { contextSummary?: string | null }).contextSummary ?? null)
+      .then((summary) => {
+        if (summary) return updateContextSummary(activeThread.id, summary);
+      })
+      .catch(() => {/* non-critical */});
+  }
 
   // ── Extract and log wellness data (local regex, no extra LLM call) ──
   const wellness = extractWellnessLocal(text);

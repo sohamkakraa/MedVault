@@ -356,6 +356,10 @@ function describeOp(op: StorePatchOp): string {
       return `Reminder: ${op.medicationName} at ${op.timeLocalHHmm}${op.repeatDaily ? " daily" : ""}`;
     case "cancel_reminder":
       return `Cancel reminder for ${op.medicationName}`;
+    case "set_interval_reminder":
+      return `Interval reminder: "${op.label}" every ${op.intervalMinutes}min, ${op.windowStartHHmm}–${op.windowEndHHmm}`;
+    case "cancel_interval_reminder":
+      return `Cancel interval reminder: "${op.label}"`;
     case "set_profile_field":
       return `Set ${op.field} to ${op.value}`;
     default: {

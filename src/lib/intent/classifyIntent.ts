@@ -95,6 +95,19 @@ const TOOL_INPUT_SCHEMA = {
           ),
           opLeaf("cancel_reminder", { medicationName: stringLeaf(120) }),
           opLeaf(
+            "set_interval_reminder",
+            {
+              label: stringLeaf(120),
+              intervalMinutes: { type: "number" as const, minimum: 1, maximum: 1440 },
+              windowStartHHmm: { type: "string", pattern: "^\\d{2}:\\d{2}$" },
+              windowEndHHmm: { type: "string", pattern: "^\\d{2}:\\d{2}$" },
+              bottleMl: { type: "number" as const, minimum: 1, maximum: 10000 },
+              startingFromHHmm: { type: "string", pattern: "^\\d{2}:\\d{2}$" },
+            },
+            ["label", "intervalMinutes", "windowStartHHmm", "windowEndHHmm"],
+          ),
+          opLeaf("cancel_interval_reminder", { label: stringLeaf(120) }),
+          opLeaf(
             "set_profile_field",
             {
               field: {
@@ -276,6 +289,6 @@ function looksLikeMutationIntent(msg: string): boolean {
   if (/\bi (have|am|'m|got|don'?t have|no longer|stopped|started|need|want)\b/.test(m)) return true;
   if (/\bmy (\w+\s+){0,2}(is|are|has|have|was|were|hurts?|aches?)\b/.test(m)) return true;
   // Phrasings the deterministic parsers might miss
-  if (/\b(allerg(y|ies|ic)|medicine|medication|appointment|doctor|hospital|symptom|condition|reminder)\b/.test(m)) return true;
+  if (/\b(allerg(y|ies|ic)|medicine|medication|appointment|doctor|hospital|symptom|condition|reminder|water|bottle|every hour|every \d|interval)\b/.test(m)) return true;
   return false;
 }

@@ -14,6 +14,7 @@ export function defaultHealthLogs(): HealthLogsBundle {
     medicationIntake: [],
     sideEffects: [],
     medicationReminders: [],
+    intervalReminders: [],
   };
 }
 
@@ -150,6 +151,12 @@ export function normalizeHealthLogs(raw: unknown): HealthLogsBundle {
     medicationIntake: clampArray(med),
     sideEffects: clampArray(se),
     medicationReminders: clampArray(reminders),
+    intervalReminders: Array.isArray(o.intervalReminders)
+      ? (o.intervalReminders as unknown[]).filter(
+          (r): r is import("@/lib/types").IntervalReminderEntry =>
+            typeof r === "object" && r !== null && "id" in r && "label" in r,
+        )
+      : [],
   };
 }
 

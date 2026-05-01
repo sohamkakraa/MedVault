@@ -26,6 +26,7 @@ export type ThreadRow = {
   archivedAt: Date | null;
   lastMessageAt: Date;
   createdAt: Date;
+  contextSummary: string | null;
 };
 
 export type MessageRow = {
@@ -210,6 +211,20 @@ export async function appendMessage(input: {
       data: { lastMessageAt: now, ...titlePatch },
     });
     return message as MessageRow;
+  });
+}
+
+/**
+ * Persist a new caveman-compressed context summary for a thread.
+ * Called asynchronously after reply delivery — never blocks the response.
+ */
+export async function updateContextSummary(
+  threadId: string,
+  summary: string,
+): Promise<void> {
+  await prisma.thread.update({
+    where: { id: threadId },
+    data: { contextSummary: summary.slice(0, 8000) },
   });
 }
 

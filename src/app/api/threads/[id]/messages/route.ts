@@ -19,7 +19,8 @@ import { z } from "zod";
 import { requireUserId } from "@/lib/server/authSession";
 import { prisma } from "@/lib/prisma";
 import { parsePatientStoreJson } from "@/lib/patientStoreApi";
-import { listMessages, appendMessage, setActiveThread } from "@/lib/server/threads";
+import { listMessages, appendMessage, setActiveThread, updateContextSummary } from "@/lib/server/threads";
+import { buildContextWindow, summarizeOlderMessages, SUMMARY_THRESHOLD, UPDATE_EVERY } from "@/lib/intent/cavemanSummarize";
 import { parseReminderIntent, applyReminderIntent } from "@/lib/whatsapp/reminderIntent";
 import { parseConditionIntent, applyConditionIntent } from "@/lib/whatsapp/conditionIntent";
 import { classifyIntent } from "@/lib/intent/classifyIntent";
@@ -165,11 +166,11 @@ export async function POST(
     }
   }
 
-  const recent = await listMessages(userId, id, { limit: 30 });
+  const recent = await listMessages(userId, id, { limit: 60 });
 
   let reply: string;
   try {
-    reply = await callConversationLLM(content, recent, store);
+    reply = await callConversationLLM(content, recent, store, thread.contextSummary ?? null);
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : "The chat agent didn't reply this time.";
     const fallback = `Sorry — I couldn't reach the assistant just now (${errMsg.slice(0, 80)}). Your message was saved; try again in a moment.`;
@@ -195,6 +196,19 @@ export async function POST(
     content: reply,
     source: "web",
   });
+
+  // Async caveman compression: after every UPDATE_EVERY messages once the
+  // thread is long enough, re-summarize older history and persist the summary.
+  const totalCount = recent.length + 1; // +1 for the assistant reply just saved
+  if (totalCount > SUMMARY_THRESHOLD && totalCount % UPDATE_EVERY === 0) {
+    const msgs = recent.map((m) => ({ role: m.role, content: m.content }));
+    summarizeOlderMessages(msgs, thread.contextSummary ?? null)
+      .then((summary) => {
+        if (summary) return updateContextSummary(id, summary);
+      })
+      .catch(() => {/* non-critical */});
+  }
+
   return NextResponse.json({ ok: true, userMessage, assistantMessage });
 }
 
@@ -207,6 +221,7 @@ async function callConversationLLM(
   question: string,
   history: { role: "user" | "assistant"; content: string }[],
   store: PatientStore | null,
+  storedSummary: string | null,
 ): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -217,9 +232,10 @@ async function callConversationLLM(
   const model = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
 
   const system = buildSystemPrompt(store);
-  // Drop the message we just persisted (it'll appear as the user prompt)
-  const trimmed = history.slice(0, -1).slice(-20);
-  const messages = trimmed.map((m) => ({ role: m.role, content: m.content }));
+  // Drop the last message (it's the user message we just persisted — passed as question)
+  const priorHistory = history.slice(0, -1).map((m) => ({ role: m.role, content: m.content }));
+  const compressed = buildContextWindow(priorHistory, storedSummary);
+  const messages = [...compressed];
   messages.push({ role: "user", content: question });
 
   const completion = await anthropic.messages.create({

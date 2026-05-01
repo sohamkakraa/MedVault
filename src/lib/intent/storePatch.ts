@@ -55,6 +55,8 @@ export const STORE_PATCH_OP_KINDS = [
   "clear_side_effects_matching",
   "set_reminder",
   "cancel_reminder",
+  "set_interval_reminder",
+  "cancel_interval_reminder",
   "set_profile_field",
 ] as const;
 
@@ -103,6 +105,16 @@ export const StorePatchOpSchema = z.discriminatedUnion("kind", [
     repeatDaily: z.boolean().default(true),
   }),
   z.object({ kind: z.literal("cancel_reminder"), medicationName: z.string().min(1).max(120) }),
+  z.object({
+    kind: z.literal("set_interval_reminder"),
+    label: z.string().min(1).max(120),
+    intervalMinutes: z.number().int().min(1).max(1440),
+    windowStartHHmm: z.string().regex(/^\d{2}:\d{2}$/),
+    windowEndHHmm: z.string().regex(/^\d{2}:\d{2}$/),
+    bottleMl: z.number().int().min(1).max(10000).optional(),
+    startingFromHHmm: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  }),
+  z.object({ kind: z.literal("cancel_interval_reminder"), label: z.string().min(1).max(120) }),
   z.object({
     kind: z.literal("set_profile_field"),
     field: z.enum([
@@ -349,6 +361,47 @@ function applyOp(
         applied: `Stopped reminders for ${op.medicationName}.`,
       };
     }
+    case "set_interval_reminder": {
+      const hl = healthLogsOrDefault(store);
+      const existing = hl.intervalReminders ?? [];
+      const targetLabel = op.label.trim().toLowerCase();
+      // Disable any existing reminder with the same label first (replace semantics)
+      const filtered = existing.map((r) =>
+        r.label.trim().toLowerCase() === targetLabel ? { ...r, enabled: false } : r,
+      );
+      const entry: import("@/lib/types").IntervalReminderEntry = {
+        id: randomUUID(),
+        label: op.label.trim(),
+        intervalMinutes: op.intervalMinutes,
+        windowStartHHmm: op.windowStartHHmm,
+        windowEndHHmm: op.windowEndHHmm,
+        bottleMl: op.bottleMl,
+        enabled: true,
+        createdAtISO: new Date().toISOString(),
+        startingFromHHmm: op.startingFromHHmm,
+      };
+      const every = op.intervalMinutes >= 60
+        ? `every ${op.intervalMinutes / 60}h`
+        : `every ${op.intervalMinutes}min`;
+      return {
+        store: { ...store, healthLogs: { ...hl, intervalReminders: [...filtered, entry] } },
+        applied: `Set reminder: "${op.label}" ${every}, ${op.windowStartHHmm}–${op.windowEndHHmm}.`,
+      };
+    }
+    case "cancel_interval_reminder": {
+      const hl = healthLogsOrDefault(store);
+      const target = op.label.trim().toLowerCase();
+      const existing = hl.intervalReminders ?? [];
+      const next = existing.map((r) =>
+        r.label.trim().toLowerCase() === target ? { ...r, enabled: false } : r,
+      );
+      const changed = next.some((r, i) => r.enabled !== existing[i].enabled);
+      if (!changed) return { store, skipped: `No active interval reminder matching "${op.label}".` };
+      return {
+        store: { ...store, healthLogs: { ...hl, intervalReminders: next } },
+        applied: `Stopped interval reminders for "${op.label}".`,
+      };
+    }
     case "set_profile_field": {
       // Only allow exactly-listed fields. The Zod schema already enforces this.
       const profile = { ...store.profile, [op.field]: op.value.trim() };
@@ -380,12 +433,14 @@ function healthLogsOrDefault(store: PatientStore) {
     medicationIntake: [],
     sideEffects: [],
     medicationReminders: [],
+    intervalReminders: [],
   };
   return {
     bloodPressure: hl.bloodPressure ?? [],
     medicationIntake: hl.medicationIntake ?? [],
     sideEffects: hl.sideEffects ?? [],
     medicationReminders: hl.medicationReminders ?? [],
+    intervalReminders: (hl as { intervalReminders?: import("@/lib/types").IntervalReminderEntry[] }).intervalReminders ?? [],
   };
 }
 

@@ -35,6 +35,7 @@ model User {
   wellnessLogs     WellnessLog[]
   threads          Thread[]
   messages         Message[]
+  waterLogs        WaterLog[]
 }
 
 /**
@@ -198,8 +199,14 @@ model Thread {
    * lastMessageAt is denormalized so thread-list reads don't need a JOIN +
    * aggregate every time the sidebar loads. Updated on every Message append.
    */
-  lastMessageAt DateTime  @default(now()) @map("last_message_at")
-  createdAt     DateTime  @default(now()) @map("created_at")
+  lastMessageAt   DateTime  @default(now()) @map("last_message_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  /**
+   * Caveman-compressed summary of older messages in this thread. Stored so
+   * we don't re-summarize on every request. Updated asynchronously after
+   * every 5 new messages once the thread has more than CAVEMAN_THRESHOLD turns.
+   */
+  contextSummary  String?   @map("context_summary") @db.Text
 
   messages Message[]
 
@@ -231,4 +238,21 @@ model Message {
   @@index([threadId, createdAt])
   @@index([userId, createdAt])
   @@map("messages")
+}
+
+/**
+ * One logged water intake event. Written each time the user tells UMA they
+ * finished a bottle on WhatsApp ("done", "had water", etc.) or via the chat
+ * intent classifier. The amount defaults to the reminder's bottle_ml if set.
+ */
+model WaterLog {
+  id       String   @id @default(cuid())
+  userId   String   @map("user_id")
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amountMl Int      @default(800) @map("amount_ml")
+  notes    String?  @db.Text
+  loggedAt DateTime @default(now()) @map("logged_at")
+
+  @@index([userId, loggedAt])
+  @@map("water_logs")
 }
