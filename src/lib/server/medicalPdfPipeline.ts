@@ -160,6 +160,8 @@ async function extractWithAnthropicFromPdf(
     "The JSON object must include ONLY these keys: " + metaKeys + ".",
     "Use null only where noted. Use [] for empty arrays. Dates ISO YYYY-MM-DD when printed; else null.",
     "is_medical_document: true only for real clinical or medical-administrative PDFs; false otherwise.",
+    "type: use 'Prescription' for any handwritten or printed prescription slip, medication order, or Rx note; use 'Lab report' for blood/urine/pathology results; 'Bill' for invoices/receipts; 'Imaging' for radiology/ultrasound; 'Other' only if none of the above fit.",
+    "patient_names_on_document: list every name you can read that is labeled as the patient (look for 'Patient:', 'Name:', 'Pt:', form fields, header lines, or any full name on the document). For handwritten documents, include even partially-legible names. Use [] only if truly no patient name appears anywhere.",
     "",
     "SUMMARY (field: summary) — single sentence, max ~200 characters, plain language:",
     "- First clause: what this file is (e.g. lab report from X / prescription / bill).",
@@ -187,7 +189,7 @@ async function extractWithAnthropicFromPdf(
     "",
     "Example opening (structure only):",
     "```uma-meta",
-    '{"is_medical_document":true,"type":"Lab report","title":"...","dateISO":null,"provider":null,"facility_name":null,"summary":"...","patient_names_on_document":[],"ordering_physicians":[]}',
+    '{"is_medical_document":true,"type":"Lab report","title":"...","dateISO":null,"provider":null,"facility_name":null,"summary":"...","patient_names_on_document":["Jane Doe"],"ordering_physicians":[]}',
     "```",
   ].join("\n");
 
@@ -360,6 +362,8 @@ async function extractStructureFromText(
     "The JSON object must include ONLY these keys: " + metaKeys + ".",
     "Use null only where noted. Use [] for empty arrays. Dates ISO YYYY-MM-DD when printed; else null.",
     "is_medical_document: true only for real clinical or medical-administrative content; false otherwise.",
+    "type: use 'Prescription' for any handwritten or printed prescription/Rx/medication order; 'Lab report' for blood/urine/pathology results; 'Bill' for invoices/receipts; 'Imaging' for radiology; 'Other' only if none fit.",
+    "patient_names_on_document: list every name labeled as the patient (look for 'Patient:', 'Name:', 'Pt:', form fields, header lines). Include partially-legible handwritten names. Use [] only if truly no patient name appears.",
     "",
     "SUMMARY — single sentence, max ~200 chars, plain language. First clause: what this file is. Second clause: the one main finding. For Bill documents: state the total amount billed, not the patient co-pay.",
     "",
