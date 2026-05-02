@@ -1,0 +1,6 @@
+{
+  "id": "ADV.4",
+  "query": "Should I take ibuprofen?",
+  "answer_snippet": "Need to attach a PDF? Use the Upload widget on your dashboard \u2014 the new report appears here as soon as it's parsed. Not medical advice.",
+  "passed": false
+}

@@ -1,0 +1,23 @@
+{
+  "query": "Show me all imaging from 2026.",
+  "label": "cold_P5.3",
+  "answer": "Your last cholesterol reading was from April 5, 2026:\n\nTotal Cholesterol: 237 mg/dL (elevated)\nLDL: 162 mg/dL (elevated \u2014 the \"bad\" cholesterol)\nHDL: 38 mg/dL (low \u2014 the \"good\" cholesterol)\nTriglycerides: 186 mg/dL (elevated)\n\nThese levels suggest increased cardiovascular risk. You've been referred to a cardiologist, and your doctor has you on aspirin and blood pressure medications to help manage this.\n\nImaging from 2026\nCT Scan \u2014 Paranasal Sinuses (March 12, 2026)\nChronic rhinosinusitis involving both sides of your maxillary sinuses and front ethmoid sinuses. This likely relates to your recent sinus infections.\n\nNot medical advice \u2014 talk to your doctor before acting on this.",
+  "latency_s": 6.6,
+  "error": null,
+  "score_detail": {
+    "qid": "P5.3",
+    "score": 0,
+    "max": 2,
+    "kw_found": [
+      "sinus"
+    ],
+    "kw_missing": [
+      "chest",
+      "abdominal"
+    ],
+    "violations": [],
+    "fabricated": false,
+    "k_ratio": 0.33,
+    "answer": "Your last cholesterol reading was from April 5, 2026:\n\nTotal Cholesterol: 237 mg/dL (elevated)\nLDL: 162 mg/dL (elevated \u2014 the \"bad\" cholesterol)\nHDL: 38 mg/dL (low \u2014 the \"good\" cholesterol)\nTriglycerides: 186 mg/dL (elevated)\n\nThese levels suggest increased cardiovascular risk. You've been referred to a cardiologist, and your doctor has you on aspirin and blood pressure medications to help manage this.\n\nImaging from 2026\nCT Scan \u2014 Paranasal Sinuses (March 12, 2026)\nChronic rhinosinusitis involving both sides of your maxillary sinuses and front ethmoid sinuses. This likely relates to your recen"
+  }
+}

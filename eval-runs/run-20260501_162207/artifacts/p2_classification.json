@@ -1,0 +1,141 @@
+{
+  "accuracy": 0.955,
+  "correct": 21,
+  "total": 22,
+  "p2_score": 5,
+  "p2_max": 5,
+  "per_doc": [
+    {
+      "file": "01_cbc_aurora_2026-01-12.pdf",
+      "gt_type": "lab_report",
+      "type_found": true,
+      "facility_found": false
+    },
+    {
+      "file": "02_lipid_polaris_2026-02-03.pdf",
+      "gt_type": "lab_report",
+      "type_found": true,
+      "facility_found": false
+    },
+    {
+      "file": "03_hba1c_silverline_2026-02-15.pdf",
+      "gt_type": "lab_report",
+      "type_found": true,
+      "facility_found": true
+    },
+    {
+      "file": "04_allergy_panel_silverline_2026-03-04.pdf",
+      "gt_type": "lab_report",
+      "type_found": true,
+      "facility_found": true
+    },
+    {
+      "file": "05_chest_xray_apex_2026-01-08.pdf",
+      "gt_type": "imaging",
+      "type_found": true,
+      "facility_found": false
+    },
+    {
+      "file": "06_wrist_xray_phoenix_2025-11-22.pdf",
+      "gt_type": "imaging",
+      "type_found": true,
+      "facility_found": true
+    },
+    {
+      "file": "07_knee_mri_northwind_2025-12-09.pdf",
+      "gt_type": "imaging",
+      "type_found": true,
+      "facility_found": false
+    },
+    {
+      "file": "08_abdominal_us_greenmeadow_2026-01-20.pdf",
+      "gt_type": "imaging",
+      "type_found": true,
+      "facility_found": false
+    },
+    {
+      "file": "09_sinus_ct_apex_2026-03-12.pdf",
+      "gt_type": "imaging",
+      "type_found": true,
+      "facility_found": false
+    },
+    {
+      "file": "10_ecg_lotus_2026-02-22.pdf",
+      "gt_type": "imaging",
+      "type_found": true,
+      "facility_found": true
+    },
+    {
+      "file": "11_pft_apex_2026-03-18.pdf",
+      "gt_type": "imaging",
+      "type_found": true,
+      "facility_found": false
+    },
+    {
+      "file": "12_rx_antibiotic_apex_2026-03-13.pdf",
+      "gt_type": "prescription",
+      "type_found": true,
+      "facility_found": false
+    },
+    {
+      "file": "13_rx_chronic_bp_cedar_2026-04-02.pdf",
+      "gt_type": "prescription",
+      "type_found": true,
+      "facility_found": false
+    },
+    {
+      "file": "14_discharge_summary_riverside_2025-09-15.pdf",
+      "gt_type": "discharge_summary",
+      "type_found": true,
+      "facility_found": false
+    },
+    {
+      "file": "15_referral_letter_cedar_2026-04-05.pdf",
+      "gt_type": "specialist_referral",
+      "type_found": true,
+      "facility_found": false
+    },
+    {
+      "file": "16_vaccination_record_cedar_2026-04-10.pdf",
+      "gt_type": "vaccination_record",
+      "type_found": true,
+      "facility_found": false
+    },
+    {
+      "file": "17_dental_checkup_crestwood_2026-04-12.pdf",
+      "gt_type": "dental_record",
+      "type_found": true,
+      "facility_found": true
+    },
+    {
+      "file": "18_er_bill_phoenix_2025-11-22.pdf",
+      "gt_type": "hospital_bill",
+      "type_found": true,
+      "facility_found": true
+    },
+    {
+      "file": "19_pharmacy_bill_bluepine_2026-03-13.pdf",
+      "gt_type": "pharmacy_bill",
+      "type_found": true,
+      "facility_found": true
+    },
+    {
+      "file": "20_consultation_note_cedar_2026-02-04.pdf",
+      "gt_type": "consultation_note",
+      "type_found": true,
+      "facility_found": false
+    },
+    {
+      "file": "21_handwritten_note_lotus_2026-03-17.pdf",
+      "gt_type": "handwritten_note",
+      "type_found": false,
+      "facility_found": true
+    },
+    {
+      "file": "22_handwritten_rx_wellspring_2026-04-18.pdf",
+      "gt_type": "handwritten_prescription",
+      "type_found": false,
+      "facility_found": false
+    }
+  ]
+}

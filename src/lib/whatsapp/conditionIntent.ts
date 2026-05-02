@@ -36,6 +36,14 @@ export function parseConditionIntent(text: string): ConditionIntent {
   const lower = text.toLowerCase().trim();
   if (!lower) return null;
 
+  // Reject interrogative questions — they are asking for information, not
+  // reporting a symptom. e.g. "Do I have any allergies?" or "When did I have surgery?"
+  // We check the very start of the utterance for question words / auxiliary verbs
+  // that indicate a question rather than a statement.
+  const interrogativePrefix =
+    /^(?:do i|does|did i|when did|what|which|where|who|how|can|could|should|would|is there|are there|have i|had i)\b/;
+  if (interrogativePrefix.test(lower)) return null;
+
   // Resolution patterns. The captured group is the symptom phrase.
   const resolutionRegexes: RegExp[] = [
     // "my headache is gone" / "my headaches are gone now"

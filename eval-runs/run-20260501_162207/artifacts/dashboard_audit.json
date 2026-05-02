@@ -1,0 +1,98 @@
+{
+  "card_audit": {
+    "active_conditions": {
+      "found": true,
+      "keywords": [
+        "condition",
+        "dyslipidemia",
+        "prediabetes",
+        "hypertension",
+        "rhinosinusitis",
+        "asthma"
+      ]
+    },
+    "medication_list": {
+      "found": true,
+      "keywords": [
+        "telmisartan",
+        "amlodipine",
+        "aspirin",
+        "medication"
+      ]
+    },
+    "allergies_alerts": {
+      "found": false,
+      "keywords": [
+        "peanut",
+        "allerg"
+      ]
+    },
+    "lipid_trend": {
+      "found": true,
+      "keywords": [
+        "cholesterol",
+        "ldl",
+        "lipid",
+        "triglyceride"
+      ]
+    },
+    "glycemic_trend": {
+      "found": false,
+      "keywords": [
+        "hba1c",
+        "glucose",
+        "prediabet"
+      ]
+    },
+    "recent_imaging": {
+      "found": false,
+      "keywords": [
+        "imaging",
+        "x-ray",
+        "mri",
+        "ct scan",
+        "ultrasound",
+        "xray"
+      ]
+    },
+    "follow_ups": {
+      "found": true,
+      "keywords": [
+        "follow",
+        "referral",
+        "cardiology",
+        "appointment"
+      ]
+    },
+    "surgical_history": {
+      "found": false,
+      "keywords": [
+        "appendectomy",
+        "appendic",
+        "surgery"
+      ]
+    },
+    "immunization": {
+      "found": true,
+      "keywords": [
+        "vaccine",
+        "vaccination",
+        "immunization"
+      ]
+    },
+    "spend_tracker": {
+      "found": false,
+      "keywords": [
+        "bill",
+        "spend",
+        "$",
+        "1246",
+        "1304",
+        "57"
+      ]
+    }
+  },
+  "found_count": 5,
+  "allergy_prominent": false,
+  "raw_excerpt": "dashboard\nprofile & health details\nupload documents\nchat\n\numa\n\nur medical assistant\n\ndashboard\nchat\nbody\ntidy\nbeta\nsoham\n9+\ntip: use the left and right arrow keys to move between tabs.\nat a glance\n\nat a glance\n\nsoham kakra\n\nmanaging headache. on 15 active medications: amoxicillin + clavulanate, fexofenadine, saline nasal spray (+12 more). total cholesterol is significantly outside normal range \u2014 worth discussing with your doctor.\n\nheadache\nwheat / gluten\nedit profile\ntotal cholesterol\n\u2191 high\nbad cholesterol\n\u2191 high\nblood fats\n\u2191 high\nliver stress marker (ast)\n\u2193 low\n3-month sugar average\n\u2191 high\n\nnext appointment\n\ndoctor\n\nhospital / clinic\n\ndate\n\n18 feb 26\n\ntime\n\nset reminders\nexport visit summary\nyour medicines\nyour medicines\n15\nadd new\n\namoxicillin + clavulanate\n\n625 mg\n\nfexofenadine\n\n180 mg"
+}

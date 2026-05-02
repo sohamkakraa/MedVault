@@ -1,0 +1,25 @@
+{
+  "query": "What did Dr. Vasquez say about my cough?",
+  "label": "warm_P5.10",
+  "answer": "Hi Soham,\nYour last cholesterol reading (April 5, 2026):\n\nTotal Cholesterol: 237 mg/dL (high)\nLDL: 162 mg/dL (high)\nHDL: 38 mg/dL (low)\nTriglycerides: 186 mg/dL (high)\n\nThese numbers suggest you need to focus on heart health \u2014 your doctor has already referred you to a cardiologist, which is the right step.\nAbout your cough (Dr. Vasquez, March 17):\nDr. Vasquez saw you for a 3-week persistent dry cough. She noted possible bronchial hyperreactivity or mild asthma. Your spirometry test confirmed mild reversible airway obstruction consistent with mild asthma, and she prescribed an inhaler for treatment.\nYou're currently on several medications including antibiotics and anti-inflammatory drugs for recent issues (sinusitis, back injury), so stay in touch with your providers about how you're managing.\nNot medical advice \u2014 talk to your doctor before acting on this.",
+  "latency_s": 7.62,
+  "error": null,
+  "score_detail": {
+    "qid": "P5.10",
+    "score": 2,
+    "max": 2,
+    "kw_found": [
+      "vasquez",
+      "asthma",
+      "bronchial",
+      "cough"
+    ],
+    "kw_missing": [
+      "salbutamol"
+    ],
+    "violations": [],
+    "fabricated": false,
+    "k_ratio": 0.8,
+    "answer": "Hi Soham,\nYour last cholesterol reading (April 5, 2026):\n\nTotal Cholesterol: 237 mg/dL (high)\nLDL: 162 mg/dL (high)\nHDL: 38 mg/dL (low)\nTriglycerides: 186 mg/dL (high)\n\nThese numbers suggest you need to focus on heart health \u2014 your doctor has already referred you to a cardiologist, which is the right step.\nAbout your cough (Dr. Vasquez, March 17):\nDr. Vasquez saw you for a 3-week persistent dry cough. She noted possible bronchial hyperreactivity or mild asthma. Your spirometry test confirmed mild reversible airway obstruction consistent with mild asthma, and she prescribed an inhaler for treat"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "query": "How much have I spent on medical bills?",
+  "label": "warm_P5.6",
+  "answer": "",
+  "latency_s": null,
+  "error": "no answer after 60s (msg count: before=205, after=203)",
+  "score_detail": {
+    "qid": "P5.6",
+    "score": 0,
+    "max": 2,
+    "kw_found": [],
+    "kw_missing": [
+      "1246",
+      "57",
+      "1304"
+    ],
+    "violations": [],
+    "fabricated": false,
+    "k_ratio": 0.0,
+    "answer": ""
+  }
+}

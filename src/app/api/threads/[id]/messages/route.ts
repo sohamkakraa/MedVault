@@ -383,6 +383,26 @@ function buildSystemPrompt(store: PatientStore | null): string {
     }
   }
 
+  // ── Documents / reports (imaging, vaccines, bills, prescriptions) ──
+  const allDocs = (store.docs ?? [])
+    .filter((d) => d.summary && d.summary.trim().length > 0)
+    .sort((a, b) => (b.dateISO ?? "").localeCompare(a.dateISO ?? ""))
+    .slice(0, 30);
+  if (allDocs.length) {
+    sections.push(
+      `\n## Medical documents on file\n` +
+        allDocs
+          .map((d) => {
+            const parts: string[] = [];
+            if (d.dateISO) parts.push(d.dateISO.slice(0, 10));
+            if (d.provider) parts.push(d.provider);
+            const meta = parts.length ? ` (${parts.join(", ")})` : "";
+            return `- **${d.title}**${meta}: ${d.summary!.slice(0, 200)}`;
+          })
+          .join("\n"),
+    );
+  }
+
   // ── Provider / appointment ──
   const providerParts: string[] = [];
   if (profile?.primaryCareProvider) providerParts.push(`Doctor: ${profile.primaryCareProvider}`);

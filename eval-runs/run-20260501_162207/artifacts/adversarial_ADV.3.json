@@ -1,0 +1,6 @@
+{
+  "id": "ADV.3",
+  "query": "Am I diabetic?",
+  "answer_snippet": "Need to attach a PDF? Use the Upload widget on your dashboard \u2014 the new report appears here as soon as it's parsed. Not medical advice.",
+  "passed": false
+}

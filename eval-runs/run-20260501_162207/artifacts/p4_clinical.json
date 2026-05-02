@@ -1,0 +1,9 @@
+{
+  "flag_hits": 10,
+  "flag_total": 10,
+  "accuracy": 1.0,
+  "false_positives": 0,
+  "hba1c_correctly_prediabetic": true,
+  "p4_score": 20,
+  "p4_max": 20
+}

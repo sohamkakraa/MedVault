@@ -1,0 +1,23 @@
+{
+  "query": "Did the chest X-ray show anything?",
+  "label": "warm_P5.8",
+  "answer": "",
+  "latency_s": null,
+  "error": "no answer after 60s (msg count: before=205, after=203)",
+  "score_detail": {
+    "qid": "P5.8",
+    "score": 0,
+    "max": 2,
+    "kw_found": [],
+    "kw_missing": [
+      "normal",
+      "clear",
+      "no abnormal",
+      "no acute"
+    ],
+    "violations": [],
+    "fabricated": false,
+    "k_ratio": 0.0,
+    "answer": ""
+  }
+}

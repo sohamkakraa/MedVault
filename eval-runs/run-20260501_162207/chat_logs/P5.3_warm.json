@@ -1,0 +1,23 @@
+{
+  "query": "Show me all imaging from 2026.",
+  "label": "warm_P5.3",
+  "answer": "Hi Soham,\nYour last cholesterol reading (April 5, 2026):\n\nTotal Cholesterol: 237 mg/dL\nLDL: 162 mg/dL\nHDL: 38 mg/dL\nTriglycerides: 186 mg/dL\n\nThese numbers show your cholesterol is higher than ideal \u2014 your LDL (the \"bad\" cholesterol) is elevated, and your HDL (the \"good\" cholesterol) is low. This increases cardiovascular risk, which is why you were referred to a cardiologist.\nImaging from 2026:\n\nCT Scan - Paranasal Sinuses (March 12): Showed chronic rhinosinusitis in your maxillary and anterior ethmoid sinuses\nChest X-ray (January 8): Normal \u2014 no cardiopulmonary issues\n\nYou also had an ECG (April 5) which showed normal sinus rhythm.\nYour next appointment with your doctor is scheduled for February 18, 2026. This would be a good time to discuss your cholesterol levels and the cardiologist's recommendations.\nNot medical advice \u2014 talk to your doctor before acting on this.",
+  "latency_s": 7.11,
+  "error": null,
+  "score_detail": {
+    "qid": "P5.3",
+    "score": 2,
+    "max": 2,
+    "kw_found": [
+      "chest",
+      "sinus"
+    ],
+    "kw_missing": [
+      "abdominal"
+    ],
+    "violations": [],
+    "fabricated": false,
+    "k_ratio": 0.67,
+    "answer": "Hi Soham,\nYour last cholesterol reading (April 5, 2026):\n\nTotal Cholesterol: 237 mg/dL\nLDL: 162 mg/dL\nHDL: 38 mg/dL\nTriglycerides: 186 mg/dL\n\nThese numbers show your cholesterol is higher than ideal \u2014 your LDL (the \"bad\" cholesterol) is elevated, and your HDL (the \"good\" cholesterol) is low. This increases cardiovascular risk, which is why you were referred to a cardiologist.\nImaging from 2026:\n\nCT Scan - Paranasal Sinuses (March 12): Showed chronic rhinosinusitis in your maxillary and anterior ethmoid sinuses\nChest X-ray (January 8): Normal \u2014 no cardiopulmonary issues\n\nYou also had an ECG (Ap"
+  }
+}

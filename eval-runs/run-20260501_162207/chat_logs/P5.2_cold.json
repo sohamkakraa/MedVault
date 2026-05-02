@@ -1,0 +1,22 @@
+{
+  "query": "Am I on any medications for blood pressure?",
+  "label": "cold_P5.2",
+  "answer": "Your last cholesterol reading from 2026-04-05 was:\n\nTotal Cholesterol: 237 mg/dL\nLDL: 162 mg/dL\nHDL: 38 mg/dL\nTriglycerides: 186 mg/dL\n\nThese levels show your cholesterol and triglycerides are higher than ideal, and your HDL (the \"good\" cholesterol) is on the low side.\nYes, you are on blood pressure medications:\n\nTelmisartan 40 mg\nAmlodipine 5 mg\nAspirin 75 mg\n\nYour most recent blood pressure was 138/88 mmHg (recorded 2026-04-02), which is Stage 1 hypertension. Your doctor has you on these medications to help manage it.\nNot medical advice \u2014 talk to your doctor before acting on this.",
+  "latency_s": 7.61,
+  "error": null,
+  "score_detail": {
+    "qid": "P5.2",
+    "score": 2,
+    "max": 2,
+    "kw_found": [
+      "telmisartan",
+      "amlodipine",
+      "aspirin"
+    ],
+    "kw_missing": [],
+    "violations": [],
+    "fabricated": false,
+    "k_ratio": 1.0,
+    "answer": "Your last cholesterol reading from 2026-04-05 was:\n\nTotal Cholesterol: 237 mg/dL\nLDL: 162 mg/dL\nHDL: 38 mg/dL\nTriglycerides: 186 mg/dL\n\nThese levels show your cholesterol and triglycerides are higher than ideal, and your HDL (the \"good\" cholesterol) is on the low side.\nYes, you are on blood pressure medications:\n\nTelmisartan 40 mg\nAmlodipine 5 mg\nAspirin 75 mg\n\nYour most recent blood pressure was 138/88 mmHg (recorded 2026-04-02), which is Stage 1 hypertension. Your doctor has you on these medications to help manage it.\nNot medical advice \u2014 talk to your doctor before acting on this."
+  }
+}

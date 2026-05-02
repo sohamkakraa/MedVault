@@ -1,0 +1,218 @@
+{
+  "f1": 0.943,
+  "found_w": 41.2,
+  "total_w": 43.7,
+  "p3_score": 30,
+  "p3_max": 30,
+  "critical_missing": [],
+  "test_detail": [
+    {
+      "test": "LDL 162 mg/dL",
+      "expected": "162",
+      "found": true,
+      "weight": 2.0
+    },
+    {
+      "test": "HDL 38 mg/dL",
+      "expected": "38",
+      "found": true,
+      "weight": 2.0
+    },
+    {
+      "test": "Total Chol 237",
+      "expected": "237",
+      "found": true,
+      "weight": 2.0
+    },
+    {
+      "test": "Triglycerides 186",
+      "expected": "186",
+      "found": true,
+      "weight": 1.5
+    },
+    {
+      "test": "HbA1c 6.1%",
+      "expected": "6.1",
+      "found": true,
+      "weight": 2.0
+    },
+    {
+      "test": "Prediabetes diagnosis",
+      "expected": "prediabet",
+      "found": true,
+      "weight": 1.5
+    },
+    {
+      "test": "Peanut allergy",
+      "expected": "peanut",
+      "found": true,
+      "weight": 2.0
+    },
+    {
+      "test": "Colles fracture",
+      "expected": "colles",
+      "found": true,
+      "weight": 1.5
+    },
+    {
+      "test": "Medial meniscus tear",
+      "expected": "meniscus",
+      "found": true,
+      "weight": 1.5
+    },
+    {
+      "test": "Telmisartan",
+      "expected": "telmisartan",
+      "found": true,
+      "weight": 2.0
+    },
+    {
+      "test": "Amlodipine",
+      "expected": "amlodipine",
+      "found": true,
+      "weight": 2.0
+    },
+    {
+      "test": "Aspirin 75mg",
+      "expected": "aspirin",
+      "found": true,
+      "weight": 2.0
+    },
+    {
+      "test": "Appendectomy",
+      "expected": "appendectomy",
+      "found": true,
+      "weight": 2.0
+    },
+    {
+      "test": "ER bill total 1246",
+      "expected": "1246",
+      "found": false,
+      "weight": 1.5
+    },
+    {
+      "test": "Pharmacy bill 57.90",
+      "expected": "57",
+      "found": true,
+      "weight": 1.0
+    },
+    {
+      "test": "15 vaccines",
+      "expected": "15",
+      "found": true,
+      "weight": 1.0
+    },
+    {
+      "test": "Vasquez handwritten note",
+      "expected": "vasquez",
+      "found": true,
+      "weight": 1.5
+    },
+    {
+      "test": "Bronchial hyperreactivity",
+      "expected": "bronchial",
+      "found": true,
+      "weight": 1.5
+    },
+    {
+      "test": "Amoxicillin sinusitis",
+      "expected": "amoxicillin",
+      "found": true,
+      "weight": 1.5
+    },
+    {
+      "test": "Fexofenadine",
+      "expected": "fexofenadine",
+      "found": true,
+      "weight": 1.0
+    },
+    {
+      "test": "Dyslipidemia",
+      "expected": "dyslipidemia",
+      "found": false,
+      "weight": 1.0
+    },
+    {
+      "test": "Hypertension",
+      "expected": "hypertension",
+      "found": true,
+      "weight": 1.0
+    },
+    {
+      "test": "Dust mite allergy",
+      "expected": "dust mite",
+      "found": true,
+      "weight": 1.5
+    },
+    {
+      "test": "CBC normal",
+      "expected": "aurora",
+      "found": true,
+      "weight": 0.8
+    },
+    {
+      "test": "Chest xray normal",
+      "expected": "chest",
+      "found": true,
+      "weight": 0.8
+    },
+    {
+      "test": "Abdominal US normal",
+      "expected": "greenmeadow",
+      "found": true,
+      "weight": 0.8
+    },
+    {
+      "test": "ECG normal",
+      "expected": "lotus",
+      "found": true,
+      "weight": 0.8
+    },
+    {
+      "test": "Laparoscopic",
+      "expected": "laparoscop",
+      "found": true,
+      "weight": 1.5
+    },
+    {
+      "test": "Cefuroxime discharge",
+      "expected": "cefuroxime",
+      "found": true,
+      "weight": 1.0
+    },
+    {
+      "test": "Diclofenac handwritten",
+      "expected": "diclofenac",
+      "found": true,
+      "weight": 1.5
+    }
+  ],
+  "store_meds": [
+    "paracetamol",
+    "vitamin b12",
+    "amoxicillin + clavulanate",
+    "metronidazole",
+    "tab. diclofenac",
+    "tab. paracetamol",
+    "vitamin d3",
+    "cap. pantoprazole",
+    "cefuroxime",
+    "dispensing fee",
+    "tab. thiocolchicoside",
+    "fexofenadine",
+    "omega 3",
+    "saline nasal spray",
+    "pantoprazole"
+  ],
+  "extra_meds": [
+    "vitamin b12",
+    "tab. paracetamol",
+    "amoxicillin + clavulanate",
+    "vitamin d3",
+    "cap. pantoprazole",
+    "dispensing fee",
+    "tab. thiocolchicoside",
+    "tab. diclofenac",
+    "omega 3"
+  ]
+}

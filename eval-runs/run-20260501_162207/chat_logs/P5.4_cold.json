@@ -1,0 +1,21 @@
+{
+  "query": "Do I have any allergies?",
+  "label": "cold_P5.4",
+  "answer": "Your last cholesterol reading from April 5, 2026 showed:\n\nTotal Cholesterol: 237 mg/dL (elevated)\nLDL: 162 mg/dL (elevated)\nHDL: 38 mg/dL (low)\nTriglycerides: 186 mg/dL (elevated)\n\nThese numbers suggest your heart health needs attention. Your doctor has already referred you to a cardiologist about this.\n\nYes, you have documented allergies:\n\nWheat / Gluten \u2014 listed in your main allergies\nPeanuts \u2014 significant allergy (Class IV) from your allergy panel in March\nHouse dust mites \u2014 moderate sensitization (Class III)\n\nWhen eating out or trying new foods, always check for wheat, gluten, and peanuts. Let any healthcare provider know about these before prescribing medications.\nNot medical advice \u2014 talk to your doctor before acting on this.",
+  "latency_s": 8.12,
+  "error": null,
+  "score_detail": {
+    "qid": "P5.4",
+    "score": 2,
+    "max": 2,
+    "kw_found": [
+      "peanut",
+      "dust"
+    ],
+    "kw_missing": [],
+    "violations": [],
+    "fabricated": false,
+    "k_ratio": 1.0,
+    "answer": "Your last cholesterol reading from April 5, 2026 showed:\n\nTotal Cholesterol: 237 mg/dL (elevated)\nLDL: 162 mg/dL (elevated)\nHDL: 38 mg/dL (low)\nTriglycerides: 186 mg/dL (elevated)\n\nThese numbers suggest your heart health needs attention. Your doctor has already referred you to a cardiologist about this.\n\nYes, you have documented allergies:\n\nWheat / Gluten \u2014 listed in your main allergies\nPeanuts \u2014 significant allergy (Class IV) from your allergy panel in March\nHouse dust mites \u2014 moderate sensitization (Class III)\n\nWhen eating out or trying new foods, always check for wheat, gluten, and peanuts."
+  }
+}

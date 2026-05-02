@@ -1,0 +1,21 @@
+{
+  "query": "Do I have any allergies?",
+  "label": "warm_P5.4",
+  "answer": "",
+  "latency_s": null,
+  "error": "no answer after 60s (msg count: before=205, after=203)",
+  "score_detail": {
+    "qid": "P5.4",
+    "score": 0,
+    "max": 2,
+    "kw_found": [],
+    "kw_missing": [
+      "peanut",
+      "dust"
+    ],
+    "violations": [],
+    "fabricated": false,
+    "k_ratio": 0.0,
+    "answer": ""
+  }
+}

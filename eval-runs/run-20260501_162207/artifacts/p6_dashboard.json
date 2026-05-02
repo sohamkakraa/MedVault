@@ -1,0 +1,38 @@
+{
+  "card_audit": {
+    "active_conditions": {
+      "found": false
+    },
+    "medication_list": {
+      "found": false
+    },
+    "allergies_alerts": {
+      "found": false
+    },
+    "lipid_trend": {
+      "found": true
+    },
+    "glycemic_trend": {
+      "found": false
+    },
+    "recent_imaging": {
+      "found": false
+    },
+    "follow_ups": {
+      "found": true
+    },
+    "surgical_history": {
+      "found": false
+    },
+    "immunization": {
+      "found": true
+    },
+    "spend_tracker": {
+      "found": false
+    }
+  },
+  "found_count": 3,
+  "allergy_prominent": false,
+  "p6_score": 4,
+  "p6_max": 10
+}
