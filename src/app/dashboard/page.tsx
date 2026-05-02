@@ -26,7 +26,7 @@ import { HealthTrendsSection, GaugeCard } from "@/components/labs/HealthTrendsSe
 import { LabReadingTile } from "@/components/labs/LabReadingTile";
 import { RecordNoticeToast } from "@/components/ui/RecordNoticeToast";
 import { Footer } from "@/components/ui/Footer";
-import { getHydrationSafeStore, getStore, saveStore, getHydrationSafeViewingStore, getViewingStore, saveViewingStore, getActiveFamilyMember, setActiveFamilyMember, removeDoc, smartMergeExtractedDoc, rebuildLabsAndMedsFromDocuments, pushNotification, pushPatientStoreToServer } from "@/lib/store";
+import { getHydrationSafeStore, getStore, saveStore, getHydrationSafeViewingStore, getViewingStore, saveViewingStore, getActiveFamilyMember, setActiveFamilyMember, removeDoc, smartMergeExtractedDoc, rebuildLabsAndMedsFromDocuments, pushNotification, pushPatientStoreToServer, isStoreSyncing } from "@/lib/store";
 import { useGlobalUpload } from "@/lib/uploadContext";
 import {
   BentoSize,
@@ -329,6 +329,7 @@ function DashboardInner() {
   const searchParams = useSearchParams();
   const isDemo = searchParams.get("demo") === "1";
   const [store, setStore] = useState(() => getHydrationSafeViewingStore());
+  const [isSyncingFromServer, setIsSyncingFromServer] = useState(false);
   const [activeMember, setActiveMemberState] = useState(() => typeof window !== "undefined" ? getActiveFamilyMember() : null);
   const [printing, setPrinting] = useState(false);
   const [overlay, setOverlay] = useState<OverlayKind>(null);
@@ -514,17 +515,25 @@ function DashboardInner() {
     // Run the rebuild exactly once at mount; afterwards we trust that mutators
     // (PDF upload, doc removal, manual edits) call rebuild themselves.
     loadActiveStore({ rebuild: true });
+    // Reflect current syncing state in case sync started before mount
+    setIsSyncingFromServer(isStoreSyncing());
     const onStorage = (e: StorageEvent) => {
       if (e.key?.startsWith("mv_patient_store")) loadActiveStore();
     };
     const onCustom = () => loadActiveStore();
+    const onSyncing = () => setIsSyncingFromServer(true);
+    const onSynced = () => setIsSyncingFromServer(false);
     window.addEventListener("storage", onStorage);
     window.addEventListener("mv-store-update", onCustom as EventListener);
     window.addEventListener("mv-active-member-changed", onCustom as EventListener);
+    window.addEventListener("mv-store-syncing", onSyncing);
+    window.addEventListener("mv-store-synced", onSynced);
     return () => {
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("mv-store-update", onCustom as EventListener);
       window.removeEventListener("mv-active-member-changed", onCustom as EventListener);
+      window.removeEventListener("mv-store-syncing", onSyncing);
+      window.removeEventListener("mv-store-synced", onSynced);
     };
   }, []);
 
@@ -1732,9 +1741,15 @@ function DashboardInner() {
             </CardHeader>
             <CardContent>
               {inlineDocs.length === 0 ? (
+                isSyncingFromServer ? (
+                  <div className="rounded-2xl border border-dashed border-[var(--border)] p-4 text-sm mv-muted animate-pulse">
+                    Loading your health records…
+                  </div>
+                ) : (
                 <div className="rounded-2xl border border-dashed border-[var(--border)] p-4 text-sm mv-muted">
                   No files yet. Upload something to start your list.
                 </div>
+                )
               ) : (
                 <div className="space-y-3">
                   {inlineDocs.map((d) => (

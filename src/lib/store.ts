@@ -104,16 +104,31 @@ function mergeProfileFromServer(
  * Pull server copy after login or on app load; push local data if the server row is empty.
  * Server wins when its updatedAtISO is newer or local has no meaningful data.
  */
+/** True while a server sync is in flight; components can gate loading skeletons on this. */
+let _isSyncing = false;
+export function isStoreSyncing(): boolean {
+  return _isSyncing;
+}
+
 export async function syncPatientStoreWithServer(): Promise<void> {
   if (typeof window === "undefined") return;
+  _isSyncing = true;
+  try {
+    window.dispatchEvent(new CustomEvent("mv-store-syncing"));
+  } catch {}
   let r: Response;
   try {
     r = await fetch("/api/patient-store", { credentials: "same-origin" });
   } catch {
+    _isSyncing = false;
+    try { window.dispatchEvent(new CustomEvent("mv-store-synced")); } catch {}
     return;
   }
-  if (r.status === 401) return;
-  if (!r.ok) return;
+  if (r.status === 401 || !r.ok) {
+    _isSyncing = false;
+    try { window.dispatchEvent(new CustomEvent("mv-store-synced")); } catch {}
+    return;
+  }
 
   const j = (await r.json()) as { ok?: boolean; store?: PatientStore | null };
   if (!j.ok) return;
@@ -176,6 +191,8 @@ export async function syncPatientStoreWithServer(): Promise<void> {
   } else if (localHasData) {
     await pushPatientStoreToServer();
   }
+  _isSyncing = false;
+  try { window.dispatchEvent(new CustomEvent("mv-store-synced")); } catch {}
 }
 
 function profilePatchFromSession(session: { email?: string | null; phoneE164?: string | null }) {
