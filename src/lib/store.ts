@@ -437,14 +437,42 @@ export function rebuildLabsAndMedsFromDocuments(store: PatientStore) {
 
   const seen = new Set<string>();
   const labsOut: ExtractedLab[] = [];
+  // Secondary dedup: same name+value+unit across different dates.
+  // Keeps the EARLIER date (the original measurement), discarding later
+  // re-statements from referral letters or clinical notes.
+  const valueMap = new Map<string, { outIdx: number; date: string; isLabDoc: boolean }>();
 
   for (const doc of store.docs) {
     const enriched = enrichDocFromMarkdown(doc, lex);
+    const isLabDoc = (enriched.type ?? "").toLowerCase().includes("lab");
     for (const raw of enriched.labs ?? []) {
       const n = normalizeLabRow(raw);
-      const k = labDedupeKey(n);
+      const k = labDedupeKey(n); // exact name|date|value|unit dedup
       if (seen.has(k)) continue;
+
+      // Value-level dedup: name|value|unit ignoring date
+      const numericVal = String(n.value ?? "").replace(/[^0-9.]/g, "");
+      const vk = `${n.name.toLowerCase()}|${numericVal}|${n.unit ?? ""}`;
+      const existing = valueMap.get(vk);
+      if (existing) {
+        // Same measurement exists from another doc — keep the earlier-dated entry
+        // (the original measurement), unless the current entry is from a primary
+        // lab report and the existing entry is not.
+        const currentIsEarlier = (n.date ?? "") < (existing.date ?? "");
+        if (currentIsEarlier && (isLabDoc || !existing.isLabDoc)) {
+          // Replace existing entry with the earlier-dated one
+          labsOut[existing.outIdx] = { ...n, sourceDocId: doc.id };
+          seen.add(k);
+          valueMap.set(vk, { outIdx: existing.outIdx, date: n.date ?? "", isLabDoc });
+        } else {
+          // Existing entry is earlier or equally authoritative — skip current
+          seen.add(k);
+        }
+        continue;
+      }
+
       seen.add(k);
+      valueMap.set(vk, { outIdx: labsOut.length, date: n.date ?? "", isLabDoc });
       labsOut.push({ ...n, sourceDocId: doc.id });
     }
   }

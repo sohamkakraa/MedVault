@@ -26,7 +26,7 @@ import { HealthTrendsSection, GaugeCard } from "@/components/labs/HealthTrendsSe
 import { LabReadingTile } from "@/components/labs/LabReadingTile";
 import { RecordNoticeToast } from "@/components/ui/RecordNoticeToast";
 import { Footer } from "@/components/ui/Footer";
-import { getHydrationSafeStore, getStore, saveStore, getHydrationSafeViewingStore, getViewingStore, saveViewingStore, getActiveFamilyMember, setActiveFamilyMember, removeDoc, smartMergeExtractedDoc, rebuildLabsAndMedsFromDocuments, pushNotification } from "@/lib/store";
+import { getHydrationSafeStore, getStore, saveStore, getHydrationSafeViewingStore, getViewingStore, saveViewingStore, getActiveFamilyMember, setActiveFamilyMember, removeDoc, smartMergeExtractedDoc, rebuildLabsAndMedsFromDocuments, pushNotification, pushPatientStoreToServer } from "@/lib/store";
 import { useGlobalUpload } from "@/lib/uploadContext";
 import {
   BentoSize,
@@ -910,6 +910,9 @@ function DashboardInner() {
       standardLexiconPatches: uploadLexiconPatches,
     });
     setStore(result.store);
+    // Eagerly push to Postgres so the chat route sees the new document immediately
+    // (bypasses the 900 ms debounce in scheduleRemotePush).
+    void pushPatientStoreToServer();
 
     // Check if there are more files to upload (use global queue which survives navigation)
     const queue = globalUpload.queuedFiles.length > 0 ? globalUpload.queuedFiles : uploadFiles;
