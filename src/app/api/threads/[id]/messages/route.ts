@@ -280,6 +280,7 @@ function buildSystemPrompt(store: PatientStore | null): string {
     "Use the patient context below to give specific, personalised answers. Never say \"I don't have access to your health data\" — the data is in the context below.",
     "Replies are read in both the webapp and on WhatsApp, so keep formatting simple — short paragraphs and the occasional bulleted list.",
     "Always end with: \"Not medical advice — talk to your doctor before acting on this.\"",
+    "IMPORTANT — trend questions: if the context only shows ONE measurement of a biomarker (e.g. a single HbA1c value), say clearly \"I only have one reading, so I cannot compare trends.\" Never fabricate a trend from a single data point.",
   ];
 
   if (!store) {
@@ -383,24 +384,38 @@ function buildSystemPrompt(store: PatientStore | null): string {
     }
   }
 
-  // ── Documents / reports (imaging, vaccines, bills, prescriptions) ──
+  // ── Documents / reports — grouped by type for better LLM retrieval ──
   const allDocs = (store.docs ?? [])
     .filter((d) => d.summary && d.summary.trim().length > 0)
     .sort((a, b) => (b.dateISO ?? "").localeCompare(a.dateISO ?? ""))
-    .slice(0, 30);
+    .slice(0, 40);
+
   if (allDocs.length) {
-    sections.push(
-      `\n## Medical documents on file\n` +
-        allDocs
-          .map((d) => {
-            const parts: string[] = [];
-            if (d.dateISO) parts.push(d.dateISO.slice(0, 10));
-            if (d.provider) parts.push(d.provider);
-            const meta = parts.length ? ` (${parts.join(", ")})` : "";
-            return `- **${d.title}**${meta}: ${d.summary!.slice(0, 200)}`;
-          })
-          .join("\n"),
-    );
+    const docTypeOrder = ["Imaging", "Prescription", "Bill", "Lab report", "Other"];
+    const byType = new Map<string, typeof allDocs>();
+    for (const d of allDocs) {
+      const t = d.type ?? "Other";
+      if (!byType.has(t)) byType.set(t, []);
+      byType.get(t)!.push(d);
+    }
+
+    const formatDoc = (d: (typeof allDocs)[number]) => {
+      const parts: string[] = [];
+      if (d.dateISO) parts.push(d.dateISO.slice(0, 10));
+      if (d.provider) parts.push(d.provider);
+      const meta = parts.length ? ` (${parts.join(", ")})` : "";
+      return `  - **${d.title}**${meta}: ${d.summary!.slice(0, 200)}`;
+    };
+
+    const docLines: string[] = ["\n## Medical documents on file"];
+    // Emit typed groups first (imaging, prescriptions, bills), then lab reports, then other
+    for (const t of [...docTypeOrder, ...Array.from(byType.keys()).filter((k) => !docTypeOrder.includes(k))]) {
+      const group = byType.get(t);
+      if (!group?.length) continue;
+      docLines.push(`**${t}s** (${group.length}):`);
+      group.forEach((d) => docLines.push(formatDoc(d)));
+    }
+    sections.push(docLines.join("\n"));
   }
 
   // ── Provider / appointment ──
