@@ -51,6 +51,7 @@ import {
 } from "@/lib/providerQuickPick";
 import { AppTopNav } from "@/components/nav/AppTopNav";
 import { Footer } from "@/components/ui/Footer";
+import { InsuranceSection } from "@/components/insurance/InsuranceSection";
 import { Droplets, Plus, LogOut, Ruler, Users, Trash2, Link2, UserCheck, UserX, Send, Mail, Check, X } from "lucide-react";
 
 const RELATION_EMOJI: Record<string, string> = {
@@ -1579,6 +1580,9 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* ── Insurance — always shown ── */}
+        <InsuranceSection store={store} onStoreChange={() => window.dispatchEvent(new Event("mv-store-update"))} />
 
         {/* ── Family profiles — only shown for the primary account holder ── */}
         {!activeMember && (

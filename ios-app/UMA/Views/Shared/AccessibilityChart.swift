@@ -41,7 +41,7 @@ struct AccessibleLabChart<ChartContent: View>: View {
 
     private func labAccessibilityText(_ lab: ExtractedLab) -> String {
         let dateStr = lab.date.map { dateFormatter.string(from: $0) } ?? lab.dateISO
-        let flagText = lab.flag?.label.map { ", \($0)" } ?? ""
+        let flagText = lab.flag.map { ", \($0.label)" } ?? ""
         return "\(dateStr): \(lab.value) \(lab.unit)\(flagText)"
     }
 

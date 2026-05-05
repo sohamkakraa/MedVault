@@ -276,6 +276,17 @@ export type ExtractedDoc = {
   extractionCost?: ExtractionCost;
   /** Which primary extractor was used (llamaparse or claude_pdf). */
   extractorSource?: ExtractorSource;
+  // ─── Bill-specific fields (only populated for type === "Bill") ──────────
+  /** Total invoice / bill amount */
+  billTotalAmount?: number;
+  /** Amount covered / paid by insurance */
+  billInsurancePaidAmount?: number;
+  /** Amount the patient is liable to pay after insurance */
+  billPatientLiabilityAmount?: number;
+  /** Insurance company name as stated on the bill */
+  billInsurerName?: string;
+  /** Whether insurance has been applied or the patient should file a reimbursement claim */
+  billInsuranceStatus?: BillInsuranceStatus;
 };
 
 /** A single entry in the cumulative usage log (stored in localStorage). */
@@ -478,6 +489,105 @@ export type FamilyLink = {
   linkedDisplayName?: string;
 };
 
+// ─── Insurance types ──────────────────────────────────────────────────────────
+
+export type InsurancePolicyType = "individual" | "family" | "group" | "senior_citizen" | "other";
+export type PremiumFrequency = "monthly" | "quarterly" | "half-yearly" | "annually" | "one-time";
+export type ClaimStatus =
+  | "draft"
+  | "submitted"
+  | "pending_documents"
+  | "under_review"
+  | "approved"
+  | "partially_approved"
+  | "rejected"
+  | "appeal"
+  | "settled"
+  | "withdrawn";
+export type ClaimType = "reimbursement" | "cashless" | "pre-auth" | "top-up";
+
+export type InsurancePlan = {
+  id: string;
+  insurerName: string;
+  policyNumber: string;
+  policyType?: InsurancePolicyType;
+  /** Policy holder's full name (may differ from profile name for family floater) */
+  holderName?: string;
+  /** Sum insured / max coverage amount */
+  coverageAmount?: number;
+  currency?: string;
+  premiumAmount?: number;
+  premiumFrequency?: PremiumFrequency;
+  startDateISO?: string;
+  endDateISO?: string;
+  renewalDateISO?: string;
+  /** Email address to send claims/correspondence to */
+  claimEmailAddress?: string;
+  /** TPA (Third Party Administrator) name, if any */
+  tpaName?: string;
+  /** Specific exclusions or coverage notes */
+  coverageNotes?: string;
+  agentName?: string;
+  agentPhone?: string;
+  /** Document ID of uploaded policy PDF */
+  documentId?: string;
+  active?: boolean;
+  createdAtISO: string;
+  updatedAtISO: string;
+};
+
+export type InsuranceClaim = {
+  id: string;
+  /** Links to an InsurancePlan in `insurancePlans[]` */
+  planId?: string;
+  /** Claim number assigned by the insurer (filled after submission) */
+  claimNumber?: string;
+  status: ClaimStatus;
+  type: ClaimType;
+  /** IDs of bills/prescriptions/lab reports attached to this claim */
+  relatedDocIds?: string[];
+  providerName?: string;
+  /** Date(s) of service / treatment covered by this claim (ISO) */
+  dateOfServiceISO?: string;
+  dateSubmittedISO?: string;
+  dateSettledISO?: string;
+  amountClaimed?: number;
+  amountApproved?: number;
+  rejectionReason?: string;
+  /** Agent-drafted email subject for the claim */
+  draftEmailSubject?: string;
+  /** Agent-drafted claim email body (markdown) */
+  draftEmailBody?: string;
+  /** Who the claim email was sent to */
+  sentToEmail?: string;
+  sentAtISO?: string;
+  /** Email thread for follow-up correspondence */
+  correspondence?: ClaimCorrespondence[];
+  notes?: string;
+  /** True when the agent auto-detected this from a bill */
+  autoDetected?: boolean;
+  createdAtISO: string;
+  updatedAtISO: string;
+};
+
+export type ClaimCorrespondence = {
+  id: string;
+  direction: "outgoing" | "incoming";
+  subject: string;
+  body: string;
+  attachmentDocIds?: string[];
+  toEmail?: string;
+  fromEmail?: string;
+  sentAtISO?: string;
+  notes?: string;
+};
+
+// ─── Bill insurance detection (populated during extraction) ──────────────────
+
+export type BillInsuranceStatus = "insurance_applied" | "needs_claim" | "self_pay" | "unknown";
+
+// ─── End insurance types ──────────────────────────────────────────────────────
+
 export type PatientStore = {
   docs: ExtractedDoc[];
   meds: ExtractedMedication[]; // "current list" – built from confirmed docs + manual updates later
@@ -553,4 +663,8 @@ export type PatientStore = {
   familyLinks?: FamilyLink[];
   /** Pending and accepted cross-account family connection requests. */
   pendingFamilyRequests?: FamilyConnectionRequest[];
+  /** Insurance policies / plans the user has added. */
+  insurancePlans?: InsurancePlan[];
+  /** Insurance claims tracked by the user or auto-detected by the agent. */
+  insuranceClaims?: InsuranceClaim[];
 };

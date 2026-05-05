@@ -97,7 +97,7 @@ struct DocumentDetailView: View {
             HStack {
                 Image(systemName: doc.type.systemImage)
                     .font(.title2)
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(Color.accentColor)
                 VStack(alignment: .leading) {
                     Text(doc.type.rawValue)
                         .font(.caption.weight(.semibold))
@@ -124,8 +124,8 @@ struct DocumentDetailView: View {
                                 .font(.caption2.weight(.medium))
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background(.accentColor.opacity(0.1), in: Capsule())
-                                .foregroundStyle(.accentColor)
+                                .background(Color.accentColor.opacity(0.1), in: Capsule())
+                                .foregroundStyle(Color.accentColor)
                         }
                     }
                 }

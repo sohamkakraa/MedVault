@@ -1,0 +1,339 @@
+{
+  "_comment": "Synthetic patient store for UMA integration testing. Inspired by publicly available EHR patterns (MIMIC-III, OMOP CDM). All data is fictional. Patient: Arjun Mehta, 62M, diabetic with hypertension, recent hospitalization.",
+  "docs": [
+    {
+      "id": "doc-001",
+      "type": "Lab report",
+      "title": "Comprehensive Metabolic Panel + HbA1c",
+      "dateISO": "2026-04-15",
+      "provider": "Apollo Diagnostics, Mumbai",
+      "summary": "HbA1c mildly elevated at 7.4% (target <7.0% for T2DM). Fasting glucose 148 mg/dL. eGFR 62 mL/min/1.73m² — Stage 2 CKD. LDL 98 mg/dL on statin. Potassium 4.1 mEq/L. Creatinine 1.3 mg/dL.",
+      "labs": [
+        {"name": "HbA1c", "value": "7.4", "unit": "%", "refRange": "4.0-5.6", "date": "2026-04-15", "sourceDocId": "doc-001"},
+        {"name": "Fasting Glucose", "value": "148", "unit": "mg/dL", "refRange": "70-99", "date": "2026-04-15", "sourceDocId": "doc-001"},
+        {"name": "LDL", "value": "98", "unit": "mg/dL", "refRange": "<100", "date": "2026-04-15", "sourceDocId": "doc-001"},
+        {"name": "HDL", "value": "42", "unit": "mg/dL", "refRange": ">40", "date": "2026-04-15", "sourceDocId": "doc-001"},
+        {"name": "Total Cholesterol", "value": "182", "unit": "mg/dL", "refRange": "<200", "date": "2026-04-15", "sourceDocId": "doc-001"},
+        {"name": "Triglycerides", "value": "164", "unit": "mg/dL", "refRange": "<150", "date": "2026-04-15", "sourceDocId": "doc-001"},
+        {"name": "eGFR", "value": "62", "unit": "mL/min/1.73m²", "refRange": ">60", "date": "2026-04-15", "sourceDocId": "doc-001"},
+        {"name": "Creatinine", "value": "1.3", "unit": "mg/dL", "refRange": "0.7-1.2", "date": "2026-04-15", "sourceDocId": "doc-001"},
+        {"name": "Potassium", "value": "4.1", "unit": "mEq/L", "refRange": "3.5-5.0", "date": "2026-04-15", "sourceDocId": "doc-001"},
+        {"name": "Sodium", "value": "139", "unit": "mEq/L", "refRange": "136-145", "date": "2026-04-15", "sourceDocId": "doc-001"},
+        {"name": "ALT", "value": "32", "unit": "U/L", "refRange": "7-56", "date": "2026-04-15", "sourceDocId": "doc-001"},
+        {"name": "AST", "value": "28", "unit": "U/L", "refRange": "10-40", "date": "2026-04-15", "sourceDocId": "doc-001"},
+        {"name": "TSH", "value": "2.1", "unit": "mIU/L", "refRange": "0.4-4.0", "date": "2026-04-15", "sourceDocId": "doc-001"},
+        {"name": "Hemoglobin", "value": "13.8", "unit": "g/dL", "refRange": "13.5-17.5", "date": "2026-04-15", "sourceDocId": "doc-001"},
+        {"name": "WBC", "value": "7.2", "unit": "×10³/μL", "refRange": "4.5-11.0", "date": "2026-04-15", "sourceDocId": "doc-001"},
+        {"name": "Platelets", "value": "198", "unit": "×10³/μL", "refRange": "150-400", "date": "2026-04-15", "sourceDocId": "doc-001"},
+        {"name": "Microalbumin/Creatinine Ratio", "value": "62", "unit": "mg/g", "refRange": "<30", "date": "2026-04-15", "sourceDocId": "doc-001"}
+      ],
+      "tags": ["diabetes", "CKD", "lipid panel", "annual checkup"],
+      "conditions": ["Type 2 Diabetes Mellitus", "Stage 2 CKD", "Dyslipidaemia"],
+      "markdownArtifact": "# Comprehensive Metabolic Panel + HbA1c\n**Date:** 15 April 2026 | **Lab:** Apollo Diagnostics, Mumbai\n\n## Glycaemic Control\n| Test | Result | Reference | Status |\n|---|---|---|---|\n| HbA1c | **7.4%** | 4.0–5.6% | HIGH |\n| Fasting Glucose | **148 mg/dL** | 70–99 mg/dL | HIGH |\n\nHbA1c target for T2DM patients is generally <7.0%. Current reading of 7.4% suggests suboptimal glycaemic control — medication review advised.\n\n## Lipid Panel\n| Test | Result | Reference | Status |\n|---|---|---|---|\n| LDL | 98 mg/dL | <100 mg/dL | NORMAL |\n| HDL | 42 mg/dL | >40 mg/dL | NORMAL |\n| Total Cholesterol | 182 mg/dL | <200 mg/dL | NORMAL |\n| Triglycerides | **164 mg/dL** | <150 mg/dL | HIGH |\n\n## Kidney Function\n| Test | Result | Reference | Status |\n|---|---|---|---|\n| Creatinine | **1.3 mg/dL** | 0.7–1.2 mg/dL | HIGH |\n| eGFR | **62 mL/min/1.73m²** | >60 | BORDERLINE |\n| Microalbumin/Cr Ratio | **62 mg/g** | <30 mg/g | HIGH |\n\nMicroalbuminuria (62 mg/g) with eGFR 62 indicates early diabetic nephropathy. Nephrology referral and ACE-inhibitor/ARB coverage recommended.\n\n## CBC\nAll values within normal limits.\n\n## Thyroid\nTSH 2.1 mIU/L — normal thyroid function.",
+      "uploadedAtISO": "2026-04-16T08:00:00.000Z"
+    },
+    {
+      "id": "doc-002",
+      "type": "Lab report",
+      "title": "HbA1c + Lipid Panel (Oct 2025)",
+      "dateISO": "2025-10-08",
+      "provider": "Thyrocare, Mumbai",
+      "summary": "HbA1c 7.8% — above target. LDL 112 mg/dL — requires statin optimisation. Triglycerides 198 mg/dL.",
+      "labs": [
+        {"name": "HbA1c", "value": "7.8", "unit": "%", "refRange": "4.0-5.6", "date": "2025-10-08", "sourceDocId": "doc-002"},
+        {"name": "LDL", "value": "112", "unit": "mg/dL", "refRange": "<100", "date": "2025-10-08", "sourceDocId": "doc-002"},
+        {"name": "HDL", "value": "39", "unit": "mg/dL", "refRange": ">40", "date": "2025-10-08", "sourceDocId": "doc-002"},
+        {"name": "Total Cholesterol", "value": "204", "unit": "mg/dL", "refRange": "<200", "date": "2025-10-08", "sourceDocId": "doc-002"},
+        {"name": "Triglycerides", "value": "198", "unit": "mg/dL", "refRange": "<150", "date": "2025-10-08", "sourceDocId": "doc-002"},
+        {"name": "Fasting Glucose", "value": "168", "unit": "mg/dL", "refRange": "70-99", "date": "2025-10-08", "sourceDocId": "doc-002"}
+      ],
+      "tags": ["diabetes", "lipids"],
+      "conditions": ["Type 2 Diabetes Mellitus"],
+      "markdownArtifact": "# HbA1c + Lipid Panel\n**Date:** 08 October 2025 | **Lab:** Thyrocare, Mumbai\n\n| Test | Result | Reference | Status |\n|---|---|---|---|\n| HbA1c | **7.8%** | <7% | HIGH |\n| Fasting Glucose | **168 mg/dL** | 70–99 | HIGH |\n| LDL | **112 mg/dL** | <100 | HIGH |\n| HDL | **39 mg/dL** | >40 | LOW |\n| Total Cholesterol | **204 mg/dL** | <200 | HIGH |\n| Triglycerides | **198 mg/dL** | <150 | HIGH |\n\nGlycaemic control worse than target. Statin dose may need optimisation given LDL 112 and HDL 39.",
+      "uploadedAtISO": "2026-01-10T08:00:00.000Z"
+    },
+    {
+      "id": "doc-003",
+      "type": "Prescription",
+      "title": "Prescription — Dr. Nair (April 2026)",
+      "dateISO": "2026-04-15",
+      "provider": "Dr. Priya Nair, Diabetologist, Kokilaben Hospital",
+      "summary": "Review after latest labs. Metformin continued. Glimepiride dose increased to 2mg. Added Empagliflozin 10mg for HbA1c reduction and cardio/renal protection. Rosuvastatin 20mg continued. Telmisartan 40mg for BP and nephroprotection. Aspirin 75mg. Vitamin D3 60000IU weekly × 8 weeks.",
+      "medications": [
+        {"name": "Metformin", "dose": "500 mg", "frequency": "Twice daily with meals", "startDate": "2022-06-01", "notes": "Core T2DM medication"},
+        {"name": "Glimepiride", "dose": "2 mg", "frequency": "Once daily before breakfast", "startDate": "2026-04-15", "notes": "Dose increased from 1mg"},
+        {"name": "Empagliflozin", "dose": "10 mg", "frequency": "Once daily", "startDate": "2026-04-15", "notes": "Added for glycaemic + renal protection (SGLT2i)"},
+        {"name": "Rosuvastatin", "dose": "20 mg", "frequency": "Once daily at bedtime", "startDate": "2023-11-01"},
+        {"name": "Telmisartan", "dose": "40 mg", "frequency": "Once daily morning", "startDate": "2024-03-10", "notes": "ARB for BP + nephroprotection"},
+        {"name": "Aspirin", "dose": "75 mg", "frequency": "Once daily after breakfast", "startDate": "2024-03-10"},
+        {"name": "Vitamin D3", "dose": "60000 IU", "frequency": "Once weekly", "startDate": "2026-04-15", "endDate": "2026-06-10", "notes": "8-week course"}
+      ],
+      "tags": ["T2DM", "hypertension", "renal"],
+      "markdownArtifact": "# Prescription — Dr. Priya Nair\n**Date:** 15 April 2026 | **Doctor:** Dr. Priya Nair, Diabetologist | **Hospital:** Kokilaben Dhirubhai Ambani Hospital, Mumbai\n\n**Diagnosis:** Type 2 Diabetes Mellitus (uncontrolled), Hypertension, Stage 2 CKD, Dyslipidaemia\n\n## Medications\n1. **Metformin 500mg** — BD (twice daily with meals) — continue\n2. **Glimepiride 2mg** — OD before breakfast — INCREASED from 1mg\n3. **Empagliflozin 10mg** — OD — NEW (SGLT2 inhibitor; renal + cardiac protection)\n4. **Rosuvastatin 20mg** — OD at bedtime — continue\n5. **Telmisartan 40mg** — OD morning — continue\n6. **Aspirin 75mg** — OD after breakfast — continue\n7. **Vitamin D3 60,000 IU** — once weekly × 8 weeks\n\n## Instructions\n- Aim for HbA1c <7.0% by October 2026\n- Monitor fasting glucose daily; target 80–130 mg/dL\n- Low-salt, low-GI diet; 30 min walk daily\n- Recheck labs in 3 months\n- Nephrology referral for microalbuminuria\n\n**Next appointment:** 15 July 2026",
+      "doctors": ["Dr. Priya Nair"],
+      "facilityName": "Kokilaben Dhirubhai Ambani Hospital",
+      "uploadedAtISO": "2026-04-16T09:00:00.000Z"
+    },
+    {
+      "id": "doc-004",
+      "type": "Bill",
+      "title": "Hospital Bill — Kokilaben Hospital (April 2026)",
+      "dateISO": "2026-04-15",
+      "provider": "Kokilaben Dhirubhai Ambani Hospital, Mumbai",
+      "summary": "Outpatient consultation and lab tests. Total ₹8,450. Insurance status: not verified. Patient may need to file reimbursement claim.",
+      "billTotalAmount": 8450,
+      "billInsurancePaidAmount": 0,
+      "billPatientLiabilityAmount": 8450,
+      "billInsuranceStatus": "needs_claim",
+      "tags": ["consultation", "labs"],
+      "markdownArtifact": "# Hospital Bill\n**Date:** 15 April 2026 | **Hospital:** Kokilaben Dhirubhai Ambani Hospital\n\n## Charges\n| Item | Amount |\n|---|---|\n| Specialist Consultation (Diabetology) | ₹1,500 |\n| HbA1c Test | ₹450 |\n| Lipid Panel | ₹650 |\n| CMP (BMP + LFT) | ₹1,800 |\n| Microalbumin/Creatinine Urine | ₹600 |\n| Thyroid Profile (TSH) | ₹400 |\n| CBC | ₹350 |\n| ECG | ₹700 |\n| Prescription charges | ₹200 |\n| **TOTAL** | **₹8,450** |\n\n**Payment status:** UNPAID\n**Insurance:** Not applied",
+      "uploadedAtISO": "2026-04-16T09:30:00.000Z"
+    },
+    {
+      "id": "doc-005",
+      "type": "Imaging",
+      "title": "Echocardiogram Report",
+      "dateISO": "2026-03-20",
+      "provider": "Hinduja Hospital Cardiac Unit, Mumbai",
+      "summary": "Mild LVH (LV mass index 118 g/m²). EF 58% — normal systolic function. Mild diastolic dysfunction (Grade 1). No valvular disease. Aortic root 34mm — normal. Conclusion: Hypertensive heart disease, mild LVH, preserved EF.",
+      "labs": [],
+      "tags": ["cardiac", "echo", "hypertension"],
+      "conditions": ["Hypertensive Heart Disease", "Left Ventricular Hypertrophy"],
+      "markdownArtifact": "# Echocardiogram Report\n**Date:** 20 March 2026 | **Facility:** Hinduja Hospital Cardiac Unit\n**Referring Physician:** Dr. Priya Nair\n\n## Findings\n- **LV dimensions:** EDD 50mm, ESD 34mm (normal)\n- **LV mass index:** 118 g/m² (normal <95 F, <115 M) — MILDLY ELEVATED\n- **Ejection Fraction (EF):** 58% — NORMAL systolic function\n- **Diastolic function:** Grade 1 diastolic dysfunction (impaired relaxation)\n- **Valves:** No significant valvular disease\n- **Aortic root:** 34mm — normal\n- **Pericardium:** Normal\n\n## Impression\nMild LVH consistent with hypertensive heart disease. Preserved systolic function. Mild diastolic dysfunction — continue BP management aggressively.\n\n**Recommended follow-up:** Repeat echo in 12 months.",
+      "uploadedAtISO": "2026-03-22T10:00:00.000Z"
+    },
+    {
+      "id": "doc-006",
+      "type": "Lab report",
+      "title": "Complete Blood Count + Iron Studies",
+      "dateISO": "2026-02-10",
+      "provider": "SRL Diagnostics, Mumbai",
+      "summary": "Mild anaemia — Hb 11.8 g/dL. Low serum ferritin 14 ng/mL — iron deficiency anaemia. Transferrin saturation 16%. Folate and B12 normal. WBC normal.",
+      "labs": [
+        {"name": "Hemoglobin", "value": "11.8", "unit": "g/dL", "refRange": "13.5-17.5", "date": "2026-02-10", "sourceDocId": "doc-006"},
+        {"name": "MCV", "value": "74", "unit": "fL", "refRange": "80-100", "date": "2026-02-10", "sourceDocId": "doc-006"},
+        {"name": "Serum Ferritin", "value": "14", "unit": "ng/mL", "refRange": "30-400", "date": "2026-02-10", "sourceDocId": "doc-006"},
+        {"name": "Serum Iron", "value": "52", "unit": "μg/dL", "refRange": "60-170", "date": "2026-02-10", "sourceDocId": "doc-006"},
+        {"name": "Transferrin Saturation", "value": "16", "unit": "%", "refRange": "20-50", "date": "2026-02-10", "sourceDocId": "doc-006"},
+        {"name": "Vitamin B12", "value": "412", "unit": "pg/mL", "refRange": "200-900", "date": "2026-02-10", "sourceDocId": "doc-006"},
+        {"name": "Folate", "value": "9.8", "unit": "ng/mL", "refRange": "3.1-17.5", "date": "2026-02-10", "sourceDocId": "doc-006"},
+        {"name": "WBC", "value": "6.8", "unit": "×10³/μL", "refRange": "4.5-11.0", "date": "2026-02-10", "sourceDocId": "doc-006"},
+        {"name": "Platelets", "value": "212", "unit": "×10³/μL", "refRange": "150-400", "date": "2026-02-10", "sourceDocId": "doc-006"}
+      ],
+      "tags": ["anaemia", "iron deficiency", "CBC"],
+      "conditions": ["Iron Deficiency Anaemia"],
+      "markdownArtifact": "# CBC + Iron Studies\n**Date:** 10 February 2026 | **Lab:** SRL Diagnostics\n\n| Test | Result | Reference | Status |\n|---|---|---|---|\n| Hemoglobin | **11.8 g/dL** | 13.5–17.5 | LOW |\n| MCV | **74 fL** | 80–100 | LOW |\n| Ferritin | **14 ng/mL** | 30–400 | LOW |\n| Serum Iron | **52 μg/dL** | 60–170 | LOW |\n| Transferrin Sat | **16%** | 20–50% | LOW |\n| Vitamin B12 | 412 pg/mL | 200–900 | NORMAL |\n| Folate | 9.8 ng/mL | 3.1–17.5 | NORMAL |\n\n**Impression:** Microcytic hypochromic anaemia consistent with iron deficiency. Oral iron supplementation recommended. Rule out GI blood loss given CKD + aspirin use.",
+      "uploadedAtISO": "2026-02-12T08:00:00.000Z"
+    },
+    {
+      "id": "doc-007",
+      "type": "Other",
+      "title": "Discharge Summary — Hinduja Hospital",
+      "dateISO": "2025-11-28",
+      "provider": "Hinduja Hospital, Mumbai",
+      "summary": "5-day admission for hypertensive urgency (BP 188/112) with chest tightness. Managed with IV labetalol, oral amlodipine added. Echo showed mild LVH. Discharged stable with BP 138/88. CABG history noted from 2018.",
+      "tags": ["hospitalisation", "hypertension", "cardiology"],
+      "conditions": ["Hypertensive Urgency", "Hypertension"],
+      "sections": [
+        {"title": "Diagnosis", "items": ["Hypertensive urgency", "Hypertensive heart disease", "Type 2 Diabetes Mellitus"]},
+        {"title": "Treatment", "items": ["IV Labetalol 20mg stat, then titrated", "Amlodipine 5mg added to regimen", "IV fluids", "Continuous cardiac monitoring"]},
+        {"title": "Discharge medications", "items": ["Telmisartan 40mg OD", "Amlodipine 5mg OD", "Metformin 500mg BD", "Aspirin 75mg OD", "Rosuvastatin 20mg OD"]},
+        {"title": "Follow-up", "items": ["Cardiology OPD in 2 weeks", "Monitor BP daily at home", "Return if BP >180 systolic"]}
+      ],
+      "markdownArtifact": "# Discharge Summary\n**Admission:** 23 Nov 2025 | **Discharge:** 28 Nov 2025 | **Hospital:** Hinduja Hospital, Mumbai\n**Consultant:** Dr. Rajesh Kumar, Cardiologist\n\n## Presenting Complaint\nBP 188/112 mmHg with chest tightness and headache. No STEMI on ECG.\n\n## Past Medical History\n- Type 2 Diabetes Mellitus (since 2018)\n- Hypertension (since 2016)\n- CABG × 2 vessels (2018, Lilavati Hospital)\n\n## Hospital Course\nAdmitted for hypertensive urgency. Managed with IV labetalol, BP controlled within 24h. Echo showed mild LVH with preserved EF. Troponin negative × 3. Discharged with BP 138/88 on amlodipine added to existing regimen.\n\n## Discharge BP: 138/88 mmHg\n\n## Discharge Medications\n1. Telmisartan 40mg OD\n2. **Amlodipine 5mg OD** (new)\n3. Metformin 500mg BD\n4. Aspirin 75mg OD\n5. Rosuvastatin 20mg OD",
+      "doctors": ["Dr. Rajesh Kumar"],
+      "facilityName": "Hinduja Hospital",
+      "uploadedAtISO": "2026-01-05T10:00:00.000Z"
+    },
+    {
+      "id": "doc-008",
+      "type": "Bill",
+      "title": "Hinduja Hospital Bill — Nov 2025 Admission",
+      "dateISO": "2025-11-28",
+      "provider": "Hinduja Hospital, Mumbai",
+      "summary": "5-day hospital admission bill. Total ₹1,24,500. Star Health Insurance applied — insurer paid ₹1,05,000. Patient liability ₹19,500.",
+      "billTotalAmount": 124500,
+      "billInsurancePaidAmount": 105000,
+      "billPatientLiabilityAmount": 19500,
+      "billInsurerName": "Star Health Insurance",
+      "billInsuranceStatus": "insurance_applied",
+      "tags": ["hospitalisation", "insurance"],
+      "markdownArtifact": "# Hospital Bill — Inpatient Admission\n**Admission:** 23 Nov 2025 | **Discharge:** 28 Nov 2025 | **Hospital:** Hinduja Hospital\n\n| Item | Amount |\n|---|---|\n| Room charges (5 days, general ward) | ₹30,000 |\n| ICU monitoring (first 24h) | ₹18,000 |\n| Specialist fees | ₹12,000 |\n| Procedures (IV labetalol administration) | ₹8,000 |\n| Lab tests (CBC, electrolytes, troponin ×3, echo) | ₹22,500 |\n| Medications (inpatient) | ₹14,000 |\n| Nursing care | ₹12,000 |\n| Miscellaneous | ₹8,000 |\n| **Total** | **₹1,24,500** |\n\n**Insurance:** Star Health Comprehensive (Policy: P/211400/01/2024/007823)\n**Insurer paid:** ₹1,05,000\n**Patient pays:** ₹19,500 (co-pay 10% + non-medical items)",
+      "uploadedAtISO": "2026-01-06T08:00:00.000Z"
+    },
+    {
+      "id": "doc-009",
+      "type": "Prescription",
+      "title": "Prescription — Dr. Rajesh Kumar (Nov 2025, post-discharge)",
+      "dateISO": "2025-12-12",
+      "provider": "Dr. Rajesh Kumar, Cardiologist, Hinduja Hospital",
+      "summary": "Post-discharge cardiac review. BP 142/90. Amlodipine dose increased to 10mg. Continue existing medications. Advised daily BP monitoring at home.",
+      "medications": [
+        {"name": "Telmisartan", "dose": "40 mg", "frequency": "Once daily morning"},
+        {"name": "Amlodipine", "dose": "10 mg", "frequency": "Once daily", "notes": "Increased from 5mg"},
+        {"name": "Metformin", "dose": "500 mg", "frequency": "Twice daily with meals"},
+        {"name": "Aspirin", "dose": "75 mg", "frequency": "Once daily after breakfast"},
+        {"name": "Rosuvastatin", "dose": "20 mg", "frequency": "Once daily at bedtime"}
+      ],
+      "tags": ["cardiology", "hypertension", "post-discharge"],
+      "doctors": ["Dr. Rajesh Kumar"],
+      "facilityName": "Hinduja Hospital",
+      "markdownArtifact": "# Post-discharge Review — Dr. Rajesh Kumar\n**Date:** 12 December 2025\n\n## Vitals\n- BP: 142/90 mmHg (improved but target <130/80)\n- HR: 76 bpm, regular\n\n## Changes\n- Amlodipine increased from 5mg to 10mg for better BP control\n- Continue all other medications unchanged\n\n## Advice\n- Home BP monitoring twice daily (morning + evening)\n- Low-sodium diet (<2g/day)\n- Regular 30-min walk\n- Return if BP >160 or symptomatic\n\n**Next review:** 3 months",
+      "uploadedAtISO": "2026-01-10T09:00:00.000Z"
+    },
+    {
+      "id": "doc-010",
+      "type": "Lab report",
+      "title": "Annual Thyroid + Kidney Function (Jan 2025)",
+      "dateISO": "2025-01-14",
+      "provider": "Metropolis Healthcare, Mumbai",
+      "summary": "TSH borderline low at 0.42 mIU/L. Creatinine 1.2 mg/dL. eGFR 65 mL/min/1.73m². Uric acid 7.8 mg/dL — elevated, risk for gout.",
+      "labs": [
+        {"name": "TSH", "value": "0.42", "unit": "mIU/L", "refRange": "0.4-4.0", "date": "2025-01-14", "sourceDocId": "doc-010"},
+        {"name": "Creatinine", "value": "1.2", "unit": "mg/dL", "refRange": "0.7-1.2", "date": "2025-01-14", "sourceDocId": "doc-010"},
+        {"name": "eGFR", "value": "65", "unit": "mL/min/1.73m²", "refRange": ">60", "date": "2025-01-14", "sourceDocId": "doc-010"},
+        {"name": "Uric Acid", "value": "7.8", "unit": "mg/dL", "refRange": "3.4-7.0", "date": "2025-01-14", "sourceDocId": "doc-010"},
+        {"name": "HbA1c", "value": "8.1", "unit": "%", "refRange": "4.0-5.6", "date": "2025-01-14", "sourceDocId": "doc-010"},
+        {"name": "Fasting Glucose", "value": "174", "unit": "mg/dL", "refRange": "70-99", "date": "2025-01-14", "sourceDocId": "doc-010"}
+      ],
+      "tags": ["kidney", "thyroid", "diabetes"],
+      "markdownArtifact": "# Thyroid + Kidney Function\n**Date:** 14 January 2025 | **Lab:** Metropolis Healthcare\n\n| Test | Result | Reference | Status |\n|---|---|---|---|\n| TSH | 0.42 mIU/L | 0.4–4.0 | BORDERLINE LOW |\n| Creatinine | 1.2 mg/dL | 0.7–1.2 | BORDERLINE HIGH |\n| eGFR | 65 mL/min/1.73m² | >60 | BORDERLINE |\n| Uric Acid | **7.8 mg/dL** | 3.4–7.0 | HIGH |\n| HbA1c | **8.1%** | <7% | HIGH |\n| Fasting Glucose | **174 mg/dL** | 70–99 | HIGH |\n\nNote: HbA1c 8.1% in Jan 2025 → 7.8% in Oct 2025 → 7.4% in Apr 2026 — improving trend."
+    }
+  ],
+  "meds": [
+    {"name": "Metformin", "dose": "500 mg", "frequency": "Twice daily with meals", "startDate": "2022-06-01", "medicationLineSource": "prescription_document", "sourceDocId": "doc-003"},
+    {"name": "Glimepiride", "dose": "2 mg", "frequency": "Once daily before breakfast", "startDate": "2026-04-15", "medicationLineSource": "prescription_document", "sourceDocId": "doc-003"},
+    {"name": "Empagliflozin", "dose": "10 mg", "frequency": "Once daily", "startDate": "2026-04-15", "medicationLineSource": "prescription_document", "sourceDocId": "doc-003", "notes": "SGLT2 inhibitor — renal + cardiac protection"},
+    {"name": "Rosuvastatin", "dose": "20 mg", "frequency": "Once daily at bedtime", "startDate": "2023-11-01", "medicationLineSource": "prescription_document", "sourceDocId": "doc-003"},
+    {"name": "Telmisartan", "dose": "40 mg", "frequency": "Once daily morning", "startDate": "2024-03-10", "medicationLineSource": "prescription_document", "sourceDocId": "doc-003"},
+    {"name": "Amlodipine", "dose": "10 mg", "frequency": "Once daily", "startDate": "2025-12-12", "medicationLineSource": "prescription_document", "sourceDocId": "doc-009"},
+    {"name": "Aspirin", "dose": "75 mg", "frequency": "Once daily after breakfast", "startDate": "2024-03-10", "medicationLineSource": "prescription_document", "sourceDocId": "doc-003"},
+    {"name": "Vitamin D3", "dose": "60000 IU", "frequency": "Once weekly", "startDate": "2026-04-15", "endDate": "2026-06-10", "medicationLineSource": "prescription_document", "sourceDocId": "doc-003"}
+  ],
+  "labs": [
+    {"name": "HbA1c", "value": "7.4", "unit": "%", "refRange": "4.0-5.6", "date": "2026-04-15", "sourceDocId": "doc-001"},
+    {"name": "HbA1c", "value": "7.8", "unit": "%", "refRange": "4.0-5.6", "date": "2025-10-08", "sourceDocId": "doc-002"},
+    {"name": "HbA1c", "value": "8.1", "unit": "%", "refRange": "4.0-5.6", "date": "2025-01-14", "sourceDocId": "doc-010"},
+    {"name": "Fasting Glucose", "value": "148", "unit": "mg/dL", "refRange": "70-99", "date": "2026-04-15", "sourceDocId": "doc-001"},
+    {"name": "Fasting Glucose", "value": "168", "unit": "mg/dL", "refRange": "70-99", "date": "2025-10-08", "sourceDocId": "doc-002"},
+    {"name": "Fasting Glucose", "value": "174", "unit": "mg/dL", "refRange": "70-99", "date": "2025-01-14", "sourceDocId": "doc-010"},
+    {"name": "LDL", "value": "98", "unit": "mg/dL", "refRange": "<100", "date": "2026-04-15", "sourceDocId": "doc-001"},
+    {"name": "LDL", "value": "112", "unit": "mg/dL", "refRange": "<100", "date": "2025-10-08", "sourceDocId": "doc-002"},
+    {"name": "HDL", "value": "42", "unit": "mg/dL", "refRange": ">40", "date": "2026-04-15", "sourceDocId": "doc-001"},
+    {"name": "Triglycerides", "value": "164", "unit": "mg/dL", "refRange": "<150", "date": "2026-04-15", "sourceDocId": "doc-001"},
+    {"name": "eGFR", "value": "62", "unit": "mL/min/1.73m²", "refRange": ">60", "date": "2026-04-15", "sourceDocId": "doc-001"},
+    {"name": "eGFR", "value": "65", "unit": "mL/min/1.73m²", "refRange": ">60", "date": "2025-01-14", "sourceDocId": "doc-010"},
+    {"name": "Creatinine", "value": "1.3", "unit": "mg/dL", "refRange": "0.7-1.2", "date": "2026-04-15", "sourceDocId": "doc-001"},
+    {"name": "Creatinine", "value": "1.2", "unit": "mg/dL", "refRange": "0.7-1.2", "date": "2025-01-14", "sourceDocId": "doc-010"},
+    {"name": "Microalbumin/Creatinine Ratio", "value": "62", "unit": "mg/g", "refRange": "<30", "date": "2026-04-15", "sourceDocId": "doc-001"},
+    {"name": "Hemoglobin", "value": "11.8", "unit": "g/dL", "refRange": "13.5-17.5", "date": "2026-02-10", "sourceDocId": "doc-006"},
+    {"name": "Hemoglobin", "value": "13.8", "unit": "g/dL", "refRange": "13.5-17.5", "date": "2026-04-15", "sourceDocId": "doc-001"},
+    {"name": "Serum Ferritin", "value": "14", "unit": "ng/mL", "refRange": "30-400", "date": "2026-02-10", "sourceDocId": "doc-006"},
+    {"name": "Uric Acid", "value": "7.8", "unit": "mg/dL", "refRange": "3.4-7.0", "date": "2025-01-14", "sourceDocId": "doc-010"},
+    {"name": "TSH", "value": "2.1", "unit": "mIU/L", "refRange": "0.4-4.0", "date": "2026-04-15", "sourceDocId": "doc-001"},
+    {"name": "TSH", "value": "0.42", "unit": "mIU/L", "refRange": "0.4-4.0", "date": "2025-01-14", "sourceDocId": "doc-010"}
+  ],
+  "profile": {
+    "name": "Arjun Mehta",
+    "firstName": "Arjun",
+    "lastName": "Mehta",
+    "dob": "1963-08-14",
+    "sex": "Male",
+    "email": "arjun.mehta.uma.test@example.com",
+    "phone": "+91-9820123456",
+    "primaryCareProvider": "Dr. Priya Nair",
+    "nextVisitDate": "2026-07-15",
+    "nextVisitHospital": "Kokilaben Dhirubhai Ambani Hospital",
+    "conditions": [
+      "Type 2 Diabetes Mellitus",
+      "Hypertension",
+      "Dyslipidaemia",
+      "Stage 2 CKD",
+      "Iron Deficiency Anaemia",
+      "Hypertensive Heart Disease",
+      "CABG (2018)"
+    ],
+    "allergies": ["Penicillin", "Sulfonamides"],
+    "trends": ["HbA1c", "LDL", "eGFR", "Fasting Glucose", "Hemoglobin"],
+    "bodyMetrics": {
+      "heightCm": "172",
+      "weightKg": "84",
+      "waistCm": "98"
+    },
+    "notes": "Post-CABG patient. Avoid NSAIDs due to CKD and aspirin use. Monitor renal function with ACE/ARB use. Vegetarian diet."
+  },
+  "preferences": {
+    "theme": "system"
+  },
+  "healthLogs": {
+    "bloodPressure": [
+      {"id": "bp-001", "loggedAtISO": "2026-04-25T07:30:00.000Z", "systolic": 136, "diastolic": 86, "pulseBpm": 74},
+      {"id": "bp-002", "loggedAtISO": "2026-04-24T07:15:00.000Z", "systolic": 142, "diastolic": 90, "pulseBpm": 76},
+      {"id": "bp-003", "loggedAtISO": "2026-04-23T08:00:00.000Z", "systolic": 138, "diastolic": 88, "pulseBpm": 72},
+      {"id": "bp-004", "loggedAtISO": "2026-04-22T07:45:00.000Z", "systolic": 148, "diastolic": 94, "pulseBpm": 78, "notes": "Skipped morning walk"},
+      {"id": "bp-005", "loggedAtISO": "2026-04-21T07:30:00.000Z", "systolic": 140, "diastolic": 88, "pulseBpm": 73},
+      {"id": "bp-006", "loggedAtISO": "2026-04-20T07:30:00.000Z", "systolic": 134, "diastolic": 84, "pulseBpm": 71},
+      {"id": "bp-007", "loggedAtISO": "2026-04-18T08:15:00.000Z", "systolic": 152, "diastolic": 96, "pulseBpm": 80, "notes": "High stress day — work deadline"}
+    ],
+    "medicationIntake": [
+      {"id": "mi-001", "loggedAtISO": "2026-04-25T07:00:00.000Z", "medicationName": "Metformin", "action": "taken"},
+      {"id": "mi-002", "loggedAtISO": "2026-04-24T07:00:00.000Z", "medicationName": "Metformin", "action": "taken"},
+      {"id": "mi-003", "loggedAtISO": "2026-04-23T07:00:00.000Z", "medicationName": "Metformin", "action": "missed", "notes": "Forgot — was travelling"},
+      {"id": "mi-004", "loggedAtISO": "2026-04-22T07:00:00.000Z", "medicationName": "Metformin", "action": "taken"},
+      {"id": "mi-005", "loggedAtISO": "2026-04-25T07:00:00.000Z", "medicationName": "Telmisartan", "action": "taken"},
+      {"id": "mi-006", "loggedAtISO": "2026-04-24T07:00:00.000Z", "medicationName": "Telmisartan", "action": "taken"}
+    ],
+    "sideEffects": [
+      {"id": "se-001", "loggedAtISO": "2026-04-17T09:00:00.000Z", "description": "Mild nausea after starting Empagliflozin", "relatedMedicationName": "Empagliflozin", "intensity": "mild"},
+      {"id": "se-002", "loggedAtISO": "2026-04-20T14:00:00.000Z", "description": "Ankle swelling — possibly Amlodipine side effect", "relatedMedicationName": "Amlodipine", "intensity": "mild"}
+    ],
+    "medicationReminders": [
+      {"id": "mr-001", "medicationName": "Metformin", "timeLocalHHmm": "07:00", "repeatDaily": true, "enabled": true, "createdAtISO": "2026-04-16T08:00:00.000Z"},
+      {"id": "mr-002", "medicationName": "Telmisartan", "timeLocalHHmm": "07:00", "repeatDaily": true, "enabled": true, "createdAtISO": "2026-04-16T08:00:00.000Z"},
+      {"id": "mr-003", "medicationName": "Empagliflozin", "timeLocalHHmm": "08:00", "repeatDaily": true, "enabled": true, "createdAtISO": "2026-04-16T08:00:00.000Z"},
+      {"id": "mr-004", "medicationName": "Rosuvastatin", "timeLocalHHmm": "22:00", "repeatDaily": true, "enabled": true, "createdAtISO": "2026-04-16T08:00:00.000Z"}
+    ]
+  },
+  "insurancePlans": [
+    {
+      "id": "ins-001",
+      "insurerName": "Star Health Insurance",
+      "policyNumber": "P/211400/01/2024/007823",
+      "policyType": "family",
+      "holderName": "Arjun Mehta",
+      "coverageAmount": 1500000,
+      "currency": "₹",
+      "premiumAmount": 42000,
+      "premiumFrequency": "annually",
+      "startDateISO": "2024-04-01",
+      "endDateISO": "2025-03-31",
+      "renewalDateISO": "2025-04-01",
+      "claimEmailAddress": "claims@starhealth.in",
+      "tpaName": "Star Health TPA",
+      "active": true,
+      "createdAtISO": "2026-01-10T10:00:00.000Z",
+      "updatedAtISO": "2026-01-10T10:00:00.000Z"
+    }
+  ],
+  "insuranceClaims": [
+    {
+      "id": "claim-001",
+      "planId": "ins-001",
+      "claimNumber": "SH2025/N/00234512",
+      "status": "settled",
+      "type": "cashless",
+      "relatedDocIds": ["doc-008"],
+      "providerName": "Hinduja Hospital",
+      "dateOfServiceISO": "2025-11-23",
+      "dateSubmittedISO": "2025-11-28",
+      "dateSettledISO": "2025-12-05",
+      "amountClaimed": 124500,
+      "amountApproved": 105000,
+      "notes": "Cashless claim processed. 10% co-pay + non-medical items disallowed.",
+      "createdAtISO": "2026-01-10T10:00:00.000Z",
+      "updatedAtISO": "2026-01-10T10:00:00.000Z"
+    }
+  ],
+  "notifications": [],
+  "updatedAtISO": "2026-04-25T10:00:00.000Z"
+}

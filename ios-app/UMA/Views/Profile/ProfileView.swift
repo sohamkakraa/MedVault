@@ -7,6 +7,7 @@ struct ProfileView: View {
     @Environment(ProfileViewModel.self) private var vm
     @Environment(TodayViewModel.self) private var todayVm
     @Environment(AuthViewModel.self) private var auth
+    @Environment(HealthKitViewModel.self) private var healthKit
     @State private var showEdit = false
     @State private var showSignOutConfirm = false
 
@@ -18,11 +19,11 @@ struct ProfileView: View {
                     HStack(spacing: 16) {
                         ZStack {
                             Circle()
-                                .fill(.accentColor.opacity(0.15))
+                                .fill(Color.accentColor.opacity(0.15))
                                 .frame(width: 72, height: 72)
                             Text(initials)
                                 .font(.title.weight(.semibold))
-                                .foregroundStyle(.accentColor)
+                                .foregroundStyle(Color.accentColor)
                         }
                         VStack(alignment: .leading, spacing: 4) {
                             Text(vm.profile.name.isEmpty ? "Your Profile" : vm.profile.name)
@@ -87,6 +88,43 @@ struct ProfileView: View {
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .accessibilityLabel("Notes: \(notes)")
+                    }
+                }
+
+                // Apple Health sync
+                Section("Apple Health") {
+                    if healthKit.isSyncing {
+                        HStack {
+                            ProgressView()
+                            Text("Syncing health data…")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        Button {
+                            Task { await healthKit.requestAuthorizationAndSync() }
+                        } label: {
+                            Label("Sync Apple Health Data", systemImage: "heart.fill")
+                        }
+                        .accessibilityLabel("Sync health data from Apple Health")
+                        .accessibilityHint("Imports heart rate, steps, sleep, and vitals")
+                    }
+
+                    if let last = healthKit.lastSyncISO {
+                        let dateStr = last.prefix(10)
+                        Text("Last synced: \(dateStr)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    if healthKit.labsAdded > 0 {
+                        Text("\(healthKit.labsAdded) new readings imported")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    }
+                    if let err = healthKit.errorMessage {
+                        Text(err)
+                            .font(.caption)
+                            .foregroundStyle(.red)
                     }
                 }
 

@@ -14,7 +14,7 @@ struct OTPEntryView: View {
         @Bindable var vm = vm
         return VStack(spacing: 20) {
             VStack(spacing: 6) {
-                Text("Check your \(vm.selectedChannel == .email ? "email" : "WhatsApp")")
+                Text("Check your email")
                     .font(.headline)
                 Text("Enter the 6-digit code we sent to **\(vm.email)**")
                     .font(.subheadline)
@@ -55,7 +55,7 @@ struct OTPEntryView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(.accentColor, in: RoundedRectangle(cornerRadius: 14))
+                .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 14))
                 .foregroundStyle(.white)
             }
             .disabled(vm.isLoading || otpCode.count < 6)
@@ -71,7 +71,7 @@ struct OTPEntryView: View {
             } label: {
                 Text("Resend code")
                     .font(.subheadline)
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(Color.accentColor)
             }
             .disabled(vm.isLoading)
             .accessibilityLabel("Resend verification code")
@@ -86,7 +86,16 @@ struct OTPEntryView: View {
             }
             .accessibilityLabel("Go back and use a different email address")
         }
-        .onAppear { focusedIndex = 0 }
+        .onAppear {
+            if let code = vm.devOtp, code.count == 6 {
+                for (i, char) in code.enumerated() {
+                    digits[i] = String(char)
+                }
+                Task { await vm.verifyOTP(code) }
+            } else {
+                focusedIndex = 0
+            }
+        }
     }
 
     @ViewBuilder
@@ -94,7 +103,7 @@ struct OTPEntryView: View {
         ZStack {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .strokeBorder(
-                    focusedIndex == index ? .accentColor : .secondary.opacity(0.3),
+                    focusedIndex == index ? Color.accentColor : .secondary.opacity(0.3),
                     lineWidth: focusedIndex == index ? 2 : 1
                 )
                 .background(

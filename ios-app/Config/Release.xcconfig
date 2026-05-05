@@ -23,4 +23,4 @@ ENABLE_NS_ASSERTIONS = NO
 ENABLE_BITCODE = NO
 
 // Code signing
-CODE_SIGN_IDENTITY = iPhone Distribution
+CODE_SIGN_IDENTITY = Apple Development

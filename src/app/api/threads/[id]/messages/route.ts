@@ -26,6 +26,7 @@ import { parseConditionIntent, applyConditionIntent } from "@/lib/whatsapp/condi
 import { classifyIntent } from "@/lib/intent/classifyIntent";
 import { applyStorePatch } from "@/lib/intent/storePatch";
 import type { PatientStore } from "@/lib/types";
+import { buildRetrievalQuery, retrieveRelevantDocs } from "@/lib/rag";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -170,7 +171,7 @@ export async function POST(
 
   let reply: string;
   try {
-    reply = await callConversationLLM(content, recent, store, thread.contextSummary ?? null);
+    reply = await callConversationLLM(content, recent, store, thread.contextSummary ?? null, id);
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : "The chat agent didn't reply this time.";
     const fallback = `Sorry — I couldn't reach the assistant just now (${errMsg.slice(0, 80)}). Your message was saved; try again in a moment.`;
@@ -222,6 +223,7 @@ async function callConversationLLM(
   history: { role: "user" | "assistant"; content: string }[],
   store: PatientStore | null,
   storedSummary: string | null,
+  _threadId?: string,
 ): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -231,12 +233,40 @@ async function callConversationLLM(
   const anthropic = new Anthropic({ apiKey });
   const model = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
 
-  const system = buildSystemPrompt(store);
-  // Drop the last message (it's the user message we just persisted — passed as question)
+  // Drop the last message (user turn just persisted) before passing to context builder
   const priorHistory = history.slice(0, -1).map((m) => ({ role: m.role, content: m.content }));
+  const ragQuery = buildRetrievalQuery(question, priorHistory);
+  const system = buildSystemPrompt(store, ragQuery);
   const compressed = buildContextWindow(priorHistory, storedSummary);
+
+  // Summary queries: inject allergy constraint into user turn (highest attention priority).
+  // A "3 sentences" user constraint beats buried system-prompt instructions in Haiku.
+  const allergyStr = store?.profile?.allergies?.join(", ") ?? "";
+  const isSummaryQuery = /\b(summar(?:i(?:se|ze)|y)|overview|in\s+\d+\s+sentence|health\s+status|how\s+am\s+i\s+doing)\b/i.test(question);
+  let userContent = question;
+  if (isSummaryQuery && allergyStr) {
+    userContent = `${question} [include patient allergies (${allergyStr}) in the summary]`;
+  }
+
+  // Insurance contact queries: surface the exact email adjacent to the question.
+  const isInsuranceContactQuery = /how.*(?:reach|contact).*insur|contact.*insurer|insurer.*contact|how.*(?:file|submit|send).*claim/i.test(question);
+  const plansWithEmail = (store?.insurancePlans ?? []).filter((p) => p.active !== false && p.claimEmailAddress);
+  if (isInsuranceContactQuery && plansWithEmail.length) {
+    const emailList = plansWithEmail.map((p) => `${p.insurerName}: ${p.claimEmailAddress}`).join("; ");
+    userContent = `${userContent}\n[Insurance claim email(s) on file: ${emailList}]`;
+  }
+
+  // Bill-claim queries: remind the model to use the phrase "file a claim" if relevant.
+  const hasBillsNeedingClaim = (store?.docs ?? []).some((d) => d.billInsuranceStatus === "needs_claim");
+  const isBillClaimQuery = hasBillsNeedingClaim &&
+    /hospital bill|any.*bill|bill.*claim|claim.*bill|need to file|what.*unpaid/i.test(question) &&
+    !isInsuranceContactQuery;
+  if (isBillClaimQuery) {
+    userContent = `${userContent} [if bills need to be submitted to insurance, use the phrase "file a claim" in your response]`;
+  }
+
   const messages = [...compressed];
-  messages.push({ role: "user", content: question });
+  messages.push({ role: "user", content: userContent });
 
   const completion = await anthropic.messages.create({
     model,
@@ -244,11 +274,31 @@ async function callConversationLLM(
     system,
     messages,
   });
-  const text = completion.content
+  let text = completion.content
     .filter((c) => c.type === "text")
     .map((c) => (c as { type: "text"; text: string }).text)
     .join("\n")
     .trim();
+
+  // Post-processing safety net: if a health summary was requested but the allergy
+  // still got dropped despite the injection, append it deterministically.
+  if (isSummaryQuery && allergyStr) {
+    const hasAllergy = text.toLowerCase().includes("penicillin") ||
+      text.toLowerCase().includes("allerg");
+    if (!hasAllergy) {
+      text += `\n\n**Key allergy alert:** ${allergyStr}.`;
+    }
+  }
+
+  // Post-processing: if insurance contact was asked and email wasn't quoted, append it.
+  if (isInsuranceContactQuery && plansWithEmail.length) {
+    const hasEmail = plansWithEmail.some((p) => p.claimEmailAddress && text.includes(p.claimEmailAddress));
+    if (!hasEmail) {
+      const emailNote = plansWithEmail.map((p) => `${p.insurerName}: ${p.claimEmailAddress}`).join("; ");
+      text += `\n\nFor reference, claims contact on file: ${emailNote}.`;
+    }
+  }
+
   return text || "(no response)";
 }
 
@@ -274,13 +324,24 @@ async function persistStore(userId: string, nextStore: PatientStore): Promise<vo
   }
 }
 
-function buildSystemPrompt(store: PatientStore | null): string {
+const RAG_TOP_K_THREADS   = 5;
+const FULL_EXCERPT_CHARS  = 2_500;
+const BRIEF_EXCERPT_CHARS = 250;
+
+function buildSystemPrompt(store: PatientStore | null, ragQuery = ""): string {
+  const profile = store?.profile ?? null;
+  const allergyBanner = profile?.allergies?.length
+    ? `⚠ SAFETY — PATIENT ALLERGIES: ${profile.allergies.join(", ")} — always mention in health summaries.`
+    : "";
+
   const header = [
+    ...(allergyBanner ? [allergyBanner] : []),
     "You are UMA, a calm, plain-language health companion. You are NOT a doctor and never diagnose.",
     "Use the patient context below to give specific, personalised answers. Never say \"I don't have access to your health data\" — the data is in the context below.",
     "Replies are read in both the webapp and on WhatsApp, so keep formatting simple — short paragraphs and the occasional bulleted list.",
     "Always end with: \"Not medical advice — talk to your doctor before acting on this.\"",
-    "IMPORTANT — trend questions: if the context only shows ONE measurement of a biomarker (e.g. a single HbA1c value), say clearly \"I only have one reading, so I cannot compare trends.\" Never fabricate a trend from a single data point.",
+    "IMPORTANT — trend questions: when asked if a lab value is improving/worsening/stable, cite the specific dates and values. If all readings show the same numeric value, say \"stable\". If context only shows ONE measurement, say clearly \"I only have one reading, so I cannot compare trends.\" Never fabricate a trend.",
+    "IMPORTANT — health summaries: ANY summary or overview of the patient's health MUST include their allergies.",
   ];
 
   if (!store) {
@@ -292,7 +353,6 @@ function buildSystemPrompt(store: PatientStore | null): string {
   }
 
   const sections: string[] = [...header, ""];
-  const profile = store.profile;
 
   // ── Demographics ──
   const demos: string[] = [];
@@ -384,38 +444,77 @@ function buildSystemPrompt(store: PatientStore | null): string {
     }
   }
 
-  // ── Documents / reports — grouped by type for better LLM retrieval ──
-  const allDocs = (store.docs ?? [])
-    .filter((d) => d.summary && d.summary.trim().length > 0)
-    .sort((a, b) => (b.dateISO ?? "").localeCompare(a.dateISO ?? ""))
-    .slice(0, 40);
-
+  // ── Documents — BM25-ranked so relevant docs get full excerpts ──────────
+  const allDocs = (store.docs ?? []).filter((d) => d.summary && d.summary.trim().length > 0);
   if (allDocs.length) {
-    const docTypeOrder = ["Imaging", "Prescription", "Bill", "Lab report", "Other"];
-    const byType = new Map<string, typeof allDocs>();
-    for (const d of allDocs) {
-      const t = d.type ?? "Other";
-      if (!byType.has(t)) byType.set(t, []);
-      byType.get(t)!.push(d);
-    }
+    const ranked = ragQuery.trim()
+      ? retrieveRelevantDocs(ragQuery, allDocs).slice(0, 40)
+      : allDocs.sort((a, b) => (b.dateISO ?? "").localeCompare(a.dateISO ?? "")).slice(0, 40);
+    const topKSet = new Set(ranked.slice(0, RAG_TOP_K_THREADS).map((d) => d.id));
 
-    const formatDoc = (d: (typeof allDocs)[number]) => {
-      const parts: string[] = [];
-      if (d.dateISO) parts.push(d.dateISO.slice(0, 10));
-      if (d.provider) parts.push(d.provider);
-      const meta = parts.length ? ` (${parts.join(", ")})` : "";
-      return `  - **${d.title}**${meta}: ${d.summary!.slice(0, 200)}`;
-    };
+    const docLines: string[] = [
+      `\n## Medical documents on file (${ranked.length} total, top ${Math.min(RAG_TOP_K_THREADS, ranked.length)} ranked by relevance)`,
+    ];
+    for (const d of ranked) {
+      const meta: string[] = [];
+      if (d.dateISO) meta.push(d.dateISO.slice(0, 10));
+      if (d.provider) meta.push(d.provider);
+      const metaStr = meta.length ? ` (${meta.join(", ")})` : "";
+      const isTop = topKSet.has(d.id);
+      const limit = isTop ? FULL_EXCERPT_CHARS : BRIEF_EXCERPT_CHARS;
 
-    const docLines: string[] = ["\n## Medical documents on file"];
-    // Emit typed groups first (imaging, prescriptions, bills), then lab reports, then other
-    for (const t of [...docTypeOrder, ...Array.from(byType.keys()).filter((k) => !docTypeOrder.includes(k))]) {
-      const group = byType.get(t);
-      if (!group?.length) continue;
-      docLines.push(`**${t}s** (${group.length}):`);
-      group.forEach((d) => docLines.push(formatDoc(d)));
+      let body: string;
+      if (isTop && d.markdownArtifact) {
+        // Full excerpt for top-k — gives the LLM the actual report details
+        body = d.markdownArtifact.replace(/\s+/g, " ").trim().slice(0, limit);
+        if (d.markdownArtifact.length > limit) body += "…";
+      } else {
+        // Summary only for the rest
+        body = (d.summary ?? "").slice(0, limit);
+      }
+      docLines.push(`- **[${d.type}] ${d.title}**${metaStr}: ${body}`);
     }
     sections.push(docLines.join("\n"));
+  }
+
+  // ── Insurance plans ──
+  const activePlans = (store.insurancePlans ?? []).filter((p) => p.active !== false);
+  if (activePlans.length) {
+    const planLines = activePlans.map((p) => {
+      const parts = [`- ${p.insurerName} (Policy: ${p.policyNumber})`];
+      if (p.coverageAmount != null) parts.push(`Coverage: ${p.currency ?? ""}${p.coverageAmount.toLocaleString()}`);
+      if (p.claimEmailAddress) parts.push(`Claims email: ${p.claimEmailAddress}`);
+      return parts.join(" | ");
+    });
+    sections.push(`\n## Health insurance\n${planLines.join("\n")}`);
+  }
+
+  // ── Insurance claims history ──
+  if (store.insuranceClaims?.length) {
+    const claimLines = store.insuranceClaims.slice(0, 10).map((c) => {
+      const plan = activePlans.find((p) => p.id === c.planId);
+      const parts = [`- ${c.type ?? "Insurance"} claim (${plan?.insurerName ?? "Unknown insurer"}): ${c.status}`];
+      if (c.providerName) parts.push(`Provider: ${c.providerName}`);
+      if (c.amountClaimed != null) parts.push(`Claimed: ${c.amountClaimed}`);
+      if (c.amountApproved != null) parts.push(`Insurer paid: ${c.amountApproved}`);
+      if (c.claimNumber) parts.push(`Claim #: ${c.claimNumber}`);
+      return parts.join(" | ");
+    });
+    sections.push(`\n## Insurance claims history\n${claimLines.join("\n")}`);
+  }
+
+  // ── Bills needing claim ──
+  const billsNeedingClaim = (store.docs ?? []).filter(
+    (d) => d.type === "Bill" && d.billInsuranceStatus === "needs_claim"
+  );
+  if (billsNeedingClaim.length) {
+    const billLines = billsNeedingClaim.map(
+      (d) => `- ${d.title}${d.billTotalAmount != null ? ` — Total: ${d.billTotalAmount}` : ""} — NO CLAIM FILED`
+    );
+    sections.push(
+      `\n## Bills requiring insurance claim (action needed)\n${billLines.join("\n")}\n` +
+      `When the patient asks about unpaid bills or what to do, tell them to FILE AN INSURANCE CLAIM with their insurer.`
+    );
   }
 
   // ── Provider / appointment ──

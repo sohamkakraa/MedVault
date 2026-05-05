@@ -5,8 +5,8 @@ import UMAShared
 
 // MARK: - Haptic feedback environment key
 
-private struct HapticFeedbackKey: EnvironmentKey {
-    static let defaultValue: HapticFeedback = HapticFeedback()
+private struct HapticFeedbackKey: @preconcurrency EnvironmentKey {
+    @MainActor static let defaultValue: HapticFeedback = HapticFeedback()
 }
 
 extension EnvironmentValues {
@@ -19,9 +19,9 @@ extension EnvironmentValues {
 /// Centralised haptic feedback provider.
 @MainActor
 final class HapticFeedback: Sendable {
-    private nonisolated(unsafe) let selection = UISelectionFeedbackGenerator()
-    private nonisolated(unsafe) let notification = UINotificationFeedbackGenerator()
-    private nonisolated(unsafe) let impact = UIImpactFeedbackGenerator(style: .medium)
+    private let selection = UISelectionFeedbackGenerator()
+    private let notification = UINotificationFeedbackGenerator()
+    private let impactGenerator = UIImpactFeedbackGenerator(style: .medium)
 
     func prepare() {
         selection.prepare()
@@ -45,7 +45,7 @@ final class HapticFeedback: Sendable {
     }
 
     func impact() {
-        self.impact.impactOccurred()
+        impactGenerator.impactOccurred()
     }
 }
 

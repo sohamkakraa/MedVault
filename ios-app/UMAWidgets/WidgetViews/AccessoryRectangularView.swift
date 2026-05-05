@@ -24,7 +24,7 @@ struct AccessoryRectangularView: View {
         case .nextDose:
             Image(systemName: "pills.circle.fill")
                 .font(.title2)
-                .foregroundStyle(.accentColor)
+                .foregroundStyle(.tint)
         case .latestBP:
             Image(systemName: "heart.fill")
                 .font(.title2)
@@ -32,11 +32,11 @@ struct AccessoryRectangularView: View {
         case .hbA1c:
             Image(systemName: "waveform.path.ecg")
                 .font(.title2)
-                .foregroundStyle(.accentColor)
+                .foregroundStyle(.tint)
         case .stepCount:
             Image(systemName: "figure.walk")
                 .font(.title2)
-                .foregroundStyle(.accentColor)
+                .foregroundStyle(.tint)
         case .notificationCount:
             Image(systemName: "bell.badge.fill")
                 .font(.title2)
@@ -62,7 +62,7 @@ struct AccessoryRectangularView: View {
                         if let time = dose.scheduledTime {
                             Text(time, style: .time)
                                 .font(.caption.weight(.semibold))
-                                .foregroundStyle(.accentColor)
+                                .foregroundStyle(.tint)
                         }
                     }
                 }

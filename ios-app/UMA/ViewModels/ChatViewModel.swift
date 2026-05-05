@@ -43,7 +43,7 @@ final class ChatViewModel {
         let history = Array(messages.dropLast(2)) // exclude user+empty assistant
 
         activeStreamTask = Task {
-            let stream = client.sendChat(
+            let stream = await client.sendChat(
                 message: text,
                 history: history,
                 store: currentStore

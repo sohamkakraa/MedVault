@@ -48,8 +48,8 @@ enum WidgetMetric: String, AppEnum {
 
 /// AppIntent-based configuration for UMA widgets.
 struct UMAWidgetConfigurationIntent: WidgetConfigurationIntent {
-    static var title: LocalizedStringResource = "UMA Health Metric"
-    static var description = IntentDescription("Choose which health metric to display.")
+    static let title: LocalizedStringResource = "UMA Health Metric"
+    static let description = IntentDescription("Choose which health metric to display.")
 
     @Parameter(title: "Metric", default: .nextDose)
     var metric: WidgetMetric

@@ -21,11 +21,11 @@ struct UploadView: View {
                 VStack(spacing: 16) {
                     ZStack {
                         Circle()
-                            .fill(.accentColor.opacity(0.1))
+                            .fill(Color.accentColor.opacity(0.1))
                             .frame(width: 100, height: 100)
                         Image(systemName: "doc.badge.arrow.up.fill")
                             .font(.system(size: 44))
-                            .foregroundStyle(.accentColor)
+                            .foregroundStyle(Color.accentColor)
                     }
                     Text("Upload a Medical Document")
                         .font(.title2.weight(.semibold))
@@ -43,7 +43,7 @@ struct UploadView: View {
                 if let _ = selectedPDFData {
                     HStack {
                         Image(systemName: "doc.fill")
-                            .foregroundStyle(.accentColor)
+                            .foregroundStyle(Color.accentColor)
                         Text(selectedFilename)
                             .font(.subheadline)
                             .lineLimit(1)
@@ -66,7 +66,7 @@ struct UploadView: View {
                 if vm.isUploading {
                     VStack(spacing: 8) {
                         ProgressView(value: vm.uploadProgress)
-                            .tint(.accentColor)
+                            .tint(Color.accentColor)
                             .padding(.horizontal)
                         Text("Analysing your document…")
                             .font(.caption)
@@ -97,8 +97,8 @@ struct UploadView: View {
                         )
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
-                        .foregroundStyle(.accentColor)
+                        .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
+                        .foregroundStyle(Color.accentColor)
                         .font(.headline)
                     }
                     .accessibilityLabel("Choose a PDF file from your device")
@@ -115,7 +115,7 @@ struct UploadView: View {
                             Label("Upload Document", systemImage: "arrow.up.circle.fill")
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(.accentColor, in: RoundedRectangle(cornerRadius: 14))
+                                .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 14))
                                 .foregroundStyle(.white)
                                 .font(.headline)
                         }

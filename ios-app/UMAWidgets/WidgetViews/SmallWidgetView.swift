@@ -13,7 +13,7 @@ struct SmallWidgetView: View {
             HStack(spacing: 4) {
                 Image(systemName: metricIcon)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(.tint)
                 Text("UMA")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
@@ -68,7 +68,7 @@ struct SmallWidgetView: View {
                 if let time = dose.scheduledTime {
                     Text(time, style: .time)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.accentColor)
+                        .foregroundStyle(.tint)
                 }
             } else {
                 Image(systemName: "checkmark.circle.fill")
@@ -124,7 +124,7 @@ struct SmallWidgetView: View {
         VStack(alignment: .leading, spacing: 4) {
             Image(systemName: "figure.walk")
                 .font(.title2)
-                .foregroundStyle(.accentColor)
+                .foregroundStyle(.tint)
             Text("Steps")
                 .font(.caption)
                 .foregroundStyle(.secondary)

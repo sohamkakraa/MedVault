@@ -11,17 +11,31 @@ final class AuthViewModel {
     var errorMessage: String?
     var otpSent = false
     var email = ""
-    var selectedChannel: AuthRequest.AuthChannel = .email
+    var devOtp: String?
 
     private let client = UMAClient.shared
     private let token = AuthToken.shared
 
     func checkAuthStatus() async {
-        isAuthenticated = await token.isAuthenticated
+        let keychainAuth = await token.isAuthenticated
+        guard keychainAuth else {
+            isAuthenticated = false
+            return
+        }
+        do {
+            let session = try await client.checkSession()
+            isAuthenticated = session.ok
+            if !session.ok {
+                await token.clear()
+            }
+        } catch {
+            isAuthenticated = false
+        }
     }
 
     func requestOTP() async {
-        guard !email.trimmingCharacters(in: .whitespaces).isEmpty else {
+        let trimmed = email.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else {
             errorMessage = "Please enter your email address."
             return
         }
@@ -29,7 +43,7 @@ final class AuthViewModel {
         errorMessage = nil
         defer { isLoading = false }
         do {
-            try await client.requestOTP(email: email, channel: selectedChannel)
+            devOtp = try await client.requestOTP(identifier: trimmed)
             otpSent = true
         } catch {
             errorMessage = error.localizedDescription
@@ -37,16 +51,15 @@ final class AuthViewModel {
     }
 
     func verifyOTP(_ otp: String) async {
-        guard otp.count >= 4 else {
-            errorMessage = "Please enter the full verification code."
+        guard otp.count == 6 else {
+            errorMessage = "Please enter the full 6-digit code."
             return
         }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
         do {
-            let response = try await client.verifyOTP(email: email, otp: otp)
-            try await token.save(token: response.token, expiresAtISO: response.expiresAtISO)
+            try await client.verifyOTP(identifier: email.trimmingCharacters(in: .whitespaces), code: otp)
             isAuthenticated = true
             otpSent = false
         } catch {
@@ -55,7 +68,7 @@ final class AuthViewModel {
     }
 
     func signOut() async {
-        await token.clear()
+        await client.logout()
         isAuthenticated = false
         otpSent = false
         email = ""

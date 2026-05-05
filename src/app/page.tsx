@@ -25,6 +25,9 @@ import {
   Ban,
   Stethoscope,
   Zap,
+  Wallet,
+  Watch,
+  CheckCircle,
 } from "lucide-react";
 
 export default function HomePage() {
@@ -41,8 +44,8 @@ export default function HomePage() {
               One calm place for your health story
             </h1>
             <p className="mt-6 text-lg mv-muted leading-relaxed">
-              Upload your reports, track your medicines, and talk to UMA using your own records — all explained in
-              plain language you can actually act on, not medical jargon.
+              Upload your reports, track your medicines, manage your insurance, and talk to UMA using your own
+              records — all explained in plain language you can actually act on, not medical jargon.
             </p>
             <div className="mt-10 flex flex-wrap gap-3">
               <Link href="/login">
@@ -58,12 +61,37 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* ─── Reliability bar ──────────────────────────────────── */}
+        <section className="border-y border-[var(--border)] bg-[var(--panel-2)]">
+          <div className="mx-auto max-w-6xl px-4 py-5">
+            <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-[var(--accent)] shrink-0" aria-hidden />
+                <span className="text-xs text-[var(--fg)] font-medium">96 / 100 on end-to-end eval suite</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-[var(--accent)] shrink-0" aria-hidden />
+                <span className="text-xs text-[var(--fg)] font-medium">Perfect scores: extraction · chat Q&A · clinical reasoning</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-[var(--accent)] shrink-0" aria-hidden />
+                <span className="text-xs text-[var(--fg)] font-medium">0 clinical hallucinations across 40+ adversarial tests</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-[var(--accent)] shrink-0" aria-hidden />
+                <span className="text-xs text-[var(--fg)] font-medium">Insurance agent: 9 / 10</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* ─── Feature grid — live today ────────────────────────── */}
         <section className="border-t border-[var(--border)] bg-[var(--panel)]/60 py-16 md:py-20">
           <div className="mx-auto max-w-6xl px-4">
             <h2 className="text-2xl md:text-3xl font-semibold mv-title">Everything available right now</h2>
             <p className="mt-3 text-sm mv-muted max-w-2xl leading-relaxed">
-              Upload a PDF or start chatting — UMA connects the dots across your reports, medicines, and daily health notes in one place.
+              Upload a PDF or start chatting — UMA connects the dots across your reports, medicines, insurance,
+              and daily health notes in one place.
             </p>
 
             <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -91,8 +119,8 @@ export default function HomePage() {
                   title: "AI health chat",
                   bullets: [
                     "Ask anything — \"What was my last HbA1c?\" or \"What does this mean?\"",
+                    "Answers drawn directly from your uploaded records, not generic advice",
                     "Add or update medicines, log doses, and set reminders just by chatting",
-                    "Conversation saved across sessions so UMA remembers context",
                   ],
                 },
                 {
@@ -105,12 +133,30 @@ export default function HomePage() {
                   ],
                 },
                 {
+                  icon: Wallet,
+                  title: "Insurance tracking",
+                  bullets: [
+                    "Store your plans with policy number, coverage amount, and renewal date",
+                    "UMA flags unpaid bills that need a claim filed — no more missed deadlines",
+                    "Ask chat \"How do I file a claim?\" and get the exact contact email",
+                  ],
+                },
+                {
+                  icon: Watch,
+                  title: "Apple Health sync",
+                  bullets: [
+                    "iOS app syncs heart rate, SpO2, blood glucose, steps, and sleep",
+                    "Wearable data appears alongside lab results in your dashboard charts",
+                    "Live Activity and home-screen widgets show your next scheduled dose",
+                  ],
+                },
+                {
                   icon: HeartPulse,
                   title: "Dashboard & profile",
                   bullets: [
                     "Newest files, active medicines, and upcoming visit at a glance",
                     "Profile stores allergies, conditions, and your care provider",
-                    "Printable one-page summary ready for your next appointment",
+                    "Blood pressure log, side-effect notes, and a printable visit summary",
                   ],
                 },
                 {
@@ -119,7 +165,7 @@ export default function HomePage() {
                   bullets: [
                     "Email + one-time code — no password to remember or lose",
                     "Data stays on your device until you choose to connect other services",
-                    "Family profiles let you manage records for people you care for",
+                    "All sensitive data kept private — never used to train AI models",
                   ],
                 },
               ] as { icon: React.ElementType; title: string; bullets: string[] }[]).map((item) => (
@@ -152,17 +198,17 @@ export default function HomePage() {
                 {
                   step: "1",
                   title: "Upload your reports",
-                  body: "Drop in any PDF — lab results, discharge summaries, prescriptions, imaging reports. UMA reads them and builds your health timeline.",
+                  body: "Drop in any PDF — lab results, discharge summaries, prescriptions, imaging reports. UMA reads them and builds your health timeline automatically.",
                 },
                 {
                   step: "2",
                   title: "See everything in one place",
-                  body: "Your dashboard shows trends, medicines, and a plain summary of each document. The body map connects your numbers to the organs they belong to.",
+                  body: "Your dashboard shows trends, medicines, insurance status, and a plain summary of each document. Apple Health data flows in from your phone automatically.",
                 },
                 {
                   step: "3",
                   title: "Talk to UMA",
-                  body: "Ask questions, log doses, add medicines, set reminders — all by chatting. UMA acts on what you say and shows the change on your dashboard immediately.",
+                  body: "Ask questions, log doses, add medicines, check your insurance, set reminders — all by chatting. UMA looks up answers from your actual records, not generic health information.",
                 },
               ].map((item) => (
                 <li key={item.step} className="flex flex-col gap-3">
@@ -209,9 +255,6 @@ export default function HomePage() {
                   <p className="mt-2 text-sm mv-muted leading-relaxed">
                     Works both ways: save your phone number on UMA and get a verification code via WhatsApp to link your account. Or message UMA on WhatsApp first — if you already have an account, just confirm your email; if not, UMA will walk you through signing up right in the chat.
                   </p>
-                  <p className="mt-2 text-sm mv-muted leading-relaxed">
-                    Your health companion, wherever you are.
-                  </p>
                   <span className="mt-3 inline-block rounded-full bg-[#25D366]/10 border border-[#25D366]/30 px-3 py-1 text-[11px] font-medium" style={{color:"#25D366"}}>
                     WhatsApp Business API · Two-way verification
                   </span>
@@ -232,26 +275,30 @@ export default function HomePage() {
                 </p>
               </div>
               <div className="mv-card-muted rounded-2xl p-6">
+                <h3 className="text-sm font-semibold text-[var(--fg)]">Wellness check-ins</h3>
+                <p className="mt-2 text-sm mv-muted leading-relaxed">
+                  Gentle daily and weekly prompts in chat — one question at a time — to track how you feel, spot
+                  patterns, and catch early warning signs before they become problems.
+                </p>
+              </div>
+              <div className="mv-card-muted rounded-2xl p-6">
                 <h3 className="text-sm font-semibold text-[var(--fg)]">Family health view</h3>
                 <p className="mt-2 text-sm mv-muted leading-relaxed">
                   Optionally link with a family member to share relevant context — only when everyone agrees and
                   each person controls their own information.
                 </p>
               </div>
-              <div className="mv-card-muted rounded-2xl p-6">
-                <h3 className="text-sm font-semibold text-[var(--fg)]">Insurance help</h3>
-                <p className="mt-2 text-sm mv-muted leading-relaxed">
-                  Simpler claims help, bill reminders, and a clear view of what your plan covers — plain language,
-                  no fine print.
-                </p>
-              </div>
               <div className="mv-card-muted rounded-2xl p-6 md:col-span-2 flex flex-col sm:flex-row sm:items-start gap-4">
                 <Smartphone className="h-8 w-8 shrink-0 text-[var(--accent)]" aria-hidden />
                 <div>
-                  <h3 className="text-sm font-semibold text-[var(--fg)]">Mobile app</h3>
+                  <h3 className="text-sm font-semibold text-[var(--fg)]">
+                    Android app
+                    <span className="ml-2 text-[11px] font-normal mv-muted">(iOS app already in early access)</span>
+                  </h3>
                   <p className="mt-2 text-sm mv-muted leading-relaxed">
-                    The same calm feel on iPhone and Android — upload from anywhere, get gentle check-ins, and see
-                    your trends on the go.
+                    The iOS app is already available with Apple Health sync, Live Activities, and home-screen
+                    widgets. Android support — including Google Fit and Wear OS integration — is next on the
+                    roadmap.
                   </p>
                 </div>
               </div>

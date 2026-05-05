@@ -149,6 +149,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: sessionSigningFailureHint() }, { status: 500 });
   }
 
+  // iOS native client sends X-UMA-Client: ios — return the token in the
+  // response body because URLSession cookies are unreliable across origins.
+  const isIosClient = req.headers.get("x-uma-client") === "ios";
+  if (isIosClient) {
+    return NextResponse.json({ ok: true, token });
+  }
+
   const res = NextResponse.json({ ok: true });
   res.cookies.set(SESSION_COOKIE, token, {
     httpOnly: true,

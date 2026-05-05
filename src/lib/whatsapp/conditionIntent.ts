@@ -88,29 +88,28 @@ export function parseConditionIntent(text: string): ConditionIntent {
 }
 
 const NON_SYMPTOM_STOPWORDS = new Set([
-  "question",
-  "meeting",
-  "appointment",
-  "doubt",
-  "doctor",
-  "report",
-  "medicine",
-  "medication",
-  "test",
-  "result",
-  "results",
-  "thing",
-  "issue",
-  "problem", // ambiguous — could be symptomatic; we'd rather miss than false-fire
-  "concern",
-  "feeling", // "I feel a feeling" type loops
-  "good",
-  "fine",
-  "ok",
-  "okay",
-  "great",
-  "well",
-  "better", // "I feel better" handled by resolution path
+  // Administrative / scheduling
+  "question", "questions", "query", "doubt", "concern", "concerns",
+  "meeting", "appointment", "appointments", "visit", "followup", "follow-up",
+  "consultation", "checkup", "check-up",
+  // Medical admin (not symptoms)
+  "doctor", "dr", "physician", "specialist", "nurse",
+  "report", "reports", "file", "record", "records", "document",
+  "medicine", "medication", "medications", "tablet", "pill", "dose", "prescription",
+  "test", "tests", "result", "results", "lab", "labs",
+  // Vague / abstract
+  "thing", "things", "issue", "issues", "problem", "problems",
+  "feeling", "feelings", // "I feel a feeling" loops
+  "thought", "thoughts", "idea", "ideas",
+  "sense",
+  // Positive states (not symptoms)
+  "good", "great", "fine", "ok", "okay", "well",
+  "better",  // "I feel better" handled by resolution path
+  "happy", "nice", "amazing", "wonderful", "fantastic",
+  // Questions / information requests ("I have a question about…")
+  "query", "information", "info", "details", "update",
+  // Common false-fire verbs used as nouns
+  "chat", "talk", "call",
 ]);
 
 function cleanSymptomPhrase(raw: string): string {

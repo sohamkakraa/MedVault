@@ -14,9 +14,9 @@ struct MessageBubble: View {
                 // Assistant avatar
                 Image(systemName: "heart.text.square.fill")
                     .font(.title3)
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(Color.accentColor)
                     .frame(width: 32, height: 32)
-                    .background(.accentColor.opacity(0.1), in: Circle())
+                    .background(Color.accentColor.opacity(0.1), in: Circle())
                     .accessibilityHidden(true)
             }
 
@@ -62,7 +62,7 @@ struct MessageBubble: View {
                 .padding(.vertical, 10)
                 .background(
                     message.isUser
-                        ? AnyShapeStyle(.accentColor)
+                        ? AnyShapeStyle(Color.accentColor)
                         : AnyShapeStyle(.regularMaterial),
                     in: BubbleShape(isUser: message.isUser)
                 )

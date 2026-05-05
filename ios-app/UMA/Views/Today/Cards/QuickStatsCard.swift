@@ -20,7 +20,7 @@ struct QuickStatsCard: View {
                         value: "\(activeMedCount)",
                         label: "Medications",
                         systemImage: "pills",
-                        color: .accentColor
+                        color: Color.accentColor
                     )
                     statPill(
                         value: "\(docCount)",
@@ -54,7 +54,7 @@ struct QuickStatsCard: View {
                 if let next = profile.nextVisitDateFormatted {
                     HStack {
                         Image(systemName: "calendar.badge.clock")
-                            .foregroundStyle(.accentColor)
+                            .foregroundStyle(Color.accentColor)
                             .font(.caption)
                         Text("Next visit: \(next)")
                             .font(.caption)

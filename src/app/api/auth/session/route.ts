@@ -1,19 +1,13 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth/sessionToken";
+import { getSessionClaims } from "@/lib/server/authSession";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  const jar = await cookies();
-  const raw = jar.get(SESSION_COOKIE)?.value;
-  if (!raw) {
-    return NextResponse.json({ ok: false, error: "Not signed in." }, { status: 401 });
-  }
-  const claims = await verifySessionToken(raw);
+  const claims = await getSessionClaims();
   if (!claims?.sub) {
-    return NextResponse.json({ ok: false, error: "Session expired." }, { status: 401 });
+    return NextResponse.json({ ok: false, error: "Not signed in." }, { status: 401 });
   }
 
   try {

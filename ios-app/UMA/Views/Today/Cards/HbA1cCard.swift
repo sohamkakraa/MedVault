@@ -112,7 +112,7 @@ struct HbA1cCard: View {
 
 struct SparklineView: View {
     let values: [Double]
-    var color: Color = .accentColor
+    var color: Color = Color.accentColor
 
     var body: some View {
         GeometryReader { geo in

@@ -107,7 +107,7 @@ struct RecordsView: View {
                 .font(.caption.weight(.medium))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(isSelected ? .accentColor : .secondary.opacity(0.12),
+                .background(isSelected ? Color.accentColor : .secondary.opacity(0.12),
                             in: Capsule())
                 .foregroundStyle(isSelected ? .white : .primary)
         }
@@ -125,9 +125,9 @@ struct DocRow: View {
         HStack(spacing: 12) {
             Image(systemName: doc.type.systemImage)
                 .font(.title3)
-                .foregroundStyle(.accentColor)
+                .foregroundStyle(Color.accentColor)
                 .frame(width: 36, height: 36)
-                .background(.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(doc.title)

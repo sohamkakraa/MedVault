@@ -180,7 +180,8 @@ async function extractWithAnthropicFromPdf(
     "3. ## Overview — one short line only: copy the same meaning as the summary field (no extra sentences, no dump of raw text).",
     "4. ## Details — type-specific: lab panels with pipe tables (canonical names: HbA1c, LDL, HDL, TSH, Glucose, Creatinine, etc.); prescriptions as tables; imaging/other as clear sections.",
     "   Lab reports: include ONLY lab values that are primary measurements from THIS document's own results. Do NOT re-extract labs that are merely referenced or quoted from prior reports (e.g. in referral letters or clinical notes).",
-    "   Bill documents: produce a | Field | Value | table under ## Details with rows: Total Billed; Patient Responsibility; Insurance Paid; Currency; Service Date; Billing Provider. Use — for any field not stated.",
+    "   Referral letters / consultation notes / clinical summaries / discharge summaries: DO NOT produce any lab value tables. Labs mentioned in these documents are historical references copied from prior test results — extracting them here would associate them with the wrong date. List them only as prose if important.",
+    "   Bill documents: produce a | Field | Value | table under ## Details with rows: Total Billed; Patient Responsibility; Insurance Paid; Currency; Service Date; Billing Provider. Use — for any field not stated. Total Billed must be the full invoice amount, NOT the patient co-pay or patient responsibility.",
     "   Allergy panels / immunology reports: add a ## Allergies section after ## Details with one bullet per confirmed allergen (- Allergen name). The bullet list is required — do NOT put allergens only in pipe tables.",
     "   Imaging / radiology reports: add a ## Diagnoses section after ## Details with one bullet per finding or diagnosis (e.g. '- Grade III medial meniscus tear', '- Colles\\' fracture right wrist'). Include normal findings as '- No acute findings'.",
     "   Discharge summaries / clinical notes: add a ## Conditions section with one bullet per active diagnosis/condition, and a ## Diagnoses section if procedures were performed (e.g. '- Appendectomy 2025-09-15').",
@@ -277,9 +278,9 @@ async function extractWithLlamaParse(pdfBuffer: Buffer, fileName: string): Promi
   const jobId = uploadJson.id ?? uploadJson.job_id;
   if (!jobId) throw new Error("LlamaParse did not return a job id");
 
-  // 2. Poll for completion (max 60 s, every 2 s)
-  const maxAttempts = 30;
-  const pollIntervalMs = 2_000;
+  // 2. Poll for completion (max 45 s, every 1 s — tighter loop saves up to 15 s of dead wait)
+  const maxAttempts = 45;
+  const pollIntervalMs = 1_000;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     await new Promise((res) => setTimeout(res, pollIntervalMs));
@@ -322,7 +323,7 @@ async function extractWithLlamaParse(pdfBuffer: Buffer, fileName: string): Promi
     // PENDING / IN_PROGRESS — continue polling
   }
 
-  throw new Error("LlamaParse job timed out after 60 seconds");
+  throw new Error("LlamaParse job timed out after 45 seconds");
 }
 
 /**
@@ -367,7 +368,8 @@ async function extractStructureFromText(
     "type: use 'Prescription' for any handwritten or printed prescription/Rx/medication order; 'Lab report' for blood/urine/pathology results; 'Bill' for invoices/receipts; 'Imaging' for radiology; 'Other' only if none fit.",
     "patient_names_on_document: list every name labeled as the patient (look for 'Patient:', 'Name:', 'Pt:', form fields, header lines). Include partially-legible handwritten names. Use [] only if truly no patient name appears.",
     "",
-    "SUMMARY — single sentence, max ~200 chars, plain language. First clause: what this file is. Second clause: the one main finding. For Bill documents: state the total amount billed, not the patient co-pay.",
+    "SUMMARY — single sentence, max ~200 chars, plain language. First clause: what this file is. Second clause: the one main finding.",
+    "For Bill documents: the summary MUST state the total amount billed (not the patient-responsibility/co-pay). Format: \"total billed [currency] [amount]\". If both are present, add \", patient responsibility [currency] [amount]\".",
     "",
     "CONTEXT",
     `- File name: ${fileName}`,
@@ -380,7 +382,8 @@ async function extractStructureFromText(
     "3. ## Overview — one short line.",
     "4. ## Details — lab panels as pipe tables (canonical names: HbA1c, LDL, HDL, TSH, Glucose, Creatinine, etc.); prescriptions as tables; imaging/other as clear sections.",
     "   Lab reports: include ONLY primary measurements from THIS document. Do NOT re-extract labs merely referenced from prior reports.",
-    "   Bill documents: | Field | Value | table with rows: Total Billed; Patient Responsibility; Insurance Paid; Currency; Service Date; Billing Provider. Use — for missing fields.",
+    "   Referral letters / consultation notes / clinical summaries / discharge summaries: DO NOT produce any lab value tables. Labs in these documents are historical references from prior tests — extracting them here would attach the wrong date. List them only as prose if clinically important.",
+    "   Bill documents: | Field | Value | table with rows: Total Billed; Patient Responsibility; Insurance Paid; Currency; Service Date; Billing Provider. Use — for missing fields. Total Billed = full invoice amount, NOT the patient co-pay.",
     "   Allergy panels: add ## Allergies after ## Details with one bullet per confirmed allergen (- Allergen name). Required — do not put allergens in pipe tables only.",
     "   Imaging / radiology: add ## Diagnoses after ## Details with one bullet per finding (e.g. '- Grade III meniscus tear', '- No acute findings').",
     "   Discharge summaries / clinical notes: add ## Conditions with active diagnoses and ## Diagnoses for procedures performed (include date if known, e.g. '- Appendectomy 2025-09-15').",
@@ -407,6 +410,15 @@ async function extractStructureFromText(
     usage: message.usage as { input_tokens: number; output_tokens: number } | undefined,
     model: structureModel,
   };
+}
+
+/**
+ * Heuristic: detect handwritten documents from filename and extracted text signals.
+ * We can't change the DocType enum (it only has 5 values), so we surface this as a tag.
+ */
+function detectHandwrittenTag(fileName: string, markdownText: string, summary: string): boolean {
+  const lower = (fileName + " " + markdownText.slice(0, 2_000) + " " + summary).toLowerCase();
+  return /\bhand[\s-]?writ(ten|ing)\b|\bhandwrit|\billegi(ble|ble)|\bscrawl|\bpenmanship/.test(lower);
 }
 
 function docTypeFromHint(typeHint: string): DocType | undefined {
@@ -678,7 +690,10 @@ export async function extractMedicalPdfFromBuffer(
       allergies: docCore.allergies,
       conditions: docCore.conditions,
       sections: docCore.sections,
-      tags: [typeHint || docCore.type].filter(Boolean),
+      tags: [
+        typeHint || docCore.type,
+        detectHandwrittenTag(inp.fileName, llm.markdown_artifact, docCore.summary) ? "handwritten" : null,
+      ].filter(Boolean) as string[],
       originalFileName: inp.fileName,
       uploadedAtISO: uploadISO,
       contentHash,

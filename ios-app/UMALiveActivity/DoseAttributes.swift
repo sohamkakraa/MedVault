@@ -1,6 +1,6 @@
 // DoseAttributes.swift — ActivityKit Live Activity attributes for dose reminders
 
-import ActivityKit
+@preconcurrency import ActivityKit
 import Foundation
 import UMAShared
 
@@ -82,7 +82,7 @@ public struct DoseAttributes: ActivityAttributes, Sendable {
 public actor DoseLiveActivityManager {
     public static let shared = DoseLiveActivityManager()
 
-    private var currentActivity: Activity<DoseAttributes>?
+    nonisolated(unsafe) private var currentActivity: Activity<DoseAttributes>?
 
     public init() {}
 
@@ -118,13 +118,15 @@ public actor DoseLiveActivityManager {
         updated.status = status
         updated.ringProgress = 1.0
         updated.timeRemainingLabel = status.label
-        await activity.update(.init(state: updated, staleDate: nil))
+        let content = ActivityContent(state: updated, staleDate: nil)
+        await activity.update(content)
     }
 
     /// Ends the Live Activity.
     public func end(policy: ActivityUIDismissalPolicy = .immediate) async {
         guard let activity = currentActivity else { return }
-        await activity.end(nil, dismissalPolicy: policy)
+        let dismissal = policy
+        await activity.end(nil, dismissalPolicy: dismissal)
         currentActivity = nil
     }
 

@@ -21,7 +21,7 @@ struct LargeWidgetView: View {
             HStack {
                 Label("UMA Health", systemImage: "heart.text.square.fill")
                     .font(.headline)
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(.tint)
                 Spacer()
                 Text(entry.date, style: .date)
                     .font(.caption)
@@ -44,7 +44,7 @@ struct LargeWidgetView: View {
                                 .stroke(.secondary.opacity(0.2), lineWidth: 3)
                             Circle()
                                 .trim(from: 0, to: dose.ringProgress)
-                                .stroke(.accentColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                                .stroke(.tint, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                                 .rotationEffect(.degrees(-90))
                         }
                         .frame(width: 40, height: 40)
@@ -56,7 +56,7 @@ struct LargeWidgetView: View {
                                 if let doseAmt = dose.dose { Text(doseAmt).font(.caption).foregroundStyle(.secondary) }
                                 if let time = dose.scheduledTime {
                                     Text("·").foregroundStyle(.secondary)
-                                    Text(time, style: .time).font(.caption).foregroundStyle(.accentColor)
+                                    Text(time, style: .time).font(.caption).foregroundStyle(.tint)
                                 }
                             }
                         }
@@ -113,7 +113,7 @@ struct LargeWidgetView: View {
                 Spacer()
                 Image(systemName: "heart.text.square.fill")
                     .font(.caption2)
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(.tint)
             }
         }
         .padding(16)

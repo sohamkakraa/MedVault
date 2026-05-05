@@ -1,60 +1,73 @@
-// AuthToken.swift — Keychain-backed OTP session token
+// AuthToken.swift — Keychain-backed auth state tracking
 
 import Foundation
-import KeychainAccess
+import Security
 
-/// Thread-safe Keychain token storage.
-/// Access policy: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
 public actor AuthToken {
     public static let shared = AuthToken()
 
-    private let keychain: Keychain
+    private let service = "com.sohamkakra.uma"
     private let tokenKey = "uma_session_token"
-    private let expiryKey = "uma_session_expiry"
 
-    public init() {
-        keychain = Keychain(service: "com.sohamkakra.uma")
-            .accessibility(.afterFirstUnlockThisDeviceOnly)
-            .synchronizable(false) // device-only
-    }
+    public init() {}
 
-    /// Returns the stored token if it hasn't expired.
-    public var token: String? {
-        get {
-            guard let tok = try? keychain.get(tokenKey) else { return nil }
-            if isExpired { return nil }
-            return tok
-        }
-    }
-
-    /// True if the stored session has expired.
-    public var isExpired: Bool {
-        guard let expiryISO = try? keychain.get(expiryKey),
-              let expiry = ISO8601DateFormatter().date(from: expiryISO) else {
-            return true
-        }
-        return expiry <= Date()
-    }
-
-    /// True if there is a valid, unexpired token.
     public var isAuthenticated: Bool {
-        token != nil
+        read(key: tokenKey) != nil
     }
 
-    /// Saves a new token with its expiry to Keychain.
-    public func save(token: String, expiresAtISO: String) throws {
-        try keychain.set(token, key: tokenKey)
-        try keychain.set(expiresAtISO, key: expiryKey)
+    /// Returns the stored session token for Bearer auth, or nil if not authenticated.
+    public var sessionToken: String? {
+        read(key: tokenKey)
     }
 
-    /// Removes token and expiry from Keychain (sign out).
+    /// Stores the session token received from the server after OTP verification.
+    public func storeToken(_ token: String) throws {
+        try write(key: tokenKey, value: token)
+    }
+
     public func clear() {
-        try? keychain.remove(tokenKey)
-        try? keychain.remove(expiryKey)
+        delete(key: tokenKey)
     }
 
-    /// Returns the raw expiry ISO string for display.
-    public var expiryISO: String? {
-        try? keychain.get(expiryKey)
+    // MARK: - Native Keychain helpers
+
+    private func baseQuery(key: String) -> [String: Any] {
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: key,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        ]
+    }
+
+    private func read(key: String) -> String? {
+        var query = baseQuery(key: key)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    private func write(key: String, value: String) throws {
+        guard let data = value.data(using: .utf8) else { return }
+        delete(key: key)
+        var query = baseQuery(key: key)
+        query[kSecValueData as String] = data
+        let status = SecItemAdd(query as CFDictionary, nil)
+        if status != errSecSuccess {
+            throw KeychainError.unhandled(status: status)
+        }
+    }
+
+    private func delete(key: String) {
+        let query = baseQuery(key: key)
+        SecItemDelete(query as CFDictionary)
+    }
+
+    enum KeychainError: Error {
+        case unhandled(status: OSStatus)
     }
 }

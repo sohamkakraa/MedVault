@@ -28,7 +28,7 @@ struct MediumWidgetView: View {
                         if let time = dose.scheduledTime {
                             Text(time, style: .time)
                                 .font(.caption.weight(.semibold))
-                                .foregroundStyle(.accentColor)
+                                .foregroundStyle(.tint)
                         }
 
                         // Progress ring
@@ -37,7 +37,7 @@ struct MediumWidgetView: View {
                                 .stroke(.secondary.opacity(0.2), lineWidth: 3)
                             Circle()
                                 .trim(from: 0, to: dose.ringProgress)
-                                .stroke(.accentColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                                .stroke(.tint, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                                 .rotationEffect(.degrees(-90))
                         }
                         .frame(width: 32, height: 32)

@@ -10,7 +10,7 @@ struct DoseLiveActivityView: Widget {
             // Lock Screen / Banner view
             lockScreenView(context: context)
                 .activityBackgroundTint(Color(.systemBackground))
-                .activitySystemActionForegroundColor(.accentColor)
+                .activitySystemActionForegroundColor(Color.accentColor)
         } dynamicIsland: { context in
             DynamicIsland {
                 // Expanded regions
@@ -33,7 +33,7 @@ struct DoseLiveActivityView: Widget {
             } minimal: {
                 minimal(context: context)
             }
-            .keylineTint(.accentColor)
+            .keylineTint(Color.accentColor)
         }
     }
 
@@ -48,13 +48,13 @@ struct DoseLiveActivityView: Widget {
                     .stroke(.secondary.opacity(0.2), lineWidth: 4)
                 Circle()
                     .trim(from: 0, to: context.state.ringProgress)
-                    .stroke(.accentColor, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                     .animation(.easeInOut, value: context.state.ringProgress)
 
                 Image(systemName: context.state.status.systemImage)
                     .font(.title3)
-                    .foregroundStyle(context.state.status.isTaken ? .green : .accentColor)
+                    .foregroundStyle(context.state.status.isTaken ? .green : Color.accentColor)
             }
             .frame(width: 52, height: 52)
             .accessibilityHidden(true)
@@ -74,7 +74,7 @@ struct DoseLiveActivityView: Widget {
                         Text("·").foregroundStyle(.secondary)
                         Text(context.state.timeRemainingLabel)
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.accentColor)
+                            .foregroundStyle(Color.accentColor)
                     } else {
                         Text("·").foregroundStyle(.secondary)
                         Text(context.state.status.label)
@@ -93,7 +93,7 @@ struct DoseLiveActivityView: Widget {
                         .font(.caption.weight(.semibold))
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
-                        .background(.accentColor, in: Capsule())
+                        .background(Color.accentColor, in: Capsule())
                         .foregroundStyle(.white)
                 }
                 .buttonStyle(.plain)
@@ -109,7 +109,7 @@ struct DoseLiveActivityView: Widget {
     @ViewBuilder
     private func compactLeading(context: ActivityViewContext<DoseAttributes>) -> some View {
         Image(systemName: context.state.status.isTaken ? "checkmark.circle.fill" : "pills.circle.fill")
-            .foregroundStyle(context.state.status.isTaken ? .green : .accentColor)
+            .foregroundStyle(context.state.status.isTaken ? .green : Color.accentColor)
             .font(.body.weight(.semibold))
             .accessibilityLabel(context.state.status.isTaken ? "Dose taken" : "Dose due")
     }
@@ -123,7 +123,7 @@ struct DoseLiveActivityView: Widget {
         } else {
             Text(context.state.timeRemainingLabel)
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(.accentColor)
+                .foregroundStyle(Color.accentColor)
         }
     }
 
@@ -137,12 +137,12 @@ struct DoseLiveActivityView: Widget {
             if !context.state.status.isTaken {
                 Circle()
                     .trim(from: 0, to: context.state.ringProgress)
-                    .stroke(.accentColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                     .rotationEffect(.degrees(-90))
             }
             Image(systemName: context.state.status.isTaken ? "checkmark" : "pills")
                 .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(context.state.status.isTaken ? .green : .accentColor)
+                .foregroundStyle(context.state.status.isTaken ? .green : Color.accentColor)
         }
         .accessibilityLabel(context.state.status.isTaken ? "Dose taken" : "Dose pending")
     }
@@ -157,12 +157,12 @@ struct DoseLiveActivityView: Widget {
             if !context.state.status.isTaken {
                 Circle()
                     .trim(from: 0, to: context.state.ringProgress)
-                    .stroke(.accentColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                     .rotationEffect(.degrees(-90))
             }
             Image(systemName: context.state.status.systemImage)
                 .font(.title3)
-                .foregroundStyle(context.state.status.isTaken ? .green : .accentColor)
+                .foregroundStyle(context.state.status.isTaken ? .green : Color.accentColor)
         }
         .frame(width: 44, height: 44)
         .padding(.leading, 4)
@@ -176,7 +176,7 @@ struct DoseLiveActivityView: Widget {
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(.accentColor, in: Capsule())
+                    .background(Color.accentColor, in: Capsule())
                     .foregroundStyle(.white)
             }
             .buttonStyle(.plain)
@@ -212,7 +212,7 @@ struct DoseLiveActivityView: Widget {
             } else {
                 Text(context.state.timeRemainingLabel)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(Color.accentColor)
                 Spacer()
                 Button(intent: DismissDoseIntent(doseId: context.attributes.doseId)) {
                     Text("Dismiss")

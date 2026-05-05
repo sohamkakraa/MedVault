@@ -25,7 +25,6 @@ public enum UMAClientError: Error, Sendable, LocalizedError {
     }
 }
 
-/// Main API client. All methods are isolated to the actor executor.
 public actor UMAClient {
     public static let shared = UMAClient()
 
@@ -55,13 +54,11 @@ public actor UMAClient {
 
     // MARK: - Patient Store
 
-    /// Fetches the full PatientStore from the server.
     public func fetchStore() async throws -> PatientStore {
         let request = try await authenticatedRequest(for: .patientStore)
         return try await performRequest(request, decoding: PatientStore.self)
     }
 
-    /// Streams PatientStore updates via SSE.
     public func streamStore() -> AsyncThrowingStream<PatientStore, Error> {
         AsyncThrowingStream { [weak self] continuation in
             guard let self else {
@@ -91,7 +88,6 @@ public actor UMAClient {
 
     // MARK: - PDF Upload
 
-    /// Uploads a PDF and returns the extracted document.
     public func uploadPDF(data: Data, filename: String) async throws -> ExtractedDoc {
         var request = try await authenticatedRequest(for: .extract)
         request.httpMethod = "POST"
@@ -113,7 +109,6 @@ public actor UMAClient {
 
     // MARK: - Chat (SSE streaming)
 
-    /// Sends a chat message and returns an AsyncThrowingStream of token strings.
     public func sendChat(
         message: String,
         history: [ChatMessage],
@@ -149,38 +144,82 @@ public actor UMAClient {
 
     // MARK: - Auth
 
-    public func requestOTP(email: String, channel: AuthRequest.AuthChannel) async throws {
-        var request = URLRequest(url: UMAEndpoint.patientStore.url
-            .deletingLastPathComponent()
-            .appendingPathComponent("auth/login"))
+    /// Returns the dev OTP if the server provides one (dev mode only).
+    public func requestOTP(identifier: String, phoneCountryCode: String? = nil) async throws -> String? {
+        var request = URLRequest(url: UMAEndpoint.requestOTP.url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let body = AuthRequest(email: email, channel: channel)
+        let body = OTPRequest(identifier: identifier, phoneCountryCode: phoneCountryCode)
         request.httpBody = try encoder.encode(body)
+
+        let data = try await performRawRequest(request)
+        let response = try decoder.decode(APIResponse.self, from: data)
+        if !response.ok {
+            throw UMAClientError.serverError(400, response.error ?? "Failed to send code")
+        }
+        return response.devOtp
+    }
+
+    public func verifyOTP(identifier: String, code: String) async throws {
+        var request = URLRequest(url: UMAEndpoint.verifyOTP.url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // Signal to the server that this is the iOS native client so it
+        // returns the session token in the response body (cookies don't
+        // survive across domains on URLSession without an app group cookie jar).
+        request.setValue("ios", forHTTPHeaderField: "X-UMA-Client")
+        let body = OTPVerifyRequest(identifier: identifier, code: code)
+        request.httpBody = try encoder.encode(body)
+
+        let data = try await performRawRequest(request)
+        let response = try decoder.decode(APIResponse.self, from: data)
+        if !response.ok {
+            throw UMAClientError.serverError(401, response.error ?? "Verification failed")
+        }
+        guard let token = response.token else {
+            throw UMAClientError.serverError(500, "Server did not return a session token.")
+        }
+        try await authToken.storeToken(token)
+    }
+
+    public func checkSession() async throws -> SessionResponse {
+        var request = try await authenticatedRequest(for: .session)
+        request.timeoutInterval = 10
+        return try await performRequest(request, decoding: SessionResponse.self)
+    }
+
+    // MARK: - HealthKit sync
+
+    public func syncHealthKit(_ payload: HealthKitSyncPayload) async throws {
+        var request = try await authenticatedRequest(for: .healthKitSync)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try encoder.encode(payload)
         _ = try await performRawRequest(request)
     }
 
-    public func verifyOTP(email: String, otp: String) async throws -> AuthResponse {
-        var request = URLRequest(url: UMAEndpoint.patientStore.url
-            .deletingLastPathComponent()
-            .appendingPathComponent("auth/verify"))
+    public func logout() async {
+        var request = URLRequest(url: UMAEndpoint.logout.url)
         request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let body = OTPVerifyRequest(email: email, otp: otp)
-        request.httpBody = try encoder.encode(body)
-        return try await performRequest(request, decoding: AuthResponse.self)
+        _ = try? await performRawRequest(request)
+        await authToken.clear()
+        // Clear cookies for the domain
+        if let cookies = session.configuration.httpCookieStorage?.cookies(for: UMAEndpoint.session.url) {
+            for cookie in cookies {
+                session.configuration.httpCookieStorage?.deleteCookie(cookie)
+            }
+        }
     }
 
     // MARK: - Private helpers
 
     private func authenticatedRequest(for endpoint: UMAEndpoint) async throws -> URLRequest {
-        guard let token = await authToken.token else {
+        guard let token = await authToken.sessionToken else {
             throw UMAClientError.notAuthenticated
         }
         var request = URLRequest(url: endpoint.url)
         request.httpMethod = endpoint.method
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 30
         return request
     }
@@ -209,13 +248,16 @@ public actor UMAClient {
                 guard let httpResponse = response as? HTTPURLResponse else {
                     throw UMAClientError.networkError(URLError(.badServerResponse))
                 }
+                if httpResponse.statusCode == 401 {
+                    await authToken.clear()
+                    throw UMAClientError.notAuthenticated
+                }
                 guard (200...299).contains(httpResponse.statusCode) else {
                     let message = String(data: data, encoding: .utf8)
                     throw UMAClientError.serverError(httpResponse.statusCode, message)
                 }
                 return data
             } catch let error as UMAClientError {
-                // Don't retry auth errors or 4xx
                 if case .serverError(let code, _) = error, (400...499).contains(code) {
                     throw error
                 }

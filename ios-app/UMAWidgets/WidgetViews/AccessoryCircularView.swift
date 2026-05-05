@@ -37,13 +37,13 @@ struct AccessoryCircularView: View {
         if let dose = entry.nextDose {
             Circle()
                 .trim(from: 0, to: dose.ringProgress)
-                .stroke(.accentColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                .stroke(.tint, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                 .rotationEffect(.degrees(-90))
 
             VStack(spacing: 1) {
                 Image(systemName: "pills.circle.fill")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(.tint)
                 if let time = dose.scheduledTime {
                     Text(time, format: .dateTime.hour().minute())
                         .font(.system(size: 9, weight: .medium))
@@ -103,7 +103,7 @@ struct AccessoryCircularView: View {
         VStack(spacing: 0) {
             Image(systemName: "figure.walk")
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.accentColor)
+                .foregroundStyle(.tint)
         }
     }
 

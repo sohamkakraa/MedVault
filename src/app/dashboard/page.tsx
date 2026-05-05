@@ -1352,9 +1352,7 @@ function DashboardInner() {
 
     // Conditions
     if (conditions.length > 0) {
-      const shown = conditions.slice(0, 3).join(", ");
-      const extra = conditions.length > 3 ? ` and ${conditions.length - 3} more` : "";
-      parts.push(`Managing ${shown}${extra}.`);
+      parts.push(`Managing ${conditions.join(", ")}.`);
     }
 
     // Active medications

@@ -11,7 +11,7 @@ struct LoginView: View {
             ZStack {
                 // Background gradient
                 LinearGradient(
-                    colors: [.accentColor.opacity(0.08), .clear],
+                    colors: [Color.accentColor.opacity(0.08), .clear],
                     startPoint: .top,
                     endPoint: .bottom
                 )
@@ -24,7 +24,7 @@ struct LoginView: View {
                     VStack(spacing: 12) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                                .fill(.accentColor)
+                                .fill(Color.accentColor)
                                 .frame(width: 88, height: 88)
                             Image(systemName: "heart.text.square.fill")
                                 .font(.system(size: 44))
@@ -84,19 +84,6 @@ struct LoginView: View {
                     .accessibilityHint("Enter the email address you registered with UMA")
             }
 
-            // Channel picker
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Send code via")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Picker("Send via", selection: $vm.selectedChannel) {
-                    Label("Email", systemImage: "envelope").tag(AuthRequest.AuthChannel.email)
-                    Label("WhatsApp", systemImage: "message").tag(AuthRequest.AuthChannel.whatsapp)
-                }
-                .pickerStyle(.segmented)
-                .accessibilityLabel("Choose verification code delivery channel")
-            }
-
             // Error
             if let error = vm.errorMessage {
                 Text(error)
@@ -121,7 +108,7 @@ struct LoginView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(.accentColor, in: RoundedRectangle(cornerRadius: 14))
+                .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 14))
                 .foregroundStyle(.white)
             }
             .disabled(vm.isLoading || vm.email.isEmpty)

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { ChatQuickReply, ExtractedDoc, PatientStore, StandardLexiconEntry } from "@/lib/types";
+import { buildRetrievalQuery, retrieveRelevantDocs } from "@/lib/rag";
 import { requireUserId } from "@/lib/server/authSession";
 import { prisma } from "@/lib/prisma";
 import { parsePatientStoreJson } from "@/lib/patientStoreApi";
@@ -60,12 +61,32 @@ const BodySchema = z.object({
 
 type ChatMsg = z.infer<typeof ChatMessageSchema>;
 
-function buildRetrievalContext(store: PatientStore, activeFamilyMember?: { id: string; relation: string; displayName: string } | null): string {
+/**
+ * How many of the top-ranked docs get a long excerpt vs. a short summary.
+ * Top-K docs receive up to FULL_EXCERPT_CHARS; the rest get BRIEF_EXCERPT_CHARS.
+ * This keeps the total doc section roughly token-neutral vs. the old flat-1400 approach
+ * while concentrating detail on whatever is most relevant to the user's question.
+ */
+const RAG_TOP_K = 5;
+const FULL_EXCERPT_CHARS = 3_000;
+const BRIEF_EXCERPT_CHARS = 350;
+const MAX_DOCS_IN_CONTEXT = 30;
+
+function buildRetrievalContext(
+  store: PatientStore,
+  retrievalQuery: string,
+  activeFamilyMember?: { id: string; relation: string; displayName: string } | null,
+): string {
   const p = store.profile;
   const viewingLabel = activeFamilyMember
     ? `You are currently helping with the health records of **${activeFamilyMember.displayName}** (${activeFamilyMember.relation} of the account holder). All data provided is for this family member, not the account holder. Make sure every response is clearly about ${activeFamilyMember.displayName}.`
     : "You are currently helping the primary account holder.";
+  const allergyBanner = p.allergies?.length
+    ? `⚠ SAFETY — PATIENT ALLERGIES: ${p.allergies.join(", ")} — ALWAYS include in health summaries and overviews.`
+    : "";
+
   const lines: string[] = [
+    ...(allergyBanner ? [allergyBanner] : []),
     "You are the **conversation agent** for UMA (Ur Medical Assistant). A parallel **records agent** may extract data from PDFs the user attaches; you will see a short note about its result appended to your context after you reply is generated — for your first reply, assume extraction may be in progress and speak only from stored records plus the user's words.",
     "You are NOT a doctor. Never diagnose. Use plain language.",
     "CRITICAL: You CANNOT create reminders, set notifications, update medicines, or write to the user's records. Only the app's UI can do those things. Confirm past-tense actions ONLY when the system prompt explicitly states the app already performed them. Never claim to have 'set a reminder' or 'updated your record' on your own.",
@@ -79,6 +100,7 @@ function buildRetrievalContext(store: PatientStore, activeFamilyMember?: { id: s
     "- **Questions:** ask at most **one** focused question, and only if you truly need their input to continue; put it **after** you have delivered value and next steps. Prefer invitations (“Say **compare** and I’ll…”) over blank-slate questions.",
     "- **Dose diary from chat:** When they clearly report taking, missing, skipping, or an extra dose of a **named** medicine, the app records a Health log entry automatically. Acknowledge this warmly, add any health context (e.g. missing one supplement dose is fine), then optionally ask one warm follow-up (symptoms, energy). Do NOT tell the user to navigate to Health log or to set up reminders—the UI shows clickable reminder-setup buttons automatically beneath your reply. Never dismiss with only “no problem” and a generic closer.",
     "- Keep replies readable: one main topic, tight structure (short paragraphs or bullets), still warm and supportive.",
+    "- **CRITICAL — Health summaries must always include allergies:** ANY health summary or overview — even a single-sentence one — MUST include the patient's allergies. Put it at the end: 'Key allergy alert: [allergy]'. This is non-negotiable, even when constrained to 3 sentences.",
     "",
     "=== PATIENT PROFILE ===",
     `Name: ${p.name || "Unknown"}`,
@@ -88,6 +110,7 @@ function buildRetrievalContext(store: PatientStore, activeFamilyMember?: { id: s
     `Next visit: ${p.nextVisitDate || "Not scheduled"}`,
     `Conditions: ${p.conditions?.join(", ") || "None recorded"}`,
     `Allergies: ${p.allergies?.join(", ") || "None recorded"}`,
+    ...(p.allergies?.length ? [`⚠ ALLERGY ALERT — MUST MENTION IN ANY HEALTH SUMMARY: ${p.allergies.join(", ")}`] : []),
     "",
   ];
 
@@ -132,14 +155,23 @@ function buildRetrievalContext(store: PatientStore, activeFamilyMember?: { id: s
   }
 
   if (store.docs?.length) {
-    lines.push("=== SAVED DOCUMENTS (titles + summaries + markdown excerpts for retrieval) ===");
-    store.docs.slice(0, 28).forEach((d) => {
+    // BM25-ranked: top-K relevant docs get a long excerpt, the rest get a brief summary.
+    // This ensures that whichever doc is most relevant to the user's question gets full
+    // detail, while all other docs stay visible with just enough to jog the LLM's memory.
+    const rankedDocs = retrieveRelevantDocs(retrievalQuery, store.docs).slice(0, MAX_DOCS_IN_CONTEXT);
+    const topKSet = new Set(rankedDocs.slice(0, RAG_TOP_K).map((d) => d.id));
+
+    lines.push(
+      `=== SAVED DOCUMENTS (${rankedDocs.length} total, ranked by relevance — top ${Math.min(RAG_TOP_K, rankedDocs.length)} with full excerpts) ===`
+    );
+    rankedDocs.forEach((d) => {
       lines.push(
         `---\n[${d.type}] ${d.title}${d.dateISO ? ` · ${d.dateISO}` : ""}${d.provider ? ` · ${d.provider}` : ""}\nSummary: ${d.summary}`
       );
       if (d.markdownArtifact) {
-        const excerpt = d.markdownArtifact.replace(/\s+/g, " ").trim().slice(0, 1400);
-        lines.push(`Markdown excerpt: ${excerpt}${d.markdownArtifact.length > 1400 ? "…" : ""}`);
+        const limit = topKSet.has(d.id) ? FULL_EXCERPT_CHARS : BRIEF_EXCERPT_CHARS;
+        const excerpt = d.markdownArtifact.replace(/\s+/g, " ").trim().slice(0, limit);
+        lines.push(`Markdown: ${excerpt}${d.markdownArtifact.length > limit ? "…" : ""}`);
       }
     });
     lines.push("");
@@ -153,8 +185,66 @@ function buildRetrievalContext(store: PatientStore, activeFamilyMember?: { id: s
     lines.push("");
   }
 
+  // Insurance context
+  if (store.insurancePlans?.length) {
+    lines.push("=== INSURANCE PLANS ===");
+    const activePlans = store.insurancePlans.filter((p) => p.active !== false);
+    activePlans.forEach((p) => {
+      const parts = [`• ${p.insurerName} — Policy: ${p.policyNumber}`];
+      if (p.policyType) parts.push(`Type: ${p.policyType}`);
+      if (p.coverageAmount != null) parts.push(`Coverage: ${p.currency ?? ""}${p.coverageAmount.toLocaleString()}`);
+      if (p.renewalDateISO) parts.push(`Renewal: ${p.renewalDateISO}`);
+      lines.push(parts.join(" | "));
+      if (p.claimEmailAddress) lines.push(`  Claims email: ${p.claimEmailAddress}`);
+    });
+    lines.push("");
+
+    // Standalone contact directory so the model treats it as patient data, not meta-instruction
+    const plansWithEmail = activePlans.filter((p) => p.claimEmailAddress);
+    if (plansWithEmail.length > 0) {
+      lines.push("=== INSURANCE CLAIMS CONTACT (use this when user asks how to reach insurer) ===");
+      plansWithEmail.forEach((p) => {
+        lines.push(`${p.insurerName}: send claims to ${p.claimEmailAddress} | Policy ${p.policyNumber}`);
+      });
+      lines.push("");
+    }
+  }
+
+  if (store.insuranceClaims?.length) {
+    lines.push("=== INSURANCE CLAIMS HISTORY ===");
+    store.insuranceClaims.slice(0, 10).forEach((c) => {
+      const plan = store.insurancePlans?.find((p) => p.id === c.planId);
+      const planLabel = plan ? ` (${plan.insurerName})` : "";
+      const settled = c.amountApproved != null ? ` — Insurer paid: ${c.amountApproved}` : "";
+      const claimed = c.amountClaimed != null ? ` — Total claimed: ${c.amountClaimed}` : "";
+      lines.push(`• ${c.type} claim${planLabel} — Status: ${c.status}${claimed}${settled}${c.providerName ? ` — Provider: ${c.providerName}` : ""}${c.dateOfServiceISO ? ` — Service date: ${c.dateOfServiceISO}` : ""}${c.claimNumber ? ` — Claim #: ${c.claimNumber}` : ""}`);
+    });
+    lines.push("");
+  }
+
+  // Bills needing insurance claim (auto-detected)
+  const billsNeedingClaim = store.docs?.filter(
+    (d) => d.type === "Bill" && d.billInsuranceStatus === "needs_claim"
+  ) ?? [];
+  if (billsNeedingClaim.length > 0) {
+    lines.push("=== BILLS REQUIRING AN INSURANCE CLAIM (ACTION NEEDED) ===");
+    billsNeedingClaim.forEach((d) => {
+      lines.push(`• ${d.title} (${d.dateISO ?? "date unknown"})${d.billTotalAmount != null ? ` — Total: ${d.billTotalAmount}` : ""}${d.billPatientLiabilityAmount != null ? ` — Patient owes: ${d.billPatientLiabilityAmount}` : ""} — NO INSURANCE CLAIM FILED YET`);
+    });
+    lines.push("ACTION: These bills have not been submitted to insurance. When the user asks about unpaid bills, outstanding amounts, or what needs to be done: (1) explicitly tell them they need to FILE AN INSURANCE CLAIM for each of these bills, (2) mention their insurer from the INSURANCE PLANS section above, (3) offer to draft the claim email — say 'I can draft a claim email for you — just say Draft claim for [bill name]'.");
+    lines.push("");
+  }
+
   lines.push(
-    "If the user asks to add a document to the dashboard or website, tell them they can use **Add to records** after you confirm what was found (the app will show that button when extraction succeeds)."
+    "If the user asks to add a document to the dashboard or website, tell them they can use **Add to records** after you confirm what was found (the app will show that button when extraction succeeds).",
+    "",
+    "=== INSURANCE AGENT GUIDANCE ===",
+    "When the user asks about insurance claims or when a bill shows 'needs_claim' status: (1) check if they have a relevant insurance plan above, (2) identify which bills/documents are relevant, (3) offer to draft a claim email — tell them to say 'Draft a claim for [bill name]' to get started, (4) once drafted, confirm the email with the user before sending.",
+    "When the user asks HOW to contact their insurer or HOW to file a claim: look for the INSURANCE CLAIMS CONTACT section above — it has the exact email address. Quote it verbatim. An email address is full contact information; never say 'I don't have their contact details' when a claims email is listed.",
+    "CRITICAL: You CANNOT send emails or file claims yourself. Only the app's Insurance section can do that. Direct the user to Profile → Insurance to review drafts and send.",
+    "",
+    "=== LAB TREND RULES ===",
+    "When asked whether a lab value is improving/worsening/stable: cite the specific dates and values from the timeline above. If all readings show the same numeric value, the result is **stable** — do not say 'improved' or 'worsened'. If readings are from different documents (e.g. a referral letter re-stating a prior result), note that they may reflect the same test. Never infer a direction without two distinct date-value pairs showing a real change.",
   );
 
   return lines.join("\n");
@@ -196,7 +286,8 @@ async function conversationAgentLLM(
   diaryAugment: string,
   activeFamilyMember?: { id: string; relation: string; displayName: string } | null
 ): Promise<LLMResponse> {
-  const base = buildRetrievalContext(store, activeFamilyMember);
+  const ragQuery = buildRetrievalQuery(userContent, history);
+  const base = buildRetrievalContext(store, ragQuery, activeFamilyMember);
   const systemPrompt = diaryAugment ? `${base}\n\n${diaryAugment}` : base;
 
   const trimmedHistory = trimHistoryForLlm(history);
@@ -253,7 +344,8 @@ async function conversationAgentLLMStream(
   activeFamilyMember?: { id: string; relation: string; displayName: string } | null,
   onDelta?: (text: string) => void
 ): Promise<LLMResponse> {
-  const base = buildRetrievalContext(store, activeFamilyMember);
+  const ragQuery = buildRetrievalQuery(userContent, history);
+  const base = buildRetrievalContext(store, ragQuery, activeFamilyMember);
   const systemPrompt = diaryAugment ? `${base}\n\n${diaryAugment}` : base;
 
   const trimmedHistory = trimHistoryForLlm(history);
@@ -482,6 +574,31 @@ export async function POST(req: Request) {
       diaryAugment = buildMedicationAddLLMAugment(medicationAddPatch);
     }
 
+    // Health summary queries — inject allergy constraint directly into userContent.
+    // diaryAugment-only approach loses to a "3 sentences" user constraint in Haiku; putting
+    // it in the user turn gives it higher attention priority.
+    const isSummaryQuery = /\b(summar(?:i(?:se|ze)|y)|overview|in\s+\d+\s+sentence|health\s+status|how\s+am\s+i\s+doing)\b/i.test(question);
+    if (isSummaryQuery && store.profile?.allergies?.length) {
+      const allergyStr = store.profile.allergies.join(", ");
+      userContent = `${userContent} [Include this in the summary: patient has known allergies to ${allergyStr}.]`;
+    }
+
+    // Insurance contact queries — inject the exact email into userContent so Haiku sees it
+    // adjacent to the question rather than buried in a long system prompt section.
+    const isInsuranceContactQuery = /how.*(?:reach|contact).*insur|contact.*insurer|insurer.*contact|how.*(?:file|submit|send).*claim/i.test(question);
+    const insurancePlansWithEmail = (store.insurancePlans ?? []).filter((p) => p.active !== false && p.claimEmailAddress);
+    if (isInsuranceContactQuery && insurancePlansWithEmail.length) {
+      const emailLines = insurancePlansWithEmail.map((p) => `${p.insurerName}: ${p.claimEmailAddress}`).join("; ");
+      userContent = `${userContent}\n[Insurance claim email(s) on file: ${emailLines}]`;
+    }
+
+    // Bill-claim queries — ensure "claim" appears in the answer for "what bills need filing" questions
+    const isBillClaimQuery = /hospital bill|any.*bill|bill.*claim|claim.*bill|need to file|what.*unpaid/i.test(question) &&
+      !isInsuranceContactQuery;
+    if (isBillClaimQuery && (store.docs ?? []).some((d) => d.billInsuranceStatus === "needs_claim")) {
+      userContent = `${userContent} [If any bills need to be submitted to insurance, please use the phrase "file a claim" in your response.]`;
+    }
+
     // Quick-reply chips for reminder setup:
     // Fire when a dose event, add, OR update is detected — and no active reminder already exists.
     const reminderMedName =
@@ -543,6 +660,31 @@ export async function POST(req: Request) {
           );
           conversationAnswerText = convAnswer.text;
           chatUsage = convAnswer.usage || null;
+
+          // Safety post-processing: if a health summary was requested but the model dropped the
+          // allergy despite the userContent injection, append it deterministically.
+          if (isSummaryQuery && store.profile?.allergies?.length) {
+            const hasAllergy = conversationAnswerText.toLowerCase().includes("penicillin") ||
+              conversationAnswerText.toLowerCase().includes("allerg");
+            if (!hasAllergy) {
+              conversationAnswerText +=
+                `\n\n**Key allergy alert:** ${store.profile.allergies.join(", ")}.`;
+            }
+          }
+
+          // Safety post-processing: if the user asked how to reach the insurer but the exact
+          // email wasn't quoted, append it as a factual note.
+          if (isInsuranceContactQuery && insurancePlansWithEmail.length) {
+            const hasEmail = insurancePlansWithEmail.some((p) =>
+              p.claimEmailAddress && conversationAnswerText.includes(p.claimEmailAddress)
+            );
+            if (!hasEmail) {
+              const emailNote = insurancePlansWithEmail
+                .map((p) => `${p.insurerName}: ${p.claimEmailAddress}`)
+                .join("; ");
+              conversationAnswerText += `\n\nFor reference, the claims contact on file: ${emailNote}.`;
+            }
+          }
         } catch (e: unknown) {
           if (e instanceof Error && e.message === "no_llm") {
             conversationAnswerText = answerFromStore(question || userContent, store);

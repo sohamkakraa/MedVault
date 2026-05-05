@@ -131,7 +131,11 @@ export async function syncPatientStoreWithServer(): Promise<void> {
   }
 
   const j = (await r.json()) as { ok?: boolean; store?: PatientStore | null };
-  if (!j.ok) return;
+  if (!j.ok) {
+    _isSyncing = false;
+    try { window.dispatchEvent(new CustomEvent("mv-store-synced")); } catch {}
+    return;
+  }
 
   const local = getStore();
   const localHasData =
@@ -387,6 +391,12 @@ function parseStoredPatientStore(parsed: unknown): PatientStore {
       : undefined,
     pendingFamilyRequests: Array.isArray((parsedSansWearables as Partial<PatientStore>).pendingFamilyRequests)
       ? ((parsedSansWearables as Partial<PatientStore>).pendingFamilyRequests as import("@/lib/types").FamilyConnectionRequest[])
+      : undefined,
+    insurancePlans: Array.isArray((parsedSansWearables as Partial<PatientStore>).insurancePlans)
+      ? ((parsedSansWearables as Partial<PatientStore>).insurancePlans as import("@/lib/types").InsurancePlan[])
+      : undefined,
+    insuranceClaims: Array.isArray((parsedSansWearables as Partial<PatientStore>).insuranceClaims)
+      ? ((parsedSansWearables as Partial<PatientStore>).insuranceClaims as import("@/lib/types").InsuranceClaim[])
       : undefined,
   };
 }

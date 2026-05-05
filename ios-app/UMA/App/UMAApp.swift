@@ -10,6 +10,7 @@ struct UMAApp: App {
     @State private var chatViewModel = ChatViewModel()
     @State private var recordsViewModel = RecordsViewModel()
     @State private var profileViewModel = ProfileViewModel()
+    @State private var healthKitViewModel = HealthKitViewModel()
 
     var body: some Scene {
         WindowGroup {
@@ -19,6 +20,7 @@ struct UMAApp: App {
                 .environment(chatViewModel)
                 .environment(recordsViewModel)
                 .environment(profileViewModel)
+                .environment(healthKitViewModel)
                 .task {
                     await authViewModel.checkAuthStatus()
                 }
@@ -61,6 +63,6 @@ struct MainTabView: View {
                 ProfileView()
             }
         }
-        .tint(.accentColor)
+        .tint(Color.accentColor)
     }
 }

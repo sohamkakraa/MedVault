@@ -116,7 +116,7 @@ struct ChatView: View {
                     } label: {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.title2)
-                            .foregroundStyle(vm.canSend ? .accentColor : .secondary)
+                            .foregroundStyle(vm.canSend ? Color.accentColor : .secondary)
                     }
                     .disabled(!vm.canSend)
                     .accessibilityLabel("Send message")
@@ -137,7 +137,7 @@ struct ChatView: View {
             Spacer()
             Image(systemName: "heart.text.square.fill")
                 .font(.system(size: 60))
-                .foregroundStyle(.accentColor)
+                .foregroundStyle(Color.accentColor)
 
             VStack(spacing: 8) {
                 Text("Hi, I'm UMA")

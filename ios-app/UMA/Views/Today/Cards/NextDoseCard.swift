@@ -32,13 +32,13 @@ struct NextDoseCard: View {
                     .stroke(.secondary.opacity(0.2), lineWidth: 4)
                 Circle()
                     .trim(from: 0, to: dose.ringProgress)
-                    .stroke(.accentColor, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                     .animation(.easeInOut(duration: 0.4), value: dose.ringProgress)
 
                 Image(systemName: dose.status.systemImage)
                     .font(.title3)
-                    .foregroundStyle(dose.status.isTaken ? .green : .accentColor)
+                    .foregroundStyle(dose.status.isTaken ? .green : Color.accentColor)
             }
             .frame(width: 56, height: 56)
             .accessibilityLabel("Dose progress ring: \(Int(dose.ringProgress * 100)) percent")
@@ -74,8 +74,8 @@ struct NextDoseCard: View {
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
-                    .background(.accentColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
-                    .foregroundStyle(.accentColor)
+                    .background(Color.accentColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
+                    .foregroundStyle(Color.accentColor)
             }
             .disabled(isLogging)
             .accessibilityLabel("Mark \(dose.medicationName) as taken")
