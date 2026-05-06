@@ -101,6 +101,17 @@ export async function listThreads(userId: string): Promise<ThreadRow[]> {
 }
 
 /**
+ * List the user's archived threads, newest archived first. Caps at 50.
+ */
+export async function listArchivedThreads(userId: string): Promise<ThreadRow[]> {
+  return (await prisma.thread.findMany({
+    where: { userId, archivedAt: { not: null } },
+    orderBy: { archivedAt: "desc" },
+    take: 50,
+  })) as ThreadRow[];
+}
+
+/**
  * Create a new thread and atomically mark it as active. Used by the "New
  * chat" button on the webapp.
  */

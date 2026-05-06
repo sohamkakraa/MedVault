@@ -27,6 +27,7 @@ import { patientStoreForApiPayload } from "@/lib/patientStoreApi";
 import { log } from "@/lib/log";
 import { applyEffectiveThemeToDocument, resolveThemePreference } from "@/lib/themePreference";
 import { generateInternalId, registerPrimaryAccount, registerSubProfile, deregisterEntry } from "@/lib/accountRegistry";
+import { interpretLab } from "@/lib/labInterpret";
 
 const KEY = "mv_patient_store_v1";
 const ACCOUNT_INIT = "mv_account_initialized_v1";
@@ -824,13 +825,9 @@ export function smartMergeExtractedDoc(
     rebuildLabsAndMedsFromDocuments(store);
     mergeDocProfileFields(store, enriched);
     saveStore(store);
-    pushNotification({
-      kind: enriched.type === "Lab report" ? "lab_uploaded" : "doc_uploaded",
-      title: `${enriched.type} saved`,
-      body: enriched.summary.slice(0, 120),
-      actionHref: `/docs/${enriched.id}`,
-      actionLabel: "View document",
-    });
+    // Only notify if the report contains abnormal (flagged) labs — skip the
+    // purely informational "document saved" event which was noisy.
+    pushAbnormalLabNotificationIfNeeded(enriched, store.standardLexicon ?? []);
     return {
       action: "added",
       store,
@@ -866,13 +863,9 @@ export function smartMergeExtractedDoc(
       rebuildLabsAndMedsFromDocuments(store);
       mergeDocProfileFields(store, upgradedDoc);
       saveStore(store);
-      pushNotification({
-        kind: "lab_uploaded",
-        title: `Report updated`,
-        body: `"${existingTitle}" was upgraded with ${overlap.newExtraCount} additional result${overlap.newExtraCount === 1 ? "" : "s"}.`,
-        actionHref: `/docs/${upgradedDoc.id}`,
-        actionLabel: "View document",
-      });
+      // Only notify if the upgraded report has abnormal labs — skip the
+      // informational "report updated" event.
+      pushAbnormalLabNotificationIfNeeded(upgradedDoc, store.standardLexicon ?? []);
       return {
         action: "upgraded",
         store,
@@ -903,6 +896,37 @@ export function smartMergeExtractedDoc(
       };
     }
   }
+}
+
+/**
+ * If the document contains any abnormal (out-of-range) lab results, push a single
+ * actionable `lab_flag` notification. If all labs are in range (or there are none),
+ * no notification is created — document uploads are otherwise silent.
+ */
+function pushAbnormalLabNotificationIfNeeded(doc: ExtractedDoc, lex: import("@/lib/types").StandardLexiconEntry[]): void {
+  const labs = doc.labs ?? [];
+  if (labs.length === 0) return;
+
+  const abnormal = labs.filter((l) => {
+    try {
+      const interp = interpretLab(l, lex);
+      return interp.flag === "high" || interp.flag === "low";
+    } catch {
+      return false;
+    }
+  });
+
+  if (abnormal.length === 0) return;
+
+  const labNames = abnormal.slice(0, 3).map((l) => l.name).join(", ");
+  const more = abnormal.length > 3 ? ` and ${abnormal.length - 3} more` : "";
+  pushNotification({
+    kind: "lab_flag",
+    title: `${abnormal.length} result${abnormal.length === 1 ? "" : "s"} outside normal range`,
+    body: `${labNames}${more} — review these with your doctor.`,
+    actionHref: `/docs/${doc.id}`,
+    actionLabel: "View report",
+  });
 }
 
 /** Merge allergies, conditions, and primary care provider from a doc into the store profile. */

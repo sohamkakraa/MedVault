@@ -199,7 +199,7 @@ export function GaugeCard(props: {
       <CardContent className="p-4 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-sm font-semibold truncate">
+            <p className="text-sm font-semibold break-words">
               {meta?.emoji} {meta ? meta.friendlyName : name}
             </p>
             {meta && meta.friendlyName !== name && (
@@ -240,13 +240,13 @@ export function GaugeCard(props: {
           />
         </div>
 
-        <div className="flex justify-between text-[10px] text-[var(--muted)] leading-none">
-          <span>
-            &lt;&thinsp;{fmtNum(refData.low)}&thinsp;{refData.unit}
+        <div className="flex justify-between text-[10px] text-[var(--muted)] leading-none gap-1">
+          <span className="shrink-0">
+            &lt;{fmtNum(refData.low)}&thinsp;{refData.unit}
           </span>
-          <span>Normal range</span>
-          <span>
-            &gt;&thinsp;{fmtNum(refData.high)}&thinsp;{refData.unit}
+          <span className="truncate text-center">Normal</span>
+          <span className="shrink-0 text-right">
+            &gt;{fmtNum(refData.high)}&thinsp;{refData.unit}
           </span>
         </div>
       </CardContent>

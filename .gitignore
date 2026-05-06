@@ -40,3 +40,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# Prism (auto-generated, machine-specific)
+.claude/settings.local.json
+.claude/prism.md
+.claude/skills/
+.claude/.prism_project_id

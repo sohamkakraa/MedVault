@@ -214,6 +214,16 @@ export async function POST(
 }
 
 /**
+ * Returns true when the assistant's reply contains clinical/advisory language
+ * that warrants the "Not medical advice" disclaimer.  Returns false for purely
+ * factual lookups (stored values, names, dates, appointments).
+ */
+function isClinicalResponse(text: string): boolean {
+  const t = text.toLowerCase();
+  return /\b(dos(?:e|age|ing)|mg\b|mcg\b|tablet|capsule|inject|interaction|side[\s-]effect|symptom|diagnos|treat(?:ment|ing)|prescri|avoid\b|consult\b|risk\b|allerg|medication\s+change|adverse|contra[\s-]?indica|monitor\b|overdose|toxic|warning)\b/.test(t);
+}
+
+/**
  * Minimal patient-aware LLM call — mirrors the WhatsApp processIncomingMessage
  * pattern so a question asked on either surface produces the same answer
  * given the same context.
@@ -299,6 +309,14 @@ async function callConversationLLM(
     }
   }
 
+  // Post-processing safety net: append the medical-advice disclaimer only when
+  // the response contains clinical/advisory language.  Skip it for purely
+  // factual lookups (stored values, names, dates, appointments).
+  const DISCLAIMER = "Not medical advice — talk to your doctor before acting on this.";
+  if (!text.includes(DISCLAIMER) && isClinicalResponse(text)) {
+    text += `\n\n*${DISCLAIMER}*`;
+  }
+
   return text || "(no response)";
 }
 
@@ -339,7 +357,7 @@ function buildSystemPrompt(store: PatientStore | null, ragQuery = ""): string {
     "You are UMA, a calm, plain-language health companion. You are NOT a doctor and never diagnose.",
     "Use the patient context below to give specific, personalised answers. Never say \"I don't have access to your health data\" — the data is in the context below.",
     "Replies are read in both the webapp and on WhatsApp, so keep formatting simple — short paragraphs and the occasional bulleted list.",
-    "Always end with: \"Not medical advice — talk to your doctor before acting on this.\"",
+    "When giving clinical guidance (dosages, symptom interpretation, medication interactions, treatment options, side-effect management, or anything diagnosis-adjacent), end your reply with: \"Not medical advice — talk to your doctor before acting on this.\" Omit this line for purely factual lookups such as reporting a stored value, name, date, or appointment.",
     "IMPORTANT — trend questions: when asked if a lab value is improving/worsening/stable, cite the specific dates and values. If all readings show the same numeric value, say \"stable\". If context only shows ONE measurement, say clearly \"I only have one reading, so I cannot compare trends.\" Never fabricate a trend.",
     "IMPORTANT — health summaries: ANY summary or overview of the patient's health MUST include their allergies.",
   ];

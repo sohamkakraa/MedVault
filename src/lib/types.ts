@@ -422,8 +422,8 @@ export type MenstrualCyclePrefs = {
 export type UmaNotificationKind =
   | "med_reminder"       // a scheduled medication is due or overdue
   | "med_missed_auto"    // auto-mode: a dose was auto-logged but later overridden to missed
-  | "lab_uploaded"       // a new lab report was added
-  | "doc_uploaded"       // a new document was added
+  // "lab_uploaded" and "doc_uploaded" are intentionally removed — purely informational system events
+  | "lab_flag"           // one or more lab results in an uploaded report are outside the normal range
   | "cycle_period_soon"  // period predicted within 2 days (female users)
   | "cycle_fertile"      // fertile window starts today (female users)
   | "next_visit"         // upcoming scheduled visit within 3 days

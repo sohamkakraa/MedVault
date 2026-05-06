@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
-import { ChevronDown, UserRound } from "lucide-react";
+import { Menu, UserRound, X } from "lucide-react";
 import { cn } from "@/components/ui/cn";
 import { UmaLogo } from "@/components/branding/UmaLogo";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
@@ -21,7 +21,6 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/chat", label: "Chat" },
-  { href: "/body", label: "Body", disabled: true, tooltip: "Coming soon" },
 ];
 
 export function AppTopNav({
@@ -33,7 +32,7 @@ export function AppTopNav({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [burgerOpen, setBurgerOpen] = useState(false);
   const navRef = useRef<HTMLDivElement | null>(null);
   const activeIndex = useMemo(() => {
     const exact = NAV_ITEMS.findIndex((item) => !item.disabled && pathname === item.href);
@@ -66,6 +65,7 @@ export function AppTopNav({
       )}
     >
       <div className="mx-auto grid h-14 w-full max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 sm:gap-3">
+        {/* Logo */}
         <div className="flex min-w-0 items-center justify-start">
           <Link href="/dashboard" className="shrink-0">
             <UmaLogo compact className="sm:hidden" />
@@ -73,13 +73,14 @@ export function AppTopNav({
           </Link>
         </div>
 
+        {/* Tab group */}
         <div className="flex min-w-0 justify-center">
           <div
             ref={navRef}
             role="tablist"
             tabIndex={0}
             onKeyDown={onNavKeyDown}
-            className="relative grid w-full max-w-[300px] sm:max-w-[340px] rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] p-1"
+            className="relative grid w-full max-w-[240px] rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] p-1"
             style={{ gridTemplateColumns: `repeat(${NAV_ITEMS.length}, 1fr)` }}
           >
             {activeIndex >= 0 && (
@@ -128,45 +129,61 @@ export function AppTopNav({
           </div>
         </div>
 
+        {/* Right-side controls */}
         <div className="flex min-w-0 items-center justify-end gap-2">
-          <div className="hidden sm:flex items-center justify-end gap-2">
+          {/* Desktop controls — visible at md (768px) and above */}
+          <div className="max-md:hidden md:flex items-center justify-end gap-2">
             <TidyButton />
             <FamilySwitcher />
             <NotificationCenter />
             <ThemeToggle />
             {rightSlot}
           </div>
+
+          {/* Hamburger button — visible below md (768px) */}
           <button
             type="button"
-            onClick={() => setMobileOpen((v) => !v)}
-            className="sm:hidden h-11 w-11 shrink-0 rounded-xl border border-[var(--border)] bg-[var(--panel-2)] text-[var(--fg)] grid place-items-center"
-            aria-label="Toggle mobile actions"
+            onClick={() => setBurgerOpen((v) => !v)}
+            className="md:hidden h-10 w-10 shrink-0 rounded-xl border border-[var(--border)] bg-[var(--panel-2)] text-[var(--fg)] grid place-items-center"
+            aria-label={burgerOpen ? "Close menu" : "Open menu"}
+            aria-expanded={burgerOpen}
           >
-            <ChevronDown className={cn("h-4 w-4 transition-transform", mobileOpen && "rotate-180")} />
+            {burgerOpen
+              ? <X className="h-5 w-5" aria-hidden />
+              : <Menu className="h-5 w-5" aria-hidden />
+            }
           </button>
         </div>
       </div>
 
-      {mobileOpen && (
-        <div className="sm:hidden border-t border-[var(--border)] px-4 py-2 bg-[var(--panel)]/95">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+      {/* Burger dropdown — tablet and below */}
+      {burgerOpen && (
+        <div className="md:hidden border-t border-[var(--border)] bg-[var(--panel)]/95">
+          <nav aria-label="Site menu" className="mx-auto max-w-6xl px-4 py-3 flex flex-col gap-1">
+            {/* Profile link */}
             <Link
               href="/profile"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--panel-2)] px-3 py-1.5 text-xs font-medium text-[var(--fg)] hover:bg-[var(--panel)]"
+              onClick={() => setBurgerOpen(false)}
+              className="flex items-center gap-3 rounded-xl px-3 h-11 text-sm font-medium text-[var(--fg)] hover:bg-[var(--panel-2)] transition-colors"
             >
-              <UserRound className="h-4 w-4 text-[var(--accent)]" aria-hidden />
+              <UserRound className="h-5 w-5 text-[var(--accent)] shrink-0" aria-hidden />
               Profile
             </Link>
-            <div className="flex items-center gap-2">
+
+            <div className="h-px bg-[var(--border)] my-1" aria-hidden />
+
+            {/* Inline row: Tidy, Family, Notifications, Theme */}
+            <div className="flex items-center gap-2 px-1 py-1">
               <TidyButton />
               <FamilySwitcher />
               <NotificationCenter />
               <ThemeToggle />
               {rightSlot}
             </div>
-          </div>
+          </nav>
         </div>
       )}
+
       <div className="sr-only" aria-live="polite">
         Tip: use the left and right arrow keys to move between tabs.
       </div>

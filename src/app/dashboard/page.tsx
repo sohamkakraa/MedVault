@@ -2130,9 +2130,9 @@ function DashboardInner() {
               <div className="p-5 space-y-3">
                 <div className="flex items-center gap-2 pb-1">
                   <Activity className="h-4 w-4 text-amber-500 shrink-0" />
-                  <h2 className="text-sm font-semibold">Lab results to discuss with your doctor</h2>
+                  <h2 className="text-sm font-semibold">Flagged labs</h2>
                 </div>
-                <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                   {flaggedGaugeItems.map(({ lab, canonical, ref, rawVal, color }) => (
                     <GaugeCard
                       key={canonical}

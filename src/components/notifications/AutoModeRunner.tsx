@@ -4,10 +4,10 @@
  * AutoModeRunner — background effect that runs once per calendar day on app open.
  * Responsibilities:
  *  1. Call autoLogTodayDoses() — for medications in auto-tracking mode, inserts a
- *     "taken" health-log entry for today if one doesn't already exist.
- *  2. Push an in-app notification for each auto-logged med so the user can override.
- *  3. Push a reminder notification for any med due today that has no log entry yet
- *     (applies to manual-mode meds with a set reminder time).
+ *     "taken" health-log entry for today if one doesn't already exist. Silent — no
+ *     notification is fired for routine auto-logging (would be noisy).
+ *  2. Push an actionable `next_visit` notification if an appointment is within 3 days.
+ *  3. Push cycle notifications (period soon / fertile window) for female users.
  *
  * All logic is client-side localStorage only. Not a medical device.
  */
@@ -36,28 +36,12 @@ export function AutoModeRunner() {
 
     const store = getStore();
 
-    // 1. Auto-log today's doses for auto-mode meds
+    // 1. Auto-log today's doses for auto-mode meds (silent — no notification for routine auto-logging)
     const autoMeds = (store.meds ?? []).filter((m) => m.trackingMode === "auto");
     if (autoMeds.length > 0) {
       autoLogTodayDoses();
-      // Push a bundled notification
-      if (autoMeds.length === 1) {
-        pushNotification({
-          kind: "med_reminder",
-          title: `${autoMeds[0].name} auto-logged`,
-          body: `Today's dose was automatically marked as taken. Tap to override if you missed it.`,
-          actionHref: "/dashboard",
-          actionLabel: "Review on Dashboard",
-        });
-      } else {
-        pushNotification({
-          kind: "med_reminder",
-          title: `${autoMeds.length} medicines auto-logged`,
-          body: `Today's doses for ${autoMeds.map((m) => m.name).slice(0, 3).join(", ")}${autoMeds.length > 3 ? ` and ${autoMeds.length - 3} more` : ""} were automatically marked as taken.`,
-          actionHref: "/dashboard",
-          actionLabel: "Review on Dashboard",
-        });
-      }
+      // Intentionally no notification here: "X was auto-logged" is a noisy system event,
+      // not something the user needs to act on. Missed-dose alerts are handled separately.
     }
 
     // 2. Upcoming visit reminder (within 3 days)

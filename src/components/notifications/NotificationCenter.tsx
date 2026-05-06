@@ -31,11 +31,11 @@ function kindIcon(kind: UmaNotification["kind"]) {
   switch (kind) {
     case "med_reminder":    return "💊";
     case "med_missed_auto": return "⚠️";
-    case "lab_uploaded":    return "🧪";
-    case "doc_uploaded":    return "📄";
+    case "lab_flag":        return "🧪";
     case "cycle_period_soon":
     case "cycle_fertile":   return "🌸";
     case "next_visit":      return "🏥";
+    case "family_risk_flag": return "🧬";
     default:                return "🔔";
   }
 }

@@ -40,6 +40,7 @@ const POLL_INTERVAL_MS = 6000;
 
 export default function ChatPage() {
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
+  const [archivedThreads, setArchivedThreads] = useState<ThreadSummary[]>([]);
   const [threadsLoading, setThreadsLoading] = useState(true);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -56,7 +57,10 @@ export default function ChatPage() {
     (async () => {
       setThreadsLoading(true);
       try {
-        const r = await fetch("/api/threads", { credentials: "same-origin" });
+        const [r, ra] = await Promise.all([
+          fetch("/api/threads", { credentials: "same-origin" }),
+          fetch("/api/threads?archived=true", { credentials: "same-origin" }),
+        ]);
         if (!r.ok) {
           // 401 happens if the user isn't signed in — leave the page in an
           // empty state with a calm message rather than a hard crash.
@@ -69,6 +73,11 @@ export default function ChatPage() {
         // Pick the first thread (server-sorted by lastMessageAt desc) — this
         // matches the active thread for the WA-default-view requirement.
         if (list.length > 0) setActiveThreadId(list[0].id);
+        // Load archived threads (non-blocking — ignore errors)
+        if (ra.ok) {
+          const ja = await ra.json();
+          if (!cancelled) setArchivedThreads(ja.threads ?? []);
+        }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Couldn't load chats.");
       } finally {
@@ -145,10 +154,17 @@ export default function ChatPage() {
   // ── Actions ─────────────────────────────────────────────────────────
   const refreshThreads = useCallback(async () => {
     try {
-      const r = await fetch("/api/threads", { credentials: "same-origin" });
+      const [r, ra] = await Promise.all([
+        fetch("/api/threads", { credentials: "same-origin" }),
+        fetch("/api/threads?archived=true", { credentials: "same-origin" }),
+      ]);
       if (!r.ok) return;
       const j = await r.json();
       setThreads(j.threads ?? []);
+      if (ra.ok) {
+        const ja = await ra.json();
+        setArchivedThreads(ja.threads ?? []);
+      }
     } catch {
       /* swallow */
     }
@@ -244,11 +260,58 @@ export default function ChatPage() {
           const remaining = threads.filter((t) => t.id !== id);
           setActiveThreadId(remaining[0]?.id ?? null);
         }
+        void refreshThreads();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't delete this chat.");
       }
     },
-    [activeThreadId, threads],
+    [activeThreadId, threads, refreshThreads],
+  );
+
+  const bulkArchive = useCallback(
+    async (ids: string[]) => {
+      try {
+        const r = await fetch("/api/threads", {
+          method: "PATCH",
+          credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: "archive", ids }),
+        });
+        if (!r.ok) throw new Error((await r.json()).error ?? `HTTP ${r.status}`);
+        setThreads((prev) => prev.filter((t) => !ids.includes(t.id)));
+        if (activeThreadId && ids.includes(activeThreadId)) {
+          const remaining = threads.filter((t) => !ids.includes(t.id));
+          setActiveThreadId(remaining[0]?.id ?? null);
+        }
+        void refreshThreads();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Couldn't archive chats.");
+      }
+    },
+    [activeThreadId, threads, refreshThreads],
+  );
+
+  const bulkDelete = useCallback(
+    async (ids: string[]) => {
+      try {
+        const r = await fetch("/api/threads", {
+          method: "PATCH",
+          credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: "delete", ids }),
+        });
+        if (!r.ok) throw new Error((await r.json()).error ?? `HTTP ${r.status}`);
+        setThreads((prev) => prev.filter((t) => !ids.includes(t.id)));
+        if (activeThreadId && ids.includes(activeThreadId)) {
+          const remaining = threads.filter((t) => !ids.includes(t.id));
+          setActiveThreadId(remaining[0]?.id ?? null);
+        }
+        void refreshThreads();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Couldn't delete chats.");
+      }
+    },
+    [activeThreadId, threads, refreshThreads],
   );
 
   const activeThread = useMemo(
@@ -263,9 +326,12 @@ export default function ChatPage() {
         <ThreadSidebar
           threads={threads}
           activeThreadId={activeThreadId}
+          archivedThreads={archivedThreads}
           onSelect={(id) => void switchThread(id)}
           onCreate={() => void createThread()}
           onArchive={(id) => void archiveThread(id)}
+          onBulkArchive={bulkArchive}
+          onBulkDelete={bulkDelete}
           loading={threadsLoading}
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
