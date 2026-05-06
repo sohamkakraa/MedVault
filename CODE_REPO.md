@@ -86,7 +86,7 @@
 - `src/app/onboarding/page.tsx` · 267 lines · TODO: describe · exports: `OnboardingPage`
 - `src/app/page.tsx` · 361 lines · TODO: describe · exports: `HomePage`
 - `src/app/privacy/page.tsx` · 62 lines · TODO: describe · exports: `PrivacyPolicyPage`
-- `src/app/profile/page.tsx` · 2359 lines · Profile editor — personal details, body metrics, BYOK AI provider section · exports: `ProfilePage`
+- `src/app/profile/page.tsx` · 2603 lines · Profile editor — personal details, body metrics, BYOK AI provider section. DOB uses shadcn Calendar dropdown caption, doctor/hospital use NativeSelect + add-new flow, OTP uses shadcn InputOTP, appointment uses DatePicker + TimePicker · exports: `ProfilePage`
 - `src/app/terms/page.tsx` · 62 lines · TODO: describe · exports: `TermsPage`
 - `src/app/upload/page.tsx` · 6 lines · Redirect to /dashboard (upload is inline on dashboard) · exports: `UploadPage`
 
@@ -116,7 +116,7 @@
 - `src/components/labs/LabReadingTile.tsx` · 141 lines · TODO: describe · exports: `LabReadingTile`
 - `src/components/nav/AppShell.tsx` · 25 lines · TODO: describe · exports: `AppShell`
 - `src/components/nav/AppSideNav.tsx` · 61 lines · Left rail nav — Dashboard, Chat, Profile, Upload links · exports: `AppSideNav`
-- `src/components/nav/AppTopNav.tsx` · 193 lines · Sticky top nav with tabs and NotificationCenter · exports: `AppTopNav`
+- `src/components/nav/AppTopNav.tsx` · 151 lines · Sticky top nav using shadcn Tabs (Radix) wired to next router via TabsTrigger asChild Link; `fixed` mode indents from left on sm+ so the slim rail stays visible · exports: `AppTopNav`
 - `src/components/nav/LandingHeader.tsx` · 26 lines · TODO: describe · exports: `LandingHeader`
 - `src/components/nav/TidyButton.tsx` · 446 lines · Tidy ✨ Beta button — calls /api/tidy, applies store patch proposal · exports: `TidyButton`
 - `src/components/notifications/AutoModeRunner.tsx` · 103 lines · TODO: describe · exports: `AutoModeRunner`
@@ -128,8 +128,13 @@
 - `src/components/ui/Badge.tsx` · 40 lines · Badge primitive — variant: default/success/warning/muted · exports: `Badge`
 - `src/components/ui/Button.tsx` · 18 lines · Button primitive — variant: solid/ghost/outline; size: sm/md/lg · exports: `Button`
 - `src/components/ui/Card.tsx` · 32 lines · TODO: describe · exports: `Card`, `CardHeader`, `CardContent`
-- `src/components/ui/Combobox.tsx` · 340 lines · Multi-select combobox for allergies/conditions — free-text + suggestion list · exports: `Combobox`
-- `src/components/ui/DatePicker.tsx` · 331 lines · Date picker — 2-digit year format to prevent mobile truncation · exports: `DatePicker`
+- `src/components/ui/Calendar.tsx` · 76 lines · shadcn-style react-day-picker v9 Calendar with theme classNames + chevron component override · exports: `Calendar`, `CalendarProps`
+- `src/components/ui/Combobox.tsx` · 244 lines · Free-text + suggestion combobox; selection via bg highlight (no Check icon), optional remove via Trash button on hover (no inline Pencil) · exports: `Combobox`
+- `src/components/ui/DatePicker.tsx` · 105 lines · Date picker built on shadcn Calendar (react-day-picker); supports captionLayout dropdown for DOB, fromYear/toYear · exports: `DatePicker`
+- `src/components/ui/InputOTP.tsx` · 80 lines · shadcn InputOTP wrapper around input-otp — themed slots + fake caret · exports: `InputOTP`, `InputOTPGroup`, `InputOTPSlot`, `InputOTPSeparator`
+- `src/components/ui/Label.tsx` · 22 lines · shadcn Label wrapper around @radix-ui/react-label · exports: `Label`
+- `src/components/ui/NativeSelect.tsx` · 30 lines · Styled HTML `<select>` with chevron — fixed-list pickers (doctor, hospital, sex) · exports: `NativeSelect`
+- `src/components/ui/Tabs.tsx` · 57 lines · shadcn Tabs wrapper around @radix-ui/react-tabs — TabsList/TabsTrigger/TabsContent themed · exports: `Tabs`, `TabsList`, `TabsTrigger`, `TabsContent`
 - `src/components/ui/DateTimePicker.tsx` · 65 lines · TODO: describe · exports: `DateTimePicker`
 - `src/components/ui/Dialog.tsx` · 108 lines · TODO: describe · exports: `Dialog`, `DialogPortal`, `DialogOverlay`, `DialogClose`, `DialogTrigger`, `DialogContent`, `DialogHeader`, `DialogFooter`
 - `src/components/ui/DropdownMenu.tsx` · 193 lines · TODO: describe · exports: `DropdownMenu`, `DropdownMenuTrigger`, `DropdownMenuContent`, `DropdownMenuItem`, `DropdownMenuCheckboxItem`, `DropdownMenuRadioItem`, `DropdownMenuLabel`, `DropdownMenuSeparator`
@@ -144,7 +149,7 @@
 - `src/components/ui/Tooltip.tsx` · 38 lines · TODO: describe · exports: `Tooltip`, `TooltipTrigger`, `TooltipContent`, `TooltipProvider`
 - `src/components/ui/UploadProgressSheet.tsx` · 92 lines · TODO: describe · exports: `UploadProgressSheet`
 - `src/components/ui/chart.tsx` · 68 lines · TODO: describe · exports: `ChartConfig`, `ChartContainer`, `ChartTooltipContent`
-- `src/components/ui/cn.ts` · 6 lines · TODO: describe · exports: `cn`
+- `src/components/ui/cn.ts` · 6 lines · clsx + tailwind-merge so later utility classes (e.g. `p-0`) override base classes (`px-4 py-2`) — shadcn-canonical · exports: `cn`
 
 ## `src/lib/`
 - `src/lib/accountRegistry.ts` · 125 lines · TODO: describe · exports: `AccountRegistryEntry`, `getRegistry`, `saveRegistry`, `registerEntry`, `lookupByEmail`, `isEmailOnPlatform`, `generateInternalId`, `registerPrimaryAccount`

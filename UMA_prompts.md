@@ -22,7 +22,9 @@ If you finish coding without doing all five, the work is not done. Re-open the t
 
 ## Design language reference (use this — do NOT introduce new tokens, libraries, or fonts)
 
-The codebase already has a coherent design system. Every change in this batch must use it as-is. Do not introduce shadcn/ui, MUI, Chakra, Mantine, daisyUI, or any other component library — UMA already has its own primitives.
+The codebase already has a coherent design system. Every change must use the CSS variables, fonts, and primitives below.
+
+**Component-library stance (updated 2026-05-06):** UMA's primitives in `src/components/ui/` are now thin shadcn-style wrappers around Radix + react-day-picker + input-otp + cmdk. Continue extending those wrappers — do not introduce MUI, Chakra, Mantine, daisyUI, or any other library, and do not bypass the wrappers by importing Radix / react-day-picker / cmdk directly from app or feature code. The wrappers exist so the theme tokens and tap-target rules stay enforced in one place.
 
 ### CSS variables (set in `src/app/globals.css` — never hardcode colours)
 
@@ -83,7 +85,11 @@ className={cn(
 
 ### Existing UI primitives — use these instead of building new ones
 
-`src/components/ui/`: `Badge`, `Button`, `Card`, `Combobox`, `DatePicker`, `DateTimePicker`, `Dialog`, `DropdownMenu`, `Footer`, `Input`, `Popover`, `RecordNoticeToast`, `Select`, `Sheet`, `TimePicker`, `Tooltip`, `chart`, `cn`, plus `GlobalUploadBadge` and `UploadProgressSheet`.
+`src/components/ui/`: `Badge`, `Button`, `Calendar`, `Card`, `Combobox`, `DatePicker`, `DateTimePicker`, `Dialog`, `DropdownMenu`, `Footer`, `Input`, `InputOTP`, `Label`, `NativeSelect`, `Popover`, `RecordNoticeToast`, `Select`, `Sheet`, `Tabs`, `TimePicker`, `Tooltip`, `chart`, `cn`, plus `GlobalUploadBadge` and `UploadProgressSheet`.
+
+`cn` uses `clsx` + `tailwind-merge` — later utilities (`p-0`) override earlier ones (`px-4 py-2`). Don't bypass.
+
+Picker convention: `NativeSelect` for fixed lists ≤ ~20 entries (sex, relation, visibility), `Combobox` (cmdk) for searchable / free-text lists, `DatePicker` for dates (use `captionLayout="dropdown"` + `fromYear`/`toYear` for DOB), `DatePicker` + `TimePicker` for date+time, `InputOTP` for codes, `Tabs` for tab strips.
 
 If you reach for a new primitive, **stop**. Either extend one of these or, if it really must be new, add a skill file documenting why.
 

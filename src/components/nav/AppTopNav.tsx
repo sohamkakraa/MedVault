@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useMemo, useState } from "react";
 import { Menu, UserRound, X } from "lucide-react";
 import { cn } from "@/components/ui/cn";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/Tabs";
 import { UmaLogo } from "@/components/branding/UmaLogo";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { FamilySwitcher } from "@/components/family/FamilySwitcher";
@@ -31,37 +32,23 @@ export function AppTopNav({
   rightSlot?: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [burgerOpen, setBurgerOpen] = useState(false);
-  const navRef = useRef<HTMLDivElement | null>(null);
-  const activeIndex = useMemo(() => {
-    const exact = NAV_ITEMS.findIndex((item) => !item.disabled && pathname === item.href);
-    if (exact !== -1) return exact;
-    const prefix = NAV_ITEMS.findIndex(
+  const activeHref = useMemo(() => {
+    const exact = NAV_ITEMS.find((item) => !item.disabled && pathname === item.href);
+    if (exact) return exact.href;
+    const prefix = NAV_ITEMS.find(
       (item) => !item.disabled && item.href !== "/" && pathname.startsWith(item.href + "/"),
     );
-    return prefix !== -1 ? prefix : -1;
+    return prefix?.href ?? "";
   }, [pathname]);
-
-  function onNavKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
-    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-    e.preventDefault();
-    const base = activeIndex >= 0 ? activeIndex : 0;
-    const delta = e.key === "ArrowRight" ? 1 : -1;
-    let next = (base + delta + NAV_ITEMS.length) % NAV_ITEMS.length;
-    // Skip disabled items
-    let tries = NAV_ITEMS.length;
-    while (NAV_ITEMS[next].disabled && tries-- > 0) {
-      next = (next + delta + NAV_ITEMS.length) % NAV_ITEMS.length;
-    }
-    if (!NAV_ITEMS[next].disabled) router.push(NAV_ITEMS[next].href);
-  }
 
   return (
     <header
       className={cn(
         "no-print z-40 border-b border-[var(--border)] bg-[var(--panel)]/90 backdrop-blur",
-        fixed ? "fixed inset-x-0 top-0" : "sticky top-0"
+        // Fixed positioning is viewport-relative; inset-x-0 would cover AppSideNav (z-30).
+        // Match rail width sm+: AppSideNav uses w-[3.25rem]; rail is hidden below sm.
+        fixed ? "fixed top-0 right-0 left-0 sm:left-[3.25rem]" : "sticky top-0"
       )}
     >
       <div className="mx-auto grid h-14 w-full max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 sm:gap-3">
@@ -75,58 +62,30 @@ export function AppTopNav({
 
         {/* Tab group */}
         <div className="flex min-w-0 justify-center">
-          <div
-            ref={navRef}
-            role="tablist"
-            tabIndex={0}
-            onKeyDown={onNavKeyDown}
-            className="relative grid w-full max-w-[240px] rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] p-1"
-            style={{ gridTemplateColumns: `repeat(${NAV_ITEMS.length}, 1fr)` }}
-          >
-            {activeIndex >= 0 && (
-              <span
-                className="pointer-events-none absolute inset-y-1 rounded-xl bg-[var(--panel)] shadow-sm transition-[left,width] duration-300 ease-out"
-                style={{
-                  left: `calc(4px + ${activeIndex} * ((100% - 8px) / ${NAV_ITEMS.length}))`,
-                  width: `calc((100% - 8px) / ${NAV_ITEMS.length})`,
-                }}
-                aria-hidden
-              />
-            )}
-            {NAV_ITEMS.map((item, idx) => {
-              const active = idx === activeIndex;
-              if (item.disabled) {
-                return (
+          <Tabs value={activeHref} className="w-full max-w-[240px]">
+            <TabsList
+              className="grid w-full"
+              style={{ gridTemplateColumns: `repeat(${NAV_ITEMS.length}, 1fr)` }}
+            >
+              {NAV_ITEMS.map((item) =>
+                item.disabled ? (
                   <span
                     key={item.href}
                     role="tab"
-                    aria-selected={false}
                     aria-disabled="true"
                     title={item.tooltip}
-                    className="relative z-10 rounded-xl px-2 py-1.5 text-sm text-center text-[var(--muted)] opacity-50 cursor-not-allowed"
+                    className="inline-flex items-center justify-center rounded-xl px-2 py-1.5 text-sm text-[var(--muted)] opacity-50 cursor-not-allowed"
                   >
                     {item.label}
                   </span>
-                );
-              }
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  role="tab"
-                  aria-selected={active}
-                  className={cn(
-                    "relative z-10 rounded-xl px-2 py-1.5 text-sm transition text-center",
-                    active
-                      ? "font-semibold text-[var(--fg)]"
-                      : "text-[var(--muted)] hover:text-[var(--fg)]"
-                  )}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </div>
+                ) : (
+                  <TabsTrigger key={item.href} value={item.href} asChild>
+                    <Link href={item.href}>{item.label}</Link>
+                  </TabsTrigger>
+                ),
+              )}
+            </TabsList>
+          </Tabs>
         </div>
 
         {/* Right-side controls */}
