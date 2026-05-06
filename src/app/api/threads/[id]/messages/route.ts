@@ -513,8 +513,9 @@ function buildSystemPrompt(store: PatientStore | null, ragQuery = ""): string {
       const plan = activePlans.find((p) => p.id === c.planId);
       const parts = [`- ${c.type ?? "Insurance"} claim (${plan?.insurerName ?? "Unknown insurer"}): ${c.status}`];
       if (c.providerName) parts.push(`Provider: ${c.providerName}`);
-      if (c.amountClaimed != null) parts.push(`Claimed: ${c.amountClaimed}`);
-      if (c.amountApproved != null) parts.push(`Insurer paid: ${c.amountApproved}`);
+      const fmtINR = (n: number) => "₹" + new Intl.NumberFormat("en-IN").format(n);
+      if (c.amountClaimed != null) parts.push(`Claimed: ${fmtINR(c.amountClaimed)}`);
+      if (c.amountApproved != null) parts.push(`Insurer paid: ${fmtINR(c.amountApproved)}`);
       if (c.claimNumber) parts.push(`Claim #: ${c.claimNumber}`);
       return parts.join(" | ");
     });
