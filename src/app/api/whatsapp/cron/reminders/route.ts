@@ -17,11 +17,15 @@ import type { GeneralReminderEntry, IntervalReminderEntry } from "@/lib/types";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-function verifyCronSecret(req: NextRequest): boolean {
+function verifyCronSecret(req: NextRequest): { ok: boolean; missingSecret: boolean } {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
+  // Fixed VULN-002: fail CLOSED when CRON_SECRET is not set.
+  // Previously this returned true (allowing any unauthenticated request through).
+  // Mirror the pattern in /api/whatsapp/cron/route.ts — reject with 503 if
+  // the env var is absent so a misconfigured deployment is safe by default.
+  if (!secret) return { ok: false, missingSecret: true };
   const auth = req.headers.get("authorization");
-  return auth === `Bearer ${secret}`;
+  return { ok: auth === `Bearer ${secret}`, missingSecret: false };
 }
 
 function toMinutes(hhmm: string): number {
@@ -149,7 +153,12 @@ function buildReminderMessage(r: GeneralReminderEntry): string {
 }
 
 export async function GET(req: NextRequest) {
-  if (!verifyCronSecret(req)) {
+  const cronCheck = verifyCronSecret(req);
+  if (!cronCheck.ok) {
+    if (cronCheck.missingSecret) {
+      console.error("[reminders cron] CRON_SECRET not set — rejecting request for security.");
+      return NextResponse.json({ ok: false, error: "Server misconfigured" }, { status: 503 });
+    }
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   if (!isWhatsAppConfigured()) {
@@ -159,7 +168,7 @@ export async function GET(req: NextRequest) {
   const users = await prisma.user.findMany({
     where: { whatsappVerified: true, whatsappPhone: { not: null } },
     select: { id: true, whatsappPhone: true },
-  });
+  }) as { id: string; whatsappPhone: string }[];
 
   let fired = 0;
   let errors = 0;
@@ -191,7 +200,7 @@ export async function GET(req: NextRequest) {
         const bottleNote = reminder.bottleMl ? ` (${reminder.bottleMl}ml bottle)` : "";
         const msg = `💧 Reminder: *${reminder.label}*${bottleNote}\n\nHave your water and reply _done_ when you finish — I'll log it for you.`;
         try {
-          await sendText(user.whatsappPhone!, msg);
+          await sendText(user.whatsappPhone, msg);
           reminder.lastFiredAtISO = new Date().toISOString();
           storeChanged = true;
           fired++;
@@ -206,7 +215,7 @@ export async function GET(req: NextRequest) {
         if (!generalShouldFire(reminder, timezone)) continue;
         const msg = buildReminderMessage(reminder);
         try {
-          await sendText(user.whatsappPhone!, msg);
+          await sendText(user.whatsappPhone, msg);
           reminder.lastFiredAtISO = new Date().toISOString();
           storeChanged = true;
           fired++;

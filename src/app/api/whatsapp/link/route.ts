@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { randomInt, createHash } from "crypto";
+import { randomInt, createHash, timingSafeEqual } from "crypto";
 import { requireUserId } from "@/lib/server/authSession";
 import { prisma } from "@/lib/prisma";
 import { sendOtpMessage, isWhatsAppConfigured } from "@/lib/whatsapp/client";
@@ -135,7 +135,9 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Code expired. Request a new one." }, { status: 410 });
   }
 
-  if (challenge.codeHash !== hashCode(code)) {
+  const a = Buffer.from(challenge.codeHash, "hex");
+  const b = Buffer.from(hashCode(code), "hex");
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
     return NextResponse.json({ error: "Incorrect code." }, { status: 403 });
   }
 

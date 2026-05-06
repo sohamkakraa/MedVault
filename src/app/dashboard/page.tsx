@@ -16,7 +16,6 @@ import { AppTopNav } from "@/components/nav/AppTopNav";
 import { DashboardHealthLogSection } from "@/components/health/DashboardHealthLogSection";
 import { BmiCard } from "@/components/health/BmiCard";
 import { DashboardGrid } from "@/components/dashboard/DashboardGrid";
-import { DashboardEditToolbar } from "@/components/dashboard/DashboardEditToolbar";
 import {
   defaultDashboardLayout,
   normalizeDashboardLayout,
@@ -1400,7 +1399,6 @@ function DashboardInner() {
   // normalised on read so rows reference known widget ids, each widget
   // appears at most once, row caps are enforced, and new widgets shipped
   // after the user's layout was saved surface in the hidden palette.
-  const [editMode, setEditMode] = useState(false);
   const dashboardLayout = useMemo(
     () => normalizeDashboardLayout(store.preferences.dashboardLayout ?? defaultDashboardLayout()),
     [store.preferences.dashboardLayout],

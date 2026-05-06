@@ -335,13 +335,15 @@ export type DashboardLayout = {
   sizes?: Partial<Record<DashboardWidgetId, BentoSize>>;
 };
 
-/** Optional vitals for charts and visit summaries (strings for flexible local formats). */
+/** Optional vitals for charts and visit summaries. Numeric fields accept both string and number
+ *  because the HealthKit sync route writes String(Math.round(…)) while the profile editor may
+ *  write plain numbers. `parseNumber` in bmi.ts handles both forms transparently. */
 export type BodyMetrics = {
-  heightCm?: string;
-  weightKg?: string;
-  waistCm?: string;
-  bloodPressureSys?: string;
-  bloodPressureDia?: string;
+  heightCm?: string | number;
+  weightKg?: string | number;
+  waistCm?: string | number;
+  bloodPressureSys?: string | number;
+  bloodPressureDia?: string | number;
   /** Display unit for height input; values are stored as SI in `heightCm`. Default cm. */
   heightUnit?: "cm" | "in";
   /** Display unit for weight; stored as SI in `weightKg`. Default kg. */

@@ -246,7 +246,7 @@ export async function listMessages(
 ): Promise<MessageRow[]> {
   // Confirm ownership in the same query — this is the only place where
   // thread-message reads happen, so guarding here is sufficient.
-  const t = await prisma.thread.findFirst({ where: { id: threadId, userId } });
+  const t = await prisma.thread.findFirst({ where: { id: threadId, userId, archivedAt: null } });
   if (!t) return [];
   const limit = Math.min(Math.max(opts.limit ?? 200, 1), 500);
   const where: { threadId: string; createdAt?: { lt: Date } } = { threadId };

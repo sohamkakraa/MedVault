@@ -78,11 +78,10 @@ export async function POST(req: Request) {
     sentAtISO: now,
   };
 
+  const emailSucceeded = !deliveryWarning;
   const updatedClaim: InsuranceClaim = {
     ...claims[claimIdx]!,
-    status: "submitted",
-    sentToEmail: toEmail,
-    sentAtISO: now,
+    ...(emailSucceeded ? { status: "submitted", sentToEmail: toEmail, sentAtISO: now } : {}),
     correspondence: [...(claims[claimIdx]!.correspondence ?? []), correspondence],
     updatedAtISO: now,
   };

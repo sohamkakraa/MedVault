@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { otpStorageKey, hashOtpCode } from "@/lib/auth/otpMemory";
 
@@ -20,7 +21,9 @@ export async function verifyAndConsumeOtpDb(normalizedKey: string, code: string)
     if (row) await prisma.otpChallenge.delete({ where: { lookupKey } }).catch(() => {});
     return false;
   }
-  const ok = row.codeHash === hashOtpCode(code.trim());
+  const a = Buffer.from(row.codeHash, "hex");
+  const b = Buffer.from(hashOtpCode(code.trim()), "hex");
+  const ok = a.length === b.length && timingSafeEqual(a, b);
   await prisma.otpChallenge.delete({ where: { lookupKey } }).catch(() => {});
   return ok;
 }

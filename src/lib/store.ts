@@ -1027,24 +1027,8 @@ export function addFamilyMember(meta: Omit<FamilyMemberMeta, "id" | "addedAtISO"
 }
 
 /** Auto-infer and set up family connections based on relations (mother↔father, siblings→parents). */
-function autoConnectFamilyMembers(members: FamilyMemberMeta[]): void {
-  if (!members.length) return;
-
-  // Find mother and father
-  const mothers = members.filter((m) => m.relation === "mother");
-  const fathers = members.filter((m) => m.relation === "father");
-
-  // If we just added a mother and there's already a father (or vice versa), they're now a couple
-  // (no need to explicitly mark via spouseId field; the UI infers this from relations)
-
-  // Auto-mark siblings to link to the same parents
-  // (Again, the UI will infer parent-sibling connections from relation types)
-
-  // Find brothers and sisters
-  const siblings = members.filter((m) => m.relation === "brother" || m.relation === "sister");
-
-  // If there are parents, siblings inherit that relationship implicitly via the UI
-  // No additional field updates needed; the FamilyTreeView component infers the tree structure
+function autoConnectFamilyMembers(_members: FamilyMemberMeta[]): void {
+  // TODO: implement family-connection logic (link parents as couple, link siblings to parents)
 }
 
 /** Update a family member's meta fields (displayName, relation, fullName, linkedEmail, linkedPhone).

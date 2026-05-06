@@ -19,58 +19,42 @@
  * Industry: digital health. We never log patient content, only counts.
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
-import { cookies } from "next/headers";
-import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth/sessionToken";
+import { type NextRequest, NextResponse } from "next/server";
+import { requireUserId } from "@/lib/server/authSession";
+import { prisma } from "@/lib/prisma";
+import { parsePatientStoreJson } from "@/lib/patientStoreApi";
 import { StorePatchSchema, StorePatchOpSchema, type StorePatchOp } from "@/lib/intent/storePatch";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-// ── Request shape ────────────────────────────────────────────────────────
-const RequestBodySchema = z.object({
-  store: z.object({
-    profile: z
-      .object({
-        primaryCareProvider: z.string().optional().nullable(),
-        nextVisitHospital: z.string().optional().nullable(),
-        doctorQuickPick: z.array(z.string()).optional().default([]),
-        facilityQuickPick: z.array(z.string()).optional().default([]),
-        doctorQuickPickHidden: z.array(z.string()).optional().default([]),
-        facilityQuickPickHidden: z.array(z.string()).optional().default([]),
-        conditions: z.array(z.string()).optional().default([]),
-        allergies: z.array(z.string()).optional().default([]),
-      })
-      .passthrough(),
-    docs: z
-      .array(
-        z
-          .object({
-            id: z.string(),
-            provider: z.string().optional().nullable(),
-            doctors: z.array(z.string()).optional().default([]),
-            facilityName: z.string().optional().nullable(),
-          })
-          .passthrough(),
-      )
-      .max(500),
-    meds: z
-      .array(
-        z
-          .object({
-            name: z.string(),
-            dose: z.string().optional(),
-            frequency: z.string().optional(),
-          })
-          .passthrough(),
-      )
-      .optional()
-      .default([]),
-  }),
-});
-
-type ParsedStore = z.infer<typeof RequestBodySchema>["store"];
+// ── Internal store shape (loaded server-side from DB) ────────────────────
+type ParsedStore = {
+  profile: {
+    primaryCareProvider?: string | null;
+    nextVisitHospital?: string | null;
+    doctorQuickPick?: string[];
+    facilityQuickPick?: string[];
+    doctorQuickPickHidden?: string[];
+    facilityQuickPickHidden?: string[];
+    conditions?: string[];
+    allergies?: string[];
+    [key: string]: unknown;
+  };
+  docs: Array<{
+    id: string;
+    provider?: string | null;
+    doctors?: string[];
+    facilityName?: string | null;
+    [key: string]: unknown;
+  }>;
+  meds?: Array<{
+    name: string;
+    dose?: string;
+    frequency?: string;
+    [key: string]: unknown;
+  }>;
+};
 
 // ── Response shape ───────────────────────────────────────────────────────
 type TidyResponse = {
@@ -133,29 +117,32 @@ function op(
 }
 
 // ── Route ────────────────────────────────────────────────────────────────
-export async function POST(req: NextRequest) {
-  const jar = await cookies();
-  const raw = jar.get(SESSION_COOKIE)?.value;
-  if (!raw) return NextResponse.json({ ok: false, error: "Not signed in." }, { status: 401 });
-  const claims = await verifySessionToken(raw);
-  if (!claims?.sub) {
-    return NextResponse.json({ ok: false, error: "Session expired." }, { status: 401 });
+export async function POST(_req: NextRequest) {
+  // Fixed VULN-001: load the patient store from the database using the
+  // authenticated userId. The client must NOT supply the store — a malicious
+  // client could inject adversarial strings into the LLM system prompt via
+  // crafted conditions, allergies, docs, or meds values.
+  const userId = await requireUserId();
+  if (!userId) {
+    return NextResponse.json({ ok: false, error: "Not signed in." }, { status: 401 });
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ ok: false, error: "Invalid JSON." }, { status: 400 });
+  const dbRecord = await prisma.patientRecord.findUnique({ where: { userId } });
+  if (!dbRecord?.data) {
+    return NextResponse.json({ ok: false, error: "No health records found on the server. Sync your data first." }, { status: 404 });
   }
-  const parsed = RequestBodySchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { ok: false, error: "Invalid request shape.", issues: parsed.error.issues.slice(0, 5) },
-      { status: 400 },
-    );
+  const patientStore = parsePatientStoreJson(dbRecord.data);
+  if (!patientStore) {
+    return NextResponse.json({ ok: false, error: "Could not read your health records from the server." }, { status: 500 });
   }
-  const { store } = parsed.data;
+
+  // Shape the DB-loaded store into the internal ParsedStore type.
+  const store: ParsedStore = {
+    profile: patientStore.profile as ParsedStore["profile"],
+    docs: (patientStore.docs ?? []).slice(0, 500) as ParsedStore["docs"],
+    meds: (patientStore.meds ?? []) as ParsedStore["meds"],
+  };
+
   const docDoctorMentions = collectDocDoctorMentions(store);
 
   // No API key? Return the heuristic. Surface that clearly.

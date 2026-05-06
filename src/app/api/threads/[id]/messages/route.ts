@@ -27,6 +27,7 @@ import { classifyIntent } from "@/lib/intent/classifyIntent";
 import { applyStorePatch } from "@/lib/intent/storePatch";
 import type { PatientStore } from "@/lib/types";
 import { buildRetrievalQuery, retrieveRelevantDocs } from "@/lib/rag";
+import { isClinicalResponse } from "@/lib/isClinicalResponse";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -214,16 +215,6 @@ export async function POST(
 }
 
 /**
- * Returns true when the assistant's reply contains clinical/advisory language
- * that warrants the "Not medical advice" disclaimer.  Returns false for purely
- * factual lookups (stored values, names, dates, appointments).
- */
-function isClinicalResponse(text: string): boolean {
-  const t = text.toLowerCase();
-  return /\b(dos(?:e|age|ing)|mg\b|mcg\b|tablet|capsule|inject|interaction|side[\s-]effect|symptom|diagnos|treat(?:ment|ing)|prescri|avoid\b|consult\b|risk\b|allerg|medication\s+change|adverse|contra[\s-]?indica|monitor\b|overdose|toxic|warning)\b/.test(t);
-}
-
-/**
  * Minimal patient-aware LLM call — mirrors the WhatsApp processIncomingMessage
  * pattern so a question asked on either surface produces the same answer
  * given the same context.
@@ -380,9 +371,9 @@ function buildSystemPrompt(store: PatientStore | null, ragQuery = ""): string {
   if (demos.length) sections.push(`## Patient\n${demos.join(" | ")}`);
 
   if (profile?.conditions?.length)
-    sections.push(`Conditions: ${profile.conditions.slice(0, 12).join(", ")}`);
+    sections.push(`Conditions: ${profile.conditions.join(", ")}`);
   if (profile?.allergies?.length)
-    sections.push(`Allergies: ${profile.allergies.slice(0, 12).join(", ")}`);
+    sections.push(`Allergies: ${profile.allergies.join(", ")}`);
 
   // ── Medications ──
   const activeMeds = (store.meds ?? []).filter((m) => !m.endDate).slice(0, 12);

@@ -20,6 +20,7 @@ import {
 } from "@/lib/chatMedicationIntakeInfer";
 import { inferMedicationProductCategory } from "@/lib/medicationClassification";
 import { isMedicationFormKind, medicationFormLabel } from "@/lib/medicationFormPresets";
+import { isClinicalResponse } from "@/lib/isClinicalResponse";
 
 export const runtime = "nodejs";
 
@@ -471,16 +472,6 @@ function answerFromStore(q: string, store: PatientStore): string {
   ].join("\n");
 }
 
-/**
- * Returns true when the assistant's reply contains clinical/advisory language
- * that warrants the "Not medical advice" disclaimer.  Returns false for purely
- * factual lookups (stored values, names, dates, appointments).
- */
-function isClinicalResponse(text: string): boolean {
-  const t = text.toLowerCase();
-  return /\b(dos(?:e|age|ing)|mg\b|mcg\b|tablet|capsule|inject|interaction|side[\s-]effect|symptom|diagnos|treat(?:ment|ing)|prescri|avoid\b|consult\b|risk\b|allerg|medication\s+change|adverse|contra[\s-]?indica|monitor\b|overdose|toxic|warning)\b/.test(t);
-}
-
 function userAskedToMergeRecords(question: string): boolean {
   const q = question.trim();
   if (!q) return false;
@@ -630,10 +621,10 @@ export async function POST(req: Request) {
 
     // Set up SSE response
     const encoder = new TextEncoder();
-    let responseController: any = null;
+    let responseController: ReadableStreamDefaultController<Uint8Array> | null = null;
 
-    const stream = new ReadableStream({
-      start(controller: any) {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller: ReadableStreamDefaultController<Uint8Array>) {
         responseController = controller;
       },
     });

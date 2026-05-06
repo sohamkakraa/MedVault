@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/Popover";
 import {
   getStore,
-  markNotificationRead,
   markAllNotificationsRead,
   dismissNotification,
 } from "@/lib/store";
@@ -93,11 +92,6 @@ export function NotificationCenter() {
 
   function handleDismiss(id: string) {
     dismissNotification(id);
-    refresh();
-  }
-
-  function handleRead(id: string) {
-    markNotificationRead(id);
     refresh();
   }
 
@@ -185,14 +179,14 @@ export function NotificationCenter() {
                   <span className="text-xl shrink-0 mt-0.5" aria-hidden>{kindIcon(n.kind)}</span>
 
                   {/* Text content */}
-                  <div className="flex-1 min-w-0" onClick={() => !n.readAtISO && handleRead(n.id)}>
+                  <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-[var(--fg)] leading-snug">{n.title}</p>
                     <p className="text-sm text-[var(--muted)] mt-0.5 leading-snug">{n.body}</p>
                     <p className="text-xs text-[var(--muted)] mt-1 opacity-70">{timeAgo(n.createdAtISO)}</p>
                     {n.actionHref && n.actionLabel && (
                       <Link
                         href={n.actionHref}
-                        onClick={() => { handleRead(n.id); setOpen(false); }}
+                        onClick={() => { setOpen(false); }}
                         className="inline-flex items-center gap-1 mt-2 text-sm font-medium text-[var(--accent)] hover:underline"
                       >
                         {n.actionLabel} →
