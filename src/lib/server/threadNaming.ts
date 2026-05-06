@@ -1,5 +1,5 @@
-import { Anthropic } from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
+import { getAnthropicForUser } from "./llmClient";
 
 // Simple Levenshtein distance
 function levenshtein(a: string, b: string): number {
@@ -15,7 +15,7 @@ function levenshtein(a: string, b: string): number {
   return dp[m][n];
 }
 
-export async function proposeThreadTitle(threadId: string, summary: string): Promise<void> {
+export async function proposeThreadTitle(threadId: string, summary: string, userId?: string | null): Promise<void> {
   // Skip if thread has a manually-set title
   const thread = await prisma.thread.findUnique({
     where: { id: threadId },
@@ -23,13 +23,13 @@ export async function proposeThreadTitle(threadId: string, summary: string): Pro
   });
   if (!thread || thread.titleIsManual) return;
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return;
+  const got = await getAnthropicForUser(userId ?? null, "chat");
+  if (!got) return;
 
-  const client = new Anthropic({ apiKey });
+  const client = got.client;
   try {
     const resp = await client.messages.create({
-      model: process.env.ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001",
+      model: got.modelId || process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001",
       max_tokens: 24,
       messages: [{
         role: "user",

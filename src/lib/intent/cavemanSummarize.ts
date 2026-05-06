@@ -17,6 +17,8 @@
  *      then persist with updateContextSummary(threadId, newSummary).
  */
 
+import { getAnthropicForUser } from "@/lib/server/llmClient";
+
 export const KEEP_LAST = 8;
 export const SUMMARY_THRESHOLD = 15; // don't compress until thread has this many messages
 export const UPDATE_EVERY = 5; // re-compress every N new messages
@@ -56,12 +58,13 @@ export async function summarizeOlderMessages(
   messages: { role: "user" | "assistant"; content: string }[],
   storedSummary: string | null,
   keepLast = KEEP_LAST,
+  userId?: string | null,
 ): Promise<string | null> {
   const toSummarize = messages.slice(0, -keepLast);
   if (toSummarize.length === 0) return storedSummary;
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return storedSummary;
+  const got = await getAnthropicForUser(userId ?? null, "chat");
+  if (!got) return storedSummary;
 
   const transcript = toSummarize
     .map((m) => `${m.role === "user" ? "User" : "UMA"}: ${m.content.slice(0, 400)}`)
@@ -72,10 +75,9 @@ export async function summarizeOlderMessages(
     : `Summarize this health conversation as terse bullet points (under 200 words). Capture: health facts mentioned, decisions made, user concerns, medications or conditions discussed.\n\n${transcript}`;
 
   try {
-    const Anthropic = (await import("@anthropic-ai/sdk")).default;
-    const anthropic = new Anthropic({ apiKey });
+    const anthropic = got.client;
     const res = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
+      model: got.modelId || "claude-haiku-4-5-20251001",
       max_tokens: 320,
       messages: [{ role: "user", content: prompt }],
     });

@@ -6,7 +6,11 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/Select";
 import { DatePicker } from "@/components/ui/DatePicker";
-import { Combobox } from "@/components/ui/Combobox";
+import { TimePicker } from "@/components/ui/TimePicker";
+import { NativeSelect } from "@/components/ui/NativeSelect";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/InputOTP";
+import { Popover, PopoverTrigger, PopoverContent, PopoverAnchor } from "@/components/ui/Popover";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/Command";
 import { Badge } from "@/components/ui/Badge";
 import {
   clearLocalPatientStore,
@@ -56,7 +60,7 @@ import { InsuranceSection } from "@/components/insurance/InsuranceSection";
 import { RecordNoticeToast } from "@/components/ui/RecordNoticeToast";
 import { PROVIDERS } from "@/lib/providers/registry";
 import type { ProviderId } from "@/lib/providers/registry";
-import { Droplets, Plus, LogOut, Ruler, Users, Trash2, Link2, UserCheck, UserX, Send, Mail, Check, X, Pencil, Eye, EyeOff } from "lucide-react";
+import { Droplets, Plus, LogOut, Ruler, Users, Trash2, Link2, UserCheck, UserX, Send, Mail, Check, X, Pencil, Eye, EyeOff, ChevronsUpDown } from "lucide-react";
 import { motion } from "framer-motion";
 
 const RELATION_EMOJI: Record<string, string> = {
@@ -423,31 +427,26 @@ function ConnectFlow({
                         <div className="ml-6 border-l border-[var(--border)] pl-3">
                           <div className="flex flex-col gap-1 text-xs mv-muted">
                             <span className="font-medium text-[var(--fg)]">Their relation to you</span>
-                            <Select
-                              value={selections[personId]?.relation || undefined}
-                              onValueChange={(newRelation) => {
-                                const relation = newRelation as FamilyRelation;
+                            <NativeSelect
+                              value={selections[personId]?.relation ?? ""}
+                              onChange={(e) => {
+                                const relation = (e.target.value || undefined) as FamilyRelation | undefined;
                                 onSelections({
                                   ...selections,
                                   [personId]: {
                                     selected: true,
-                                    relation,
+                                    relation: relation ?? null,
                                   },
                                 });
-                                autoInferRelations(personId, relation);
+                                if (relation) autoInferRelations(personId, relation);
                               }}
+                              className="h-9 text-xs"
                             >
-                              <SelectTrigger className="text-xs rounded-lg border border-[var(--border)] bg-[var(--panel)] py-1.5 px-2 text-[var(--fg)]">
-                                <SelectValue placeholder="Select relation" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {RELATION_OPTIONS.map((r) => (
-                                  <SelectItem key={r} value={r}>
-                                    {FAMILY_RELATION_LABELS[r]}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              <option value="">Select relation</option>
+                              {RELATION_OPTIONS.map((r) => (
+                                <option key={r} value={r}>{FAMILY_RELATION_LABELS[r]}</option>
+                              ))}
+                            </NativeSelect>
                           </div>
                         </div>
                       )}
@@ -501,19 +500,14 @@ function ConnectFlow({
 
           <div className="flex flex-col gap-1.5 text-xs mv-muted">
             <span className="font-medium text-[var(--fg)]">What can they see about you?</span>
-            <Select
+            <NativeSelect
               value={visibility}
-              onValueChange={(v) => onVisibility(v as FamilyLinkVisibility)}
+              onChange={(e) => onVisibility(e.target.value as FamilyLinkVisibility)}
             >
-              <SelectTrigger className="w-full rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] py-2 text-sm text-[var(--fg)]">
-                <SelectValue placeholder="Select visibility" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="full">Full access (all health data)</SelectItem>
-                <SelectItem value="conditions_only">Conditions only (allergies & conditions)</SelectItem>
-                <SelectItem value="none">Private (nothing)</SelectItem>
-              </SelectContent>
-            </Select>
+              <option value="full">Full access (all health data)</option>
+              <option value="conditions_only">Conditions only (allergies &amp; conditions)</option>
+              <option value="none">Private (nothing)</option>
+            </NativeSelect>
           </div>
 
           <div className="flex gap-2">
@@ -567,19 +561,15 @@ function AddMemberForm({
         </label>
         <div className="flex flex-col gap-1.5 text-xs mv-muted">
           <span>Relation to you</span>
-          <Select
-            value={relation}
-            onValueChange={(v) => onRelationChange(v as FamilyRelation)}
+          <NativeSelect
+            value={relation ?? ""}
+            onChange={(e) => onRelationChange(e.target.value as FamilyRelation)}
           >
-            <SelectTrigger className="w-full rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] py-2 text-sm text-[var(--fg)]">
-              <SelectValue placeholder="Select relation" />
-            </SelectTrigger>
-            <SelectContent>
-              {RELATION_OPTIONS.map((r) => (
-                <SelectItem key={r} value={r}>{FAMILY_RELATION_LABELS[r]}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <option value="">Select relation</option>
+            {RELATION_OPTIONS.map((r) => (
+              <option key={r} value={r}>{FAMILY_RELATION_LABELS[r]}</option>
+            ))}
+          </NativeSelect>
         </div>
       </div>
       {error && <p className="text-xs text-red-500">{error}</p>}
@@ -608,7 +598,7 @@ function TagCombobox({
   existing: string[];
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const filtered = value.trim().length > 0
     ? suggestions.filter(s =>
@@ -617,48 +607,53 @@ function TagCombobox({
       ).slice(0, 8)
     : [];
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
   return (
-    <div className="relative" ref={ref}>
-      <div className="flex gap-2">
-        <Input
-          placeholder={placeholder}
-          value={value}
-          onChange={e => { onChange(e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
-          onKeyDown={e => {
-            if (e.key === "Enter") { e.preventDefault(); if (value.trim()) { onAdd(value); setOpen(false); } }
-            if (e.key === "Escape") setOpen(false);
-          }}
-        />
-        <Button type="button" onClick={() => { if (value.trim()) { onAdd(value); setOpen(false); } }} className="gap-2 shrink-0">
-          <Plus className="h-4 w-4" /> Add
-        </Button>
-      </div>
-      {open && filtered.length > 0 && (
-        <div className="absolute top-full left-0 z-40 mt-1 w-full rounded-2xl border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow)] overflow-hidden">
-          {filtered.map(s => (
-            <button
-              key={s}
-              type="button"
-              onMouseDown={e => e.preventDefault()}
-              onClick={() => { onAdd(s); onChange(""); setOpen(false); }}
-              className="w-full px-4 py-2 text-xs text-left hover:bg-[var(--panel-2)] text-[var(--fg)]"
-            >
-              {s}
-            </button>
-          ))}
+    <Popover modal={false} open={open && filtered.length > 0} onOpenChange={setOpen}>
+      <PopoverAnchor asChild>
+        <div className="flex gap-2">
+          <Input
+            ref={inputRef}
+            placeholder={placeholder}
+            value={value}
+            onChange={e => { onChange(e.target.value); setOpen(true); }}
+            onFocus={() => setOpen(true)}
+            onKeyDown={e => {
+              if (e.key === "Enter") { e.preventDefault(); if (value.trim()) { onAdd(value); setOpen(false); } }
+              if (e.key === "Escape") setOpen(false);
+            }}
+          />
+          <Button type="button" onClick={() => { if (value.trim()) { onAdd(value); setOpen(false); } }} className="gap-2 shrink-0">
+            <Plus className="h-4 w-4" /> Add
+          </Button>
         </div>
-      )}
-    </div>
+      </PopoverAnchor>
+      <PopoverContent
+        className="w-[var(--radix-popover-trigger-width)] p-0"
+        align="start"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        <Command shouldFilter={false}>
+          <CommandList>
+            <CommandGroup>
+              {filtered.map((s) => (
+                <CommandItem
+                  key={s}
+                  value={s}
+                  onSelect={() => {
+                    onAdd(s);
+                    onChange("");
+                    setOpen(false);
+                    requestAnimationFrame(() => inputRef.current?.focus());
+                  }}
+                >
+                  {s}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -723,7 +718,6 @@ export default function ProfilePage() {
   // Country code dropdown state
   const [ccDropOpen, setCcDropOpen] = useState(false);
   const [ccSearch, setCcSearch] = useState("");
-  const ccDropRef = useRef<HTMLDivElement>(null);
   // Inline pencil-edit state for doctor picker
   const [editingDoctor, setEditingDoctor] = useState(false);
   const [editDoctorValue, setEditDoctorValue] = useState("");
@@ -797,18 +791,6 @@ export default function ProfilePage() {
       document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }, []);
-
-  useEffect(() => {
-    if (!ccDropOpen) return;
-    function onMouseDown(e: MouseEvent) {
-      if (ccDropRef.current && !ccDropRef.current.contains(e.target as Node)) {
-        setCcDropOpen(false);
-        setCcSearch("");
-      }
-    }
-    document.addEventListener("mousedown", onMouseDown);
-    return () => document.removeEventListener("mousedown", onMouseDown);
-  }, [ccDropOpen]);
 
   useEffect(() => {
     if (!hydrated || phoneDraftDirty) return;
@@ -1111,25 +1093,22 @@ export default function ProfilePage() {
                     onChange={(v) => updateProfile({ dob: v })}
                     placeholder="Pick date of birth"
                     max={new Date().toISOString().slice(0, 10)}
+                    captionLayout="dropdown"
+                    fromYear={1900}
+                    toYear={new Date().getFullYear()}
                   />
                 </div>
                 <div className="flex min-w-0 flex-col gap-1.5 text-xs mv-muted">
                   <span className="leading-tight">Sex</span>
-                  <Select
-                    value={store.profile.sex || undefined}
-                    onValueChange={(v) => updateProfile({ sex: v || undefined })}
+                  <NativeSelect
+                    value={store.profile.sex ?? ""}
+                    onChange={(e) => updateProfile({ sex: e.target.value || undefined })}
                   >
-                    <SelectTrigger className="w-full rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] py-2 text-sm text-[var(--fg)]">
-                      <SelectValue placeholder="Select sex" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {sexOptions.map((s) => (
-                        <SelectItem key={s} value={s}>
-                          {s}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <option value="">Select sex</option>
+                    {sexOptions.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </NativeSelect>
                 </div>
                 <label className="flex min-w-0 flex-col gap-1.5 text-xs mv-muted">
                   <span className="leading-tight">Email</span>
@@ -1144,63 +1123,52 @@ export default function ProfilePage() {
                   <span className="leading-tight">Mobile number</span>
                   <div className="flex gap-2">
                     {/* Searchable country code dropdown — only rendered client-side to avoid hydration mismatch */}
-                    <div className="relative shrink-0" ref={ccDropRef}>
+                    <div className="shrink-0">
                       {!hydrated ? (
                         <div className="flex items-center gap-1.5 h-10 px-3 rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] text-sm text-[var(--fg)] whitespace-nowrap w-20" />
                       ) : (
-                      <button
-                        type="button"
-                        onClick={() => { setCcDropOpen(!ccDropOpen); setCcSearch(""); }}
-                        className="flex items-center gap-1.5 h-10 px-3 rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] text-sm text-[var(--fg)] hover:border-[var(--accent)]/50 transition-colors whitespace-nowrap"
-                        aria-haspopup="listbox"
-                        aria-expanded={ccDropOpen}
-                      >
-                        {COUNTRY_CODES.find(c => c.dial === countryCodeInput)?.flag ?? "🌐"}{" "}
-                        {countryCodeInput}
-                        <svg className="h-3 w-3 text-[var(--muted)] ml-0.5" viewBox="0 0 12 12" fill="currentColor">
-                          <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
-                        </svg>
-                      </button>
-                      )}
-                      {ccDropOpen && (
-                        <div className="absolute top-full left-0 z-50 mt-1 w-64 rounded-2xl border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow)] overflow-hidden">
-                          <div className="p-2 border-b border-[var(--border)]">
-                            <input
-                              autoFocus
-                              type="text"
-                              placeholder="Search country or code…"
-                              value={ccSearch}
-                              onChange={e => setCcSearch(e.target.value)}
-                              className="w-full rounded-xl border border-[var(--border)] bg-[var(--panel-2)] px-3 py-1.5 text-xs text-[var(--fg)] placeholder:text-[var(--muted)] outline-none focus:border-[var(--accent)]"
-                            />
-                          </div>
-                          <div className="max-h-52 overflow-y-auto">
-                            {COUNTRY_CODES
-                              .filter(c => {
-                                const q = ccSearch.toLowerCase();
-                                return !q || c.name.toLowerCase().includes(q) || c.dial.includes(q);
-                              })
-                              .map(c => (
-                                <button
-                                  key={c.dial}
-                                  type="button"
-                                  onClick={() => {
-                                    setCountryCodeInput(c.dial);
-                                    setCcDropOpen(false);
-                                    setCcSearch("");
-                                    setPhoneSaved(false);
-                                    setPhoneDraftDirty(true);
-                                  }}
-                                  className={`w-full flex items-center gap-3 px-3 py-2 text-xs text-left transition-colors hover:bg-[var(--panel-2)] ${countryCodeInput === c.dial ? "bg-[var(--accent)]/8 text-[var(--accent)]" : "text-[var(--fg)]"}`}
-                                >
-                                  <span className="text-base shrink-0">{c.flag}</span>
-                                  <span className="font-medium shrink-0">{c.dial}</span>
-                                  <span className="text-[var(--muted)] truncate">{c.name}</span>
-                                </button>
-                              ))
-                            }
-                          </div>
-                        </div>
+                        <Popover open={ccDropOpen} onOpenChange={(o) => { setCcDropOpen(o); if (!o) setCcSearch(""); }}>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              className="flex items-center gap-1.5 h-10 px-3 rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] text-sm text-[var(--fg)] hover:border-[var(--accent)]/50 transition-colors whitespace-nowrap"
+                              aria-haspopup="listbox"
+                              aria-expanded={ccDropOpen}
+                            >
+                              {COUNTRY_CODES.find(c => c.dial === countryCodeInput)?.flag ?? "🌐"}{" "}
+                              {countryCodeInput}
+                              <ChevronsUpDown className="h-3.5 w-3.5 text-[var(--muted)] ml-0.5" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-64 p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Search country or code…" value={ccSearch} onValueChange={setCcSearch} />
+                              <CommandList>
+                                <CommandEmpty>No countries found.</CommandEmpty>
+                                <CommandGroup>
+                                  {COUNTRY_CODES.map((c) => (
+                                    <CommandItem
+                                      key={c.dial + c.name}
+                                      value={`${c.name} ${c.dial}`}
+                                      onSelect={() => {
+                                        setCountryCodeInput(c.dial);
+                                        setCcDropOpen(false);
+                                        setCcSearch("");
+                                        setPhoneSaved(false);
+                                        setPhoneDraftDirty(true);
+                                      }}
+                                      className={countryCodeInput === c.dial ? "bg-[var(--accent)]/10 text-[var(--accent)] aria-selected:bg-[var(--accent)]/15" : ""}
+                                    >
+                                      <span className="text-base shrink-0">{c.flag}</span>
+                                      <span className="font-medium shrink-0">{c.dial}</span>
+                                      <span className="text-[var(--muted)] truncate">{c.name}</span>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                       )}
                     </div>
                     <Input
@@ -1289,48 +1257,60 @@ export default function ProfilePage() {
                     </form>
                   ) : (
                     <>
-                      <Combobox
-                        value={store.profile.primaryCareProvider ?? ""}
-                        onChange={(v) =>
-                          updateProfile({ primaryCareProvider: v.trim() || undefined })
-                        }
-                        suggestions={hydrated ? doctorNameSuggestions : []}
-                        placeholder={
-                          hydrated && doctorNameSuggestions.length > 0
-                            ? "Pick, edit, or remove names — save your own to the list"
-                            : "Your doctor's name (optional)"
-                        }
-                        onRemoveSuggestion={hydrated ? removeDoctorSuggestion : undefined}
-                        onRenameSuggestion={hydrated ? renameDoctorSuggestion : undefined}
-                        onAppendCustom={hydrated ? appendDoctorQuickPick : undefined}
-                      />
-                      {store.profile.primaryCareProvider && (
-                        <div className="flex items-center gap-1.5 pt-0.5">
-                          <span className="truncate text-xs text-[var(--muted)]">{store.profile.primaryCareProvider}</span>
+                      <div className="flex gap-2">
+                        <NativeSelect
+                          value={store.profile.primaryCareProvider ?? ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (v === "__ADD__") {
+                              setEditDoctorValue("");
+                              setEditingDoctor(true);
+                              return;
+                            }
+                            updateProfile({ primaryCareProvider: v || undefined });
+                          }}
+                          disabled={!hydrated}
+                        >
+                          <option value="">{hydrated && doctorNameSuggestions.length > 0 ? "Pick a doctor…" : "No doctors saved yet"}</option>
+                          {hydrated && doctorNameSuggestions.map((s) => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                          <option value="__ADD__">+ Add new…</option>
+                        </NativeSelect>
+                        {store.profile.primaryCareProvider && (
                           <button
                             type="button"
                             onClick={() => {
                               setEditDoctorValue(store.profile.primaryCareProvider ?? "");
                               setEditingDoctor(true);
                             }}
-                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[var(--muted)] transition-colors hover:bg-[var(--panel-2)] hover:text-[var(--fg)]"
+                            className="shrink-0 flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] text-[var(--muted)] transition-colors hover:bg-[var(--panel)] hover:text-[var(--fg)]"
                             aria-label="Rename doctor"
                             title="Rename"
                           >
-                            <Pencil className="h-3.5 w-3.5" />
+                            <Pencil className="h-4 w-4" />
                           </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </>
                   )}
                 </div>
                 <div className="flex min-w-0 flex-col gap-1.5 text-xs mv-muted">
                   <span className="leading-tight">Next doctor visit</span>
-                  <DatePicker
-                    value={store.profile.nextVisitDate ?? ""}
-                    onChange={(v) => updateProfile({ nextVisitDate: v || undefined })}
-                    placeholder="Pick visit date"
-                  />
+                  <div className="flex flex-wrap gap-2">
+                    <DatePicker
+                      value={store.profile.nextVisitDate ?? ""}
+                      onChange={(v) => updateProfile({ nextVisitDate: v || undefined })}
+                      placeholder="Pick visit date"
+                      className="flex-1 min-w-[140px]"
+                    />
+                    <TimePicker
+                      value={store.profile.nextVisitTime ?? ""}
+                      onChange={(v) => updateProfile({ nextVisitTime: v || undefined })}
+                      placeholder="Time"
+                      className="flex-1 min-w-[120px]"
+                    />
+                  </div>
                 </div>
                 <div className="flex min-w-0 flex-col gap-1.5 text-xs mv-muted">
                   <span className="leading-tight">Hospital / Clinic</span>
@@ -1357,38 +1337,41 @@ export default function ProfilePage() {
                     </form>
                   ) : (
                     <>
-                      <Combobox
-                        value={store.profile.nextVisitHospital ?? ""}
-                        onChange={(v) =>
-                          updateProfile({ nextVisitHospital: v.trim() || undefined })
-                        }
-                        suggestions={hydrated ? facilityNameSuggestions : []}
-                        placeholder={
-                          hydrated && facilityNameSuggestions.length > 0
-                            ? "Pick, edit, or remove — save your own to the list"
-                            : "Hospital or clinic name"
-                        }
-                        onRemoveSuggestion={hydrated ? removeFacilitySuggestion : undefined}
-                        onRenameSuggestion={hydrated ? renameFacilitySuggestion : undefined}
-                        onAppendCustom={hydrated ? appendFacilityQuickPick : undefined}
-                      />
-                      {store.profile.nextVisitHospital && (
-                        <div className="flex items-center gap-1.5 pt-0.5">
-                          <span className="truncate text-xs text-[var(--muted)]">{store.profile.nextVisitHospital}</span>
+                      <div className="flex gap-2">
+                        <NativeSelect
+                          value={store.profile.nextVisitHospital ?? ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (v === "__ADD__") {
+                              setEditHospitalValue("");
+                              setEditingHospital(true);
+                              return;
+                            }
+                            updateProfile({ nextVisitHospital: v || undefined });
+                          }}
+                          disabled={!hydrated}
+                        >
+                          <option value="">{hydrated && facilityNameSuggestions.length > 0 ? "Pick a hospital or clinic…" : "No hospitals saved yet"}</option>
+                          {hydrated && facilityNameSuggestions.map((s) => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                          <option value="__ADD__">+ Add new…</option>
+                        </NativeSelect>
+                        {store.profile.nextVisitHospital && (
                           <button
                             type="button"
                             onClick={() => {
                               setEditHospitalValue(store.profile.nextVisitHospital ?? "");
                               setEditingHospital(true);
                             }}
-                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[var(--muted)] transition-colors hover:bg-[var(--panel-2)] hover:text-[var(--fg)]"
+                            className="shrink-0 flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] text-[var(--muted)] transition-colors hover:bg-[var(--panel)] hover:text-[var(--fg)]"
                             aria-label="Rename hospital"
                             title="Rename"
                           >
-                            <Pencil className="h-3.5 w-3.5" />
+                            <Pencil className="h-4 w-4" />
                           </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </>
                   )}
                 </div>
@@ -1762,9 +1745,10 @@ export default function ProfilePage() {
                 <label className="mb-1 block text-sm font-medium" style={{ color: "var(--fg)" }}>
                   Provider
                 </label>
-                <Select
+                <NativeSelect
                   value={byokProvider}
-                  onValueChange={(v) => {
+                  onChange={(e) => {
+                    const v = e.target.value;
                     setByokProvider(v);
                     const spec = PROVIDERS[v as ProviderId];
                     if (spec) setByokModel(spec.curatedModels[0]?.id ?? "");
@@ -1772,15 +1756,10 @@ export default function ProfilePage() {
                     setByokError(null);
                   }}
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(Object.values(PROVIDERS) as typeof PROVIDERS[ProviderId][]).filter((p) => p.id !== "default").map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  {(Object.values(PROVIDERS) as typeof PROVIDERS[ProviderId][]).filter((p) => p.id !== "default").map((p) => (
+                    <option key={p.id} value={p.id}>{p.label}</option>
+                  ))}
+                </NativeSelect>
               </div>
 
               {/* Model row */}
@@ -1788,20 +1767,15 @@ export default function ProfilePage() {
                 <label className="mb-1 block text-sm font-medium" style={{ color: "var(--fg)" }}>
                   Model
                 </label>
-                <Select
+                <NativeSelect
                   value={byokModel}
-                  onValueChange={(v) => { setByokModel(v); setByokState("idle"); setByokError(null); }}
+                  onChange={(e) => { setByokModel(e.target.value); setByokState("idle"); setByokError(null); }}
                   disabled={byokProvider === "default"}
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(PROVIDERS[byokProvider as ProviderId]?.curatedModels ?? []).map((m) => (
-                      <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  {(PROVIDERS[byokProvider as ProviderId]?.curatedModels ?? []).map((m) => (
+                    <option key={m.id} value={m.id}>{m.label}</option>
+                  ))}
+                </NativeSelect>
               </div>
             </div>
 
@@ -2052,19 +2026,15 @@ export default function ProfilePage() {
                               </label>
                               <div className="flex flex-col gap-1.5 text-xs mv-muted">
                                 Relation to you
-                                <Select
-                                  value={editMemberRelation}
-                                  onValueChange={(v) => setEditMemberRelation(v as FamilyRelation)}
+                                <NativeSelect
+                                  value={editMemberRelation ?? ""}
+                                  onChange={(e) => setEditMemberRelation(e.target.value as FamilyRelation)}
                                 >
-                                  <SelectTrigger className="w-full rounded-2xl border border-[var(--border)] bg-[var(--panel)] py-2 text-sm text-[var(--fg)]">
-                                    <SelectValue placeholder="Select relation" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {RELATION_OPTIONS.map((r) => (
-                                      <SelectItem key={r} value={r}>{FAMILY_RELATION_LABELS[r]}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
+                                  <option value="">Select relation</option>
+                                  {RELATION_OPTIONS.map((r) => (
+                                    <option key={r} value={r}>{FAMILY_RELATION_LABELS[r]}</option>
+                                  ))}
+                                </NativeSelect>
                               </div>
                               <label className="flex flex-col gap-1.5 text-xs mv-muted">
                                 Their UMA account email
@@ -2166,10 +2136,10 @@ export default function ProfilePage() {
                             <p className="text-xs mv-muted break-all">{link.linkedAccountEmail}</p>
                           </div>
                           <div className="flex flex-col gap-2 shrink-0">
-                            <Select
+                            <NativeSelect
                               value={link.myVisibility}
-                              onValueChange={(newVis) => {
-                                const vis = newVis as FamilyLinkVisibility;
+                              onChange={(e) => {
+                                const vis = e.target.value as FamilyLinkVisibility;
                                 const updated = familyLinks.map((l) =>
                                   l.id === link.id ? { ...l, myVisibility: vis } : l
                                 );
@@ -2178,16 +2148,12 @@ export default function ProfilePage() {
                                 s.familyLinks = updated;
                                 saveStore(s);
                               }}
+                              className="h-9 text-xs"
                             >
-                              <SelectTrigger className="text-xs rounded-lg border border-[var(--border)] bg-[var(--panel)] py-1.5 px-2 text-[var(--fg)]">
-                                <SelectValue placeholder="Select visibility" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="full">Full access</SelectItem>
-                                <SelectItem value="conditions_only">Conditions only</SelectItem>
-                                <SelectItem value="none">Private</SelectItem>
-                              </SelectContent>
-                            </Select>
+                              <option value="full">Full access</option>
+                              <option value="conditions_only">Conditions only</option>
+                              <option value="none">Private</option>
+                            </NativeSelect>
                             <Button
                               variant="ghost"
                               className="text-xs h-8 text-red-500 hover:text-red-600"
@@ -2250,19 +2216,14 @@ export default function ProfilePage() {
                                 <div className="space-y-3 border-t border-[var(--border)] pt-3">
                                   <div className="flex flex-col gap-1.5 text-xs mv-muted">
                                     <span>What can they see about you?</span>
-                                    <Select
+                                    <NativeSelect
                                       value={acceptVisibility}
-                                      onValueChange={(v) => setAcceptVisibility(v as FamilyLinkVisibility)}
+                                      onChange={(e) => setAcceptVisibility(e.target.value as FamilyLinkVisibility)}
                                     >
-                                      <SelectTrigger className="rounded-lg border border-[var(--border)] bg-[var(--panel)] py-2 text-sm text-[var(--fg)]">
-                                        <SelectValue placeholder="Select visibility" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="full">Full access</SelectItem>
-                                        <SelectItem value="conditions_only">Conditions only</SelectItem>
-                                        <SelectItem value="none">Private</SelectItem>
-                                      </SelectContent>
-                                    </Select>
+                                      <option value="full">Full access</option>
+                                      <option value="conditions_only">Conditions only</option>
+                                      <option value="none">Private</option>
+                                    </NativeSelect>
                                   </div>
                                   <div className="flex gap-2">
                                     <Button
@@ -2474,14 +2435,22 @@ export default function ProfilePage() {
                   <p className="text-xs mv-muted">
                     Code sent on WhatsApp. Check your WhatsApp messages.
                   </p>
-                  <Input
-                    maxLength={6}
-                    inputMode="numeric"
-                    placeholder="6-digit code"
-                    value={waCodeInput}
-                    onChange={(e) => { setWaCodeInput(e.target.value.replace(/\D/g, "")); setWaCodeError(null); }}
-                    className="text-center text-lg tracking-widest"
-                  />
+                  <div className="flex justify-center">
+                    <InputOTP
+                      maxLength={6}
+                      value={waCodeInput}
+                      onChange={(v) => { setWaCodeInput(v.replace(/\D/g, "")); setWaCodeError(null); }}
+                    >
+                      <InputOTPGroup>
+                        <InputOTPSlot index={0} />
+                        <InputOTPSlot index={1} />
+                        <InputOTPSlot index={2} />
+                        <InputOTPSlot index={3} />
+                        <InputOTPSlot index={4} />
+                        <InputOTPSlot index={5} />
+                      </InputOTPGroup>
+                    </InputOTP>
+                  </div>
                   {waCodeError && (
                     <p className="text-xs text-red-500 whitespace-pre-line">{waCodeError}</p>
                   )}

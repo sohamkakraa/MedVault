@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireUserId } from "@/lib/server/authSession";
+import { getAnthropicForUser } from "@/lib/server/llmClient";
 import { prisma } from "@/lib/prisma";
 import { parsePatientStoreJson } from "@/lib/patientStoreApi";
 import { listMessages, appendMessage, setActiveThread, updateContextSummary } from "@/lib/server/threads";
@@ -147,7 +148,7 @@ export async function POST(
     // sulfonamides", "log a moderate headache", "change my preferred name to
     // Sam". Returns null on plain questions or chitchat — those fall through
     // to the conversational LLM below.
-    const patch = await classifyIntent(content, store);
+    const patch = await classifyIntent(content, store, userId);
     if (patch && patch.ops.length > 0) {
       const { store: nextStore, applied, skipped } = applyStorePatch(store, patch);
       const reallyChanged = applied.length > 0;
@@ -173,7 +174,7 @@ export async function POST(
 
   let reply: string;
   try {
-    reply = await callConversationLLM(content, recent, store, thread.contextSummary ?? null, id);
+    reply = await callConversationLLM(content, recent, store, thread.contextSummary ?? null, id, userId);
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : "The chat agent didn't reply this time.";
     const fallback = `Sorry — I couldn't reach the assistant just now (${errMsg.slice(0, 80)}). Your message was saved; try again in a moment.`;
@@ -205,12 +206,12 @@ export async function POST(
   const totalCount = recent.length + 1; // +1 for the assistant reply just saved
   if (totalCount > SUMMARY_THRESHOLD && totalCount % UPDATE_EVERY === 0) {
     const msgs = recent.map((m) => ({ role: m.role, content: m.content }));
-    summarizeOlderMessages(msgs, thread.contextSummary ?? null)
+    summarizeOlderMessages(msgs, thread.contextSummary ?? null, undefined, userId)
       .then(async (summary) => {
         if (summary) {
           await updateContextSummary(id, summary);
           // Auto-rename thread from the fresh summary (non-critical)
-          proposeThreadTitle(id, summary).catch(() => {/* non-critical */});
+          proposeThreadTitle(id, summary, userId).catch(() => {/* non-critical */});
         }
       })
       .catch(() => {/* non-critical */});
@@ -230,14 +231,14 @@ async function callConversationLLM(
   store: PatientStore | null,
   storedSummary: string | null,
   _threadId?: string,
+  userId?: string | null,
 ): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  const got = await getAnthropicForUser(userId ?? null, "chat");
+  if (!got) {
     throw new Error("ANTHROPIC_API_KEY is not set");
   }
-  const Anthropic = (await import("@anthropic-ai/sdk")).default;
-  const anthropic = new Anthropic({ apiKey });
-  const model = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
+  const anthropic = got.client;
+  const model = got.modelId || process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
 
   // Drop the last message (user turn just persisted) before passing to context builder
   const priorHistory = history.slice(0, -1).map((m) => ({ role: m.role, content: m.content }));

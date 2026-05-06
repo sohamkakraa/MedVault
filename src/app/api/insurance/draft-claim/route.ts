@@ -4,8 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/server/authSession";
 import { parsePatientStoreJson, patientStoreForApiPayload } from "@/lib/patientStoreApi";
 import { randomUUID } from "crypto";
-import Anthropic from "@anthropic-ai/sdk";
 import type { InsuranceClaim } from "@/lib/types";
+import { getAnthropicForUser } from "@/lib/server/llmClient";
 
 export const runtime = "nodejs";
 
@@ -26,8 +26,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Invalid request." }, { status: 400 });
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return NextResponse.json({ ok: false, error: "AI not configured." }, { status: 503 });
+  const got = await getAnthropicForUser(userId, "chat");
+  if (!got) return NextResponse.json({ ok: false, error: "AI not configured." }, { status: 503 });
 
   const row = await prisma.patientRecord.findUnique({ where: { userId } });
   const store = parsePatientStoreJson(row?.data ?? null);
@@ -85,7 +85,7 @@ Documents:
 ${docsContext}
 ${userContext ? `\nAdditional context: ${userContext}` : ""}`;
 
-  const client = new Anthropic({ apiKey });
+  const client = got.client;
   const model = process.env.ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
 
   let subject = "";

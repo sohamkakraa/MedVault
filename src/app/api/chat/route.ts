@@ -8,6 +8,7 @@ import { parsePatientStoreJson } from "@/lib/patientStoreApi";
 import { defaultHealthLogs } from "@/lib/healthLogs";
 import { medDosePrimaryLine, medDoseSecondaryLine } from "@/lib/medicationDoseUnits";
 import { extractMedicalPdfFromBuffer } from "@/lib/server/medicalPdfPipeline";
+import { getLlmClient, getAnthropicForUser } from "@/lib/server/llmClient";
 import {
   buildMedicationAddLLMAugment,
   buildMedicationDiaryLLMAugmentFromPatch,
@@ -310,7 +311,8 @@ async function conversationAgentLLM(
   store: PatientStore,
   history: ChatMsg[],
   diaryAugment: string,
-  activeFamilyMember?: { id: string; relation: string; displayName: string } | null
+  activeFamilyMember?: { id: string; relation: string; displayName: string } | null,
+  userId?: string | null
 ): Promise<LLMResponse> {
   const ragQuery = buildRetrievalQuery(userContent, history);
   const { cacheablePrefix, dynamicSuffix: baseDynamic } = buildRetrievalContext(store, ragQuery, activeFamilyMember);
@@ -318,10 +320,11 @@ async function conversationAgentLLM(
 
   const trimmedHistory = trimHistoryForLlm(history);
 
-  if (process.env.ANTHROPIC_API_KEY) {
-    const Anthropic = (await import("@anthropic-ai/sdk")).default;
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const chatModel = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
+  const llm = await getLlmClient(userId ?? null, "chat");
+
+  if (llm.provider === "anthropic") {
+    const client = llm.anthropic;
+    const chatModel = llm.modelId || process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
     const msg = await client.messages.create({
       model: chatModel,
       max_tokens: 900,
@@ -353,10 +356,9 @@ async function conversationAgentLLM(
     };
   }
 
-  if (process.env.OPENAI_API_KEY) {
-    const OpenAI = (await import("openai")).default;
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const oaiModel = process.env.OPENAI_CHAT_MODEL || "gpt-4o-mini";
+  if (llm.provider === "openai") {
+    const client = llm.openai;
+    const oaiModel = llm.modelId || process.env.OPENAI_CHAT_MODEL || "gpt-4o-mini";
     // OpenAI: caching n/a — concatenate prefix + suffix into a single system string
     const systemPrompt = [cacheablePrefix, dynamicSuffix].filter(Boolean).join("\n\n");
     const completion = await client.chat.completions.create({
@@ -380,7 +382,8 @@ async function conversationAgentLLMStream(
   history: ChatMsg[],
   diaryAugment: string,
   activeFamilyMember?: { id: string; relation: string; displayName: string } | null,
-  onDelta?: (text: string) => void
+  onDelta?: (text: string) => void,
+  userId?: string | null
 ): Promise<LLMResponse> {
   const ragQuery = buildRetrievalQuery(userContent, history);
   const { cacheablePrefix, dynamicSuffix: baseDynamic } = buildRetrievalContext(store, ragQuery, activeFamilyMember);
@@ -388,10 +391,11 @@ async function conversationAgentLLMStream(
 
   const trimmedHistory = trimHistoryForLlm(history);
 
-  if (process.env.ANTHROPIC_API_KEY) {
-    const Anthropic = (await import("@anthropic-ai/sdk")).default;
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const chatModel = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
+  const llm = await getLlmClient(userId ?? null, "chat");
+
+  if (llm.provider === "anthropic") {
+    const client = llm.anthropic;
+    const chatModel = llm.modelId || process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
 
     let fullText = "";
     let inputTokens = 0;
@@ -438,10 +442,9 @@ async function conversationAgentLLMStream(
     };
   }
 
-  if (process.env.OPENAI_API_KEY) {
-    const OpenAI = (await import("openai")).default;
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const oaiModel = process.env.OPENAI_CHAT_MODEL || "gpt-4o-mini";
+  if (llm.provider === "openai") {
+    const client = llm.openai;
+    const oaiModel = llm.modelId || process.env.OPENAI_CHAT_MODEL || "gpt-4o-mini";
     // OpenAI: caching n/a — concatenate prefix + suffix into a single system string
     const systemPrompt = [cacheablePrefix, dynamicSuffix].filter(Boolean).join("\n\n");
 
@@ -711,7 +714,8 @@ export async function POST(req: Request) {
                 const event = `data: ${JSON.stringify({ type: "delta", text: deltaText })}\n\n`;
                 responseController.enqueue(encoder.encode(event));
               }
-            }
+            },
+            userId,
           );
           conversationAnswerText = convAnswer.text;
           chatUsage = convAnswer.usage || null;
@@ -772,8 +776,9 @@ export async function POST(req: Request) {
         }
 
         // Run records agent in parallel (it was already streaming in the background)
+        const anthropicAvailable = await getAnthropicForUser(userId, "extract");
         const recordsPromise =
-          pdfAttachment && process.env.ANTHROPIC_API_KEY
+          pdfAttachment && anthropicAvailable
             ? extractMedicalPdfFromBuffer({
                 buffer: Buffer.from(pdfAttachment.dataBase64, "base64"),
                 fileName: pdfAttachment.fileName,
@@ -782,6 +787,7 @@ export async function POST(req: Request) {
                 clientLexicon: store.standardLexicon ?? [],
                 existingContentHashes: existingHashes,
                 skipPatientNameCheck: body.skipPatientNameCheck === true,
+                userId,
               })
             : Promise.resolve(null as Awaited<ReturnType<typeof extractMedicalPdfFromBuffer>> | null);
 

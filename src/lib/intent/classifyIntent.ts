@@ -21,6 +21,7 @@
  */
 import type { PatientStore } from "@/lib/types";
 import { StorePatchSchema, type StorePatch } from "./storePatch";
+import { getAnthropicForUser } from "@/lib/server/llmClient";
 
 /**
  * Anthropic tool schema for `propose_store_patch`. Mirrors StorePatchSchema
@@ -245,9 +246,10 @@ Decide whether to call propose_store_patch.`;
 export async function classifyIntent(
   userMessage: string,
   store: PatientStore | null,
+  userId?: string | null,
 ): Promise<StorePatch | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
+  const got = await getAnthropicForUser(userId ?? null, "intent");
+  if (!got) return null;
   const trimmed = userMessage.trim();
   if (trimmed.length < 4 || trimmed.length > 4000) return null;
 
@@ -257,9 +259,9 @@ export async function classifyIntent(
   if (!looksLikeMutationIntent(trimmed)) return null;
 
   try {
-    const Anthropic = (await import("@anthropic-ai/sdk")).default;
-    const anthropic = new Anthropic({ apiKey });
+    const anthropic = got.client;
     const model =
+      got.modelId ||
       process.env.ANTHROPIC_INTENT_MODEL ||
       process.env.ANTHROPIC_MODEL ||
       "claude-haiku-4-5-20251001";

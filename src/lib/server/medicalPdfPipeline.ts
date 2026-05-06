@@ -6,6 +6,7 @@ import { buildArtifactSlug, proposeLexiconPatches } from "@/lib/standardized";
 import { applyParsedMarkdownToDoc, parseStructuredFromMarkdown } from "@/lib/parseMarkdownArtifact";
 
 import { APIError } from "@anthropic-ai/sdk";
+import { getAnthropicForUser } from "./llmClient";
 
 /**
  * Model for Messages API calls that include a PDF `document` block (base64).
@@ -133,10 +134,12 @@ async function extractWithAnthropicFromPdf(
   pdfBuffer: Buffer,
   fileName: string,
   typeHint: string,
-  uploadISO: string
+  uploadISO: string,
+  userId: string | null
 ) {
-  const Anthropic = (await import("@anthropic-ai/sdk")).default;
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const got = await getAnthropicForUser(userId, "extract");
+  if (!got) throw new Error("no_anthropic_key");
+  const client = got.client;
   const safeName = sanitizePdfFilename(fileName);
   const b64 = pdfBuffer.toString("base64");
 
@@ -335,10 +338,12 @@ async function extractStructureFromText(
   rawText: string,
   fileName: string,
   typeHint: string,
-  uploadISO: string
+  uploadISO: string,
+  userId: string | null
 ) {
-  const Anthropic = (await import("@anthropic-ai/sdk")).default;
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const got = await getAnthropicForUser(userId, "structure");
+  if (!got) throw new Error("no_anthropic_key");
+  const client = got.client;
 
   // Use Haiku when text is pre-extracted — no need for the heavier PDF model
   const structureModel =
@@ -456,6 +461,8 @@ export type ExtractMedicalPdfInput = {
   existingContentHashes: string[];
   /** When true, skip patient-name verification (user confirmed mismatch on client). */
   skipPatientNameCheck?: boolean;
+  /** Used to look up the user's BYOK Anthropic credential. Falls back to env if absent. */
+  userId?: string | null;
 };
 
 export type ExtractMedicalPdfSuccess = {
@@ -514,12 +521,13 @@ export async function extractMedicalPdfFromBuffer(
   inp: ExtractMedicalPdfInput
 ): Promise<ExtractMedicalPdfSuccess | ExtractMedicalPdfFailure> {
   try {
-    if (!process.env.ANTHROPIC_API_KEY) {
+    const anthropicCheck = await getAnthropicForUser(inp.userId ?? null, "extract");
+    if (!anthropicCheck) {
       return {
         ok: false,
         code: "no_anthropic_key",
         message:
-          "UMA reads PDFs with Anthropic Claude. Set ANTHROPIC_API_KEY in your environment to upload documents.",
+          "UMA reads PDFs with Anthropic Claude. Provide your own Anthropic key in Profile → AI provider, or set ANTHROPIC_API_KEY in your environment.",
         status: 503,
       };
     }
@@ -572,7 +580,7 @@ export async function extractMedicalPdfFromBuffer(
       try {
         const llama = await extractWithLlamaParse(buf, inp.fileName);
         // LlamaParse succeeded — now use Claude (text mode) to structure it
-        const structured = await extractStructureFromText(llama.markdown, inp.fileName, typeHint, uploadISO);
+        const structured = await extractStructureFromText(llama.markdown, inp.fileName, typeHint, uploadISO, inp.userId ?? null);
         llm = structured;
         extractorSource = "llamaparse";
         llamaParseCredits = (llama.pageCount || 1) * LLAMA_CREDITS_PER_PAGE;
@@ -592,7 +600,7 @@ export async function extractMedicalPdfFromBuffer(
     if (!llm) {
       // Claude full PDF path (original behaviour)
       try {
-        llm = await extractWithAnthropicFromPdf(buf, inp.fileName, typeHint, uploadISO);
+        llm = await extractWithAnthropicFromPdf(buf, inp.fileName, typeHint, uploadISO, inp.userId ?? null);
         extractorSource = "claude_pdf";
         llamaParseCredits = 0;
       } catch (e: unknown) {

@@ -13,6 +13,7 @@ import { classifyIntent } from "@/lib/intent/classifyIntent";
 import { applyStorePatch } from "@/lib/intent/storePatch";
 import { getOrCreateActiveThread, appendMessage, listMessages, updateContextSummary } from "@/lib/server/threads";
 import { buildContextWindow, summarizeOlderMessages, SUMMARY_THRESHOLD, UPDATE_EVERY } from "@/lib/intent/cavemanSummarize";
+import { getLlmClient } from "@/lib/server/llmClient";
 
 /** Server-safe blank store — avoids importing the "use client" store.ts module. */
 function blankStore(): PatientStore {
@@ -36,8 +37,6 @@ function blankStore(): PatientStore {
     updatedAtISO: new Date().toISOString(),
   } as PatientStore;
 }
-
-const MAX_HISTORY = 20;
 
 /**
  * Convert markdown formatting to WhatsApp-compatible formatting.
@@ -182,11 +181,13 @@ async function callLLM(
   systemPrompt: string,
   history: Array<{ role: string; content: string }>,
   userMessage: string,
+  userId?: string | null,
 ): Promise<string> {
-  if (process.env.ANTHROPIC_API_KEY) {
-    const Anthropic = (await import("@anthropic-ai/sdk")).default;
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const model = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
+  const llm = await getLlmClient(userId ?? null, "chat");
+
+  if (llm.provider === "anthropic") {
+    const client = llm.anthropic;
+    const model = llm.modelId || process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
 
     const messages = [
       ...history.map((m) => ({
@@ -209,10 +210,9 @@ async function callLLM(
       .join("");
   }
 
-  if (process.env.OPENAI_API_KEY) {
-    const OpenAI = (await import("openai")).default;
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const model = process.env.OPENAI_CHAT_MODEL || "gpt-4o-mini";
+  if (llm.provider === "openai") {
+    const client = llm.openai;
+    const model = llm.modelId || process.env.OPENAI_CHAT_MODEL || "gpt-4o-mini";
 
     const res = await client.chat.completions.create({
       model,
@@ -528,7 +528,7 @@ export async function processIncomingMessage(
   // parsers miss but the user clearly meant as an add/remove/set is caught
   // here. Returns null for questions and chitchat — those fall through to
   // the regular conversational LLM call below.
-  const generalPatch = await classifyIntent(text, store);
+  const generalPatch = await classifyIntent(text, store, user.id);
   if (generalPatch && generalPatch.ops.length > 0) {
     const { store: nextStore, applied, skipped } = applyStorePatch(store, generalPatch);
     if (applied.length > 0) {
@@ -616,7 +616,7 @@ export async function processIncomingMessage(
 
   const systemPrompt = buildRetrievalContext(store, prefs);
 
-  const rawReply = await callLLM(systemPrompt, history, text);
+  const rawReply = await callLLM(systemPrompt, history, text, user.id);
   const reply = markdownToWhatsApp(rawReply);
 
   // ── Save assistant reply ──
@@ -631,7 +631,7 @@ export async function processIncomingMessage(
   // Async caveman compression — fire-and-forget after every UPDATE_EVERY messages
   const totalCount = recentMessages.length + 1;
   if (totalCount > SUMMARY_THRESHOLD && totalCount % UPDATE_EVERY === 0) {
-    summarizeOlderMessages(allHistory, (activeThread as { contextSummary?: string | null }).contextSummary ?? null)
+    summarizeOlderMessages(allHistory, (activeThread as { contextSummary?: string | null }).contextSummary ?? null, undefined, user.id)
       .then((summary) => {
         if (summary) return updateContextSummary(activeThread.id, summary);
       })

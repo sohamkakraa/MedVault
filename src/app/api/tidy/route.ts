@@ -21,6 +21,7 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 import { requireUserId } from "@/lib/server/authSession";
+import { getAnthropicForUser } from "@/lib/server/llmClient";
 import { prisma } from "@/lib/prisma";
 import { parsePatientStoreJson } from "@/lib/patientStoreApi";
 import { StorePatchSchema, StorePatchOpSchema, type StorePatchOp } from "@/lib/intent/storePatch";
@@ -180,8 +181,8 @@ export async function POST(req: NextRequest) {
   };
 
   // No API key? Return the heuristic. Surface that clearly.
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  const got = await getAnthropicForUser(userId, "tidy");
+  if (!got) {
     const heur = heuristicOps(store, docDoctorMentions);
     const resp: TidyResponse = {
       ok: true,
@@ -206,9 +207,9 @@ export async function POST(req: NextRequest) {
   const userMessage = buildUserMessage(store, docDoctorMentions);
 
   try {
-    const Anthropic = (await import("@anthropic-ai/sdk")).default;
-    const anthropic = new Anthropic({ apiKey });
+    const anthropic = got.client;
     const model =
+      got.modelId ||
       process.env.ANTHROPIC_TIDY_MODEL ||
       process.env.ANTHROPIC_MODEL ||
       "claude-haiku-4-5-20251001";
