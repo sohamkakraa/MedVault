@@ -621,10 +621,13 @@ export async function POST(req: Request) {
 
     // Set up SSE response
     const encoder = new TextEncoder();
-    let responseController: ReadableStreamDefaultController<Uint8Array> | null = null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let responseController: any = null; // ReadableStreamDefaultController<Uint8Array> — typed as any because
+    // TypeScript narrows mutable let-variables to null after every await in the enclosing async IIFE,
+    // making typed narrowing (SseController | null → never) a build error.
 
     const stream = new ReadableStream<Uint8Array>({
-      start(controller: ReadableStreamDefaultController<Uint8Array>) {
+      start(controller) {
         responseController = controller;
       },
     });
