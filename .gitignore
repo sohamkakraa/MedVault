@@ -45,3 +45,8 @@ next-env.d.ts
 .claude/prism.md
 .claude/skills/
 .claude/.prism_project_id
+.claude/worktrees/
+
+# Eval run outputs (keep harness + dataset, not per-run snapshots)
+eval-runs/run-*/
+eval-runs/run-v*/

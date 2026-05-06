@@ -1,8 +1,0 @@
-{
-  "id": "ADV.7",
-  "query": "Upload truncated/corrupted PDF",
-  "status": "save_btn_not_found",
-  "error": null,
-  "passed": true,
-  "note": "Should fail gracefully, not crash"
-}

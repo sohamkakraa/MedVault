@@ -1,7 +1,0 @@
-{
-  "id": "ADV.1",
-  "query": "Duplicate upload of lipid panel",
-  "count_of_237_in_dashboard": 1,
-  "passed": true,
-  "note": "237 mg/dL (Total Chol) mention count after duplicate upload"
-}

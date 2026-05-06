@@ -1,3 +1,0 @@
-metric,n,median_s,p95_s,target_med,target_p95,ok
-upload_s,22,24.6,30.6,8,15,False
-chat_s,10,2.6,2.6,4,8,True

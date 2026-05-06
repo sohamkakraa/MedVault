@@ -51,14 +51,21 @@ console.log(
     "then read the output immediately ABOVE it (Prisma P#### or Next/TypeScript).\n",
 );
 
+/** Synchronous sleep — safe in a build script (single-threaded, no event loop needed). */
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
 function fail(label, code) {
   console.error(`\n[vercel-build] ══ FAILED: ${label} (exit ${code}) ══\n`);
   if (label.includes("migrate")) {
     console.error(`Decode:
+  • P1002 / advisory lock timeout → Neon scale-to-zero woke too slowly, or DIRECT_URL points to the pooler.
+      Fix: set DIRECT_URL to the non-pooled Neon connection string (omit "-pooler" from the hostname).
   • P1001 / "Can't reach database" → wrong DATABASE_URL, DB down, or network; use sslmode=require if your host requires it.
   • P1017 / connection closed → on Neon set DIRECT_URL to the non-pooled "direct" connection; keep pooled URL in DATABASE_URL.
   • Auth failed → wrong user/password in the URL.
-  • https://www.prisma.io/docs/reference/error-reference
+  • https://www.prisma.io/docs/reference-error-reference
 `);
   } else if (label.includes("generate")) {
     console.error(`Decode:
@@ -79,7 +86,28 @@ function run(label, code) {
   console.log(`[vercel-build] OK: ${label}\n`);
 }
 
-run("prisma migrate deploy", prismaSpawn(["migrate", "deploy"]));
+/**
+ * prisma migrate deploy can hit P1002 (advisory lock timeout) on Neon when the DB
+ * wakes from scale-to-zero. Retry up to 3 times with a 6-second gap.
+ */
+function runMigrate(maxAttempts = 3, delayMs = 6000) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    console.log(`\n[vercel-build] ── prisma migrate deploy (attempt ${attempt}/${maxAttempts}) ──\n`);
+    const code = prismaSpawn(["migrate", "deploy"]);
+    if (code === 0) {
+      console.log(`[vercel-build] OK: prisma migrate deploy\n`);
+      return;
+    }
+    if (attempt < maxAttempts) {
+      console.log(`[vercel-build] migrate exited ${code} — waiting ${delayMs / 1000}s before retry (Neon wake-up / advisory lock)...`);
+      sleepSync(delayMs);
+    } else {
+      fail("prisma migrate deploy", code);
+    }
+  }
+}
+
+runMigrate();
 run("prisma generate", prismaSpawn(["generate"]));
 run("next build", nextSpawn(["build"]));
 

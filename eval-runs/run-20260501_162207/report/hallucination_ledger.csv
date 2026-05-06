@@ -1,5 +1,0 @@
-surface,document_or_query,claim,claim_type,source_present,severity,root_cause_hypothesis
-extraction,meds_store,vitamin b12,medication,False,P1,Medication in store not traceable to any GT doc
-extraction,meds_store,vitamin d3,medication,False,P1,Medication in store not traceable to any GT doc
-extraction,meds_store,dispensing fee,medication,False,P1,Medication in store not traceable to any GT doc
-extraction,meds_store,omega 3,medication,False,P1,Medication in store not traceable to any GT doc
