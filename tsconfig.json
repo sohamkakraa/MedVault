@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@playwright/test": ["./node_modules/playwright/test"]
     }
   },
   "include": [

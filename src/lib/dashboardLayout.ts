@@ -23,6 +23,7 @@ export const ALL_WIDGET_IDS: DashboardWidgetId[] = [
   "bloodPressure",
   "sideEffects",
   "healthTrends",
+  "concerningItems",
   "labs",
   "bmi",
 ];
@@ -35,6 +36,7 @@ export const DEFAULT_BENTO_SIZES: Record<DashboardWidgetId, BentoSize> = {
   bloodPressure: "medium",
   sideEffects: "medium",
   healthTrends: "hero",
+  concerningItems: "hero",
   labs: "large",
   bmi: "small",
 };
@@ -93,6 +95,11 @@ export const DASHBOARD_WIDGET_META: Record<DashboardWidgetId, DashboardWidgetMet
     label: "Health trends",
     description: "Charts for pinned biomarkers over time.",
   },
+  concerningItems: {
+    id: "concerningItems",
+    label: "Concerning items",
+    description: "Flagged labs and BMI status worth discussing with your doctor.",
+  },
   labs: {
     id: "labs",
     label: "Recent test results",
@@ -122,6 +129,7 @@ export function defaultDashboardLayout(): DashboardLayout {
       { id: newRowId(), widgets: ["bloodPressure", "sideEffects"] },
       { id: newRowId(), widgets: ["labs"] },
       { id: newRowId(), widgets: ["healthTrends"] },
+      { id: newRowId(), widgets: ["concerningItems"] },
       { id: newRowId(), widgets: ["bmi"] },
     ],
     hidden: [],
@@ -181,6 +189,8 @@ export function normalizeDashboardLayout(
   }
   // Always force healthTrends to full-width for chart readability
   sizes["healthTrends"] = "hero";
+  // Always force concerningItems to full-width for the flagged lab grid
+  sizes["concerningItems"] = "hero";
 
   return { rows, hidden: Array.from(hiddenSet), sizes };
 }

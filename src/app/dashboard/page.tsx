@@ -72,6 +72,7 @@ import {
 import { displaySummaryForDoc, stripInlineMarkdownForDisplay } from "@/lib/markdownDoc";
 import { labMatchesTrendMetric, resolveCanonicalLabName } from "@/lib/standardized";
 import { normalizeLabUnitString } from "@/lib/labUnits";
+import { getBmiInfo } from "@/lib/bmi";
 import { summarizeMenstrualCycle } from "@/lib/menstrualCycle";
 import { LAB_META, getLabMeta } from "@/lib/labMeta";
 import {
@@ -103,7 +104,11 @@ import {
   ArrowUpRight,
   CheckCircle2,
   Layers,
+  Scale,
+  FlaskConical,
+  CheckCheck,
 } from "lucide-react";
+import { ConcerningTile, type ConcerningRangeBar, type ConcerningStatus } from "@/components/health/ConcerningTile";
 import { Combobox } from "@/components/ui/Combobox";
 
 function pf(s?: string | null): string {
@@ -2144,6 +2149,134 @@ function DashboardInner() {
                 </div>
               </div>
             ) : null;
+          }
+
+          {
+            // ── Concerning items widget ──────────────────────────────────────
+            // Builds ConcerningTile cards for each flagged lab + BMI.
+            // Deduplicates by canonical name (most recent wins — flaggedLabs is
+            // already sorted newest-first from recentLabs).
+
+            const bmiInfo = (() => {
+              const m = store.profile.bodyMetrics;
+              if (!m) return null;
+              return getBmiInfo(m.heightCm, m.weightKg);
+            })();
+
+            // Build deduplicated flagged lab tiles
+            const concerningLabItems = (() => {
+              const seen = new Map<string, { lab: typeof flaggedLabs[0]; canonical: string }>();
+              for (const lab of flaggedLabs) {
+                const canonical = resolveCanonicalLabName(lab.name, lex);
+                if (!seen.has(canonical)) seen.set(canonical, { lab, canonical });
+              }
+              return [...seen.values()].map(({ lab, canonical }) => {
+                const ref = getCanonicalRefRange(canonical);
+                const rawVal = typeof lab.value === "number" ? lab.value : parseFloat(String(lab.value ?? ""));
+                if (isNaN(rawVal)) return null;
+                const it = interpretLab(lab, lex);
+                const status: ConcerningStatus = it.flag === "high" ? "above" : it.flag === "low" ? "below" : "in";
+                const displayUnit = it.displayUnit || lab.unit || "";
+                const valueStr = `${Number.isInteger(rawVal) ? rawVal : rawVal.toFixed(1)}${displayUnit ? " " + displayUnit : ""}`;
+                const dateStr = lab.date
+                  ? new Date(lab.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", year: "numeric" })
+                  : undefined;
+                let rangeBar: ConcerningRangeBar | undefined = undefined;
+                if (ref) {
+                  rangeBar = {
+                    min: ref.low,
+                    max: ref.high,
+                    current: rawVal,
+                    lowLabel: `<${Number.isInteger(ref.low) ? ref.low : ref.low.toFixed(1)} ${ref.unit}`,
+                    midLabel: "Normal",
+                    highLabel: `>${Number.isInteger(ref.high) ? ref.high : ref.high.toFixed(1)} ${ref.unit}`,
+                  };
+                }
+                return { canonical, status, valueStr, dateStr, rangeBar };
+              }).filter(Boolean) as Array<{
+                canonical: string;
+                status: ConcerningStatus;
+                valueStr: string;
+                dateStr: string | undefined;
+                rangeBar: ConcerningRangeBar | undefined;
+              }>;
+            })();
+
+            const hasConcerningData = concerningLabItems.length > 0 || bmiInfo !== null;
+
+            widgetNodes.concerningItems = (
+              <div className="mv-card rounded-3xl p-5 sm:p-6">
+                {/* Section heading */}
+                <div className="mb-5">
+                  <h2 className="mv-title text-xl" style={{ color: "var(--fg)" }}>
+                    Concerning items
+                  </h2>
+                  <p className="text-sm mt-1" style={{ color: "var(--muted)" }}>
+                    Flagged labs and metrics worth discussing with your doctor.
+                  </p>
+                </div>
+
+                {/* Tile grid */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {!hasConcerningData && (
+                    <ConcerningTile
+                      kind="empty"
+                      icon={CheckCheck}
+                      label=""
+                      value=""
+                      status="neutral"
+                    />
+                  )}
+
+                  {/* Lab tiles */}
+                  {concerningLabItems.map(({ canonical, status, valueStr, dateStr, rangeBar }) => {
+                    const meta = getLabMeta(canonical);
+                    return (
+                      <ConcerningTile
+                        key={canonical}
+                        kind="lab"
+                        icon={FlaskConical}
+                        label={meta?.friendlyName ?? canonical}
+                        value={valueStr}
+                        date={dateStr}
+                        status={status}
+                        rangeBar={rangeBar}
+                      />
+                    );
+                  })}
+
+                  {/* BMI tile */}
+                  {bmiInfo && (() => {
+                    const bmiStatus: ConcerningStatus =
+                      bmiInfo.category === "healthy" ? "in"
+                      : bmiInfo.category === "underweight" ? "below"
+                      : "above";
+                    const bmiRangeBar: ConcerningRangeBar = {
+                      min: 18.5,
+                      max: 24.9,
+                      current: bmiInfo.bmi,
+                      lowLabel: "<18.5",
+                      midLabel: "Healthy",
+                      highLabel: ">25",
+                    };
+                    return (
+                      <ConcerningTile
+                        kind="bmi"
+                        icon={Scale}
+                        label="Body Mass Index (BMI)"
+                        value={`${bmiInfo.bmi.toFixed(1)} kg/m²`}
+                        status={bmiStatus}
+                        rangeBar={bmiRangeBar}
+                      />
+                    );
+                  })()}
+                </div>
+
+                <p className="mt-4 text-sm" style={{ color: "var(--muted)" }}>
+                  Not medical advice — always confirm with your doctor.
+                </p>
+              </div>
+            );
           }
 
           return (

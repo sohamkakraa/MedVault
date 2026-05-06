@@ -50,3 +50,6 @@ next-env.d.ts
 # Eval run outputs (keep harness + dataset, not per-run snapshots)
 eval-runs/run-*/
 eval-runs/run-v*/
+
+# Murphy raw screenshot frames (commit only the summary JSON)
+murphy/output/**/frames/

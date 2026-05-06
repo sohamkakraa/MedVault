@@ -148,7 +148,7 @@ export async function renameThread(
   if (!t) return null;
   const updated = await prisma.thread.update({
     where: { id: threadId },
-    data: { title: title.trim().slice(0, 200) || null },
+    data: { title: title.trim().slice(0, 200) || null, titleIsManual: true },
   });
   return updated as ThreadRow;
 }

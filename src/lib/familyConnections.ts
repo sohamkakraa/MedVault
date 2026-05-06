@@ -5,6 +5,7 @@
  */
 
 import { FamilyConnectionRequest, FamilyLink, FamilyLinkVisibility, FamilyRelation } from "@/lib/types";
+import { getStore, saveStore } from "@/lib/store";
 
 /**
  * Generates a stable key for storing requests to a specific email.
@@ -80,16 +81,10 @@ export function sendFamilyConnectionRequest(params: {
   // Also store in sender's store for their own reference
   // (they can see pending requests they sent)
   try {
-    const storeRaw = localStorage.getItem("mv_patient_store_v1");
-    if (storeRaw) {
-      const store = JSON.parse(storeRaw);
-      if (!store.pendingFamilyRequests) store.pendingFamilyRequests = [];
-      store.pendingFamilyRequests = [request, ...store.pendingFamilyRequests].slice(0, 100);
-      store.updatedAtISO = new Date().toISOString();
-      localStorage.setItem("mv_patient_store_v1", JSON.stringify(store));
-      // Dispatch event so UI can refresh
-      window.dispatchEvent(new CustomEvent("mv-store-update", { detail: store }));
-    }
+    const store = getStore();
+    if (!store.pendingFamilyRequests) store.pendingFamilyRequests = [];
+    store.pendingFamilyRequests = [request, ...store.pendingFamilyRequests].slice(0, 100);
+    saveStore(store);
   } catch {
     // If store is not available, that's OK — just the inbox entry is what matters
   }
@@ -166,44 +161,34 @@ export function acceptFamilyRequest(
 
   // Save recipient link to this account's store
   try {
-    const storeRaw = localStorage.getItem("mv_patient_store_v1");
-    if (storeRaw) {
-      const store = JSON.parse(storeRaw);
-      if (!store.familyLinks) store.familyLinks = [];
-      store.familyLinks = [
-        recipientLink,
-        ...store.familyLinks.filter((l: FamilyLink) => l.id !== request.id),
-      ];
-      if (!store.pendingFamilyRequests) store.pendingFamilyRequests = [];
-      store.pendingFamilyRequests = store.pendingFamilyRequests.filter((r: FamilyConnectionRequest) => r.id !== request.id);
-      store.updatedAtISO = new Date().toISOString();
-      localStorage.setItem("mv_patient_store_v1", JSON.stringify(store));
-      window.dispatchEvent(new CustomEvent("mv-store-update", { detail: store }));
-    }
+    const store = getStore();
+    if (!store.familyLinks) store.familyLinks = [];
+    store.familyLinks = [
+      recipientLink,
+      ...store.familyLinks.filter((l: FamilyLink) => l.id !== request.id),
+    ];
+    if (!store.pendingFamilyRequests) store.pendingFamilyRequests = [];
+    store.pendingFamilyRequests = store.pendingFamilyRequests.filter((r: FamilyConnectionRequest) => r.id !== request.id);
+    saveStore(store);
   } catch {
     // Store may not exist yet
   }
 
   // Save sender link to sender's store (if it exists on this device)
   try {
-    const senderStoreRaw = localStorage.getItem("mv_patient_store_v1");
-    if (senderStoreRaw) {
-      const senderStore = JSON.parse(senderStoreRaw);
-      // Only update if this is the sender's account (email matches)
-      if (senderStore.profile?.email === request.fromAccountEmail) {
-        if (!senderStore.familyLinks) senderStore.familyLinks = [];
-        senderStore.familyLinks = [
-          senderLink,
-          ...senderStore.familyLinks.filter((l: FamilyLink) => l.id !== request.id),
-        ];
-        if (!senderStore.pendingFamilyRequests) senderStore.pendingFamilyRequests = [];
-        senderStore.pendingFamilyRequests = senderStore.pendingFamilyRequests.filter(
-          (r: FamilyConnectionRequest) => r.id !== request.id
-        );
-        senderStore.updatedAtISO = new Date().toISOString();
-        localStorage.setItem("mv_patient_store_v1", JSON.stringify(senderStore));
-        window.dispatchEvent(new CustomEvent("mv-store-update", { detail: senderStore }));
-      }
+    const senderStore = getStore();
+    // Only update if this is the sender's account (email matches)
+    if (senderStore.profile?.email === request.fromAccountEmail) {
+      if (!senderStore.familyLinks) senderStore.familyLinks = [];
+      senderStore.familyLinks = [
+        senderLink,
+        ...senderStore.familyLinks.filter((l: FamilyLink) => l.id !== request.id),
+      ];
+      if (!senderStore.pendingFamilyRequests) senderStore.pendingFamilyRequests = [];
+      senderStore.pendingFamilyRequests = senderStore.pendingFamilyRequests.filter(
+        (r: FamilyConnectionRequest) => r.id !== request.id
+      );
+      saveStore(senderStore);
     }
   } catch {
     // Sender store may not be on this device
@@ -235,17 +220,12 @@ export function rejectFamilyRequest(request: FamilyConnectionRequest): void {
 
   // Remove from pending family requests in store
   try {
-    const storeRaw = localStorage.getItem("mv_patient_store_v1");
-    if (storeRaw) {
-      const store = JSON.parse(storeRaw);
-      if (store.pendingFamilyRequests) {
-        store.pendingFamilyRequests = store.pendingFamilyRequests.filter(
-          (r: FamilyConnectionRequest) => r.id !== request.id
-        );
-      }
-      store.updatedAtISO = new Date().toISOString();
-      localStorage.setItem("mv_patient_store_v1", JSON.stringify(store));
-      window.dispatchEvent(new CustomEvent("mv-store-update", { detail: store }));
+    const store = getStore();
+    if (store.pendingFamilyRequests) {
+      store.pendingFamilyRequests = store.pendingFamilyRequests.filter(
+        (r: FamilyConnectionRequest) => r.id !== request.id
+      );
+      saveStore(store);
     }
   } catch {
     // Store may not exist
@@ -259,12 +239,9 @@ export function rejectFamilyRequest(request: FamilyConnectionRequest): void {
  */
 export function getFamilyLinks(): FamilyLink[] {
   if (typeof window === "undefined") return [];
-
   try {
-    const storeRaw = localStorage.getItem("mv_patient_store_v1");
-    if (!storeRaw) return [];
-    const store = JSON.parse(storeRaw);
-    return Array.isArray(store.familyLinks) ? (store.familyLinks as FamilyLink[]) : [];
+    const store = getStore();
+    return Array.isArray(store.familyLinks) ? store.familyLinks : [];
   } catch {
     return [];
   }
@@ -279,15 +256,10 @@ export function removeFamilyLink(linkId: string): void {
   }
 
   try {
-    const storeRaw = localStorage.getItem("mv_patient_store_v1");
-    if (storeRaw) {
-      const store = JSON.parse(storeRaw);
-      if (store.familyLinks) {
-        store.familyLinks = store.familyLinks.filter((l: FamilyLink) => l.id !== linkId);
-      }
-      store.updatedAtISO = new Date().toISOString();
-      localStorage.setItem("mv_patient_store_v1", JSON.stringify(store));
-      window.dispatchEvent(new CustomEvent("mv-store-update", { detail: store }));
+    const store = getStore();
+    if (store.familyLinks) {
+      store.familyLinks = store.familyLinks.filter((l: FamilyLink) => l.id !== linkId);
+      saveStore(store);
     }
   } catch {
     // Store may not exist
@@ -301,12 +273,9 @@ export function removeFamilyLink(linkId: string): void {
  */
 export function getSentFamilyRequests(): FamilyConnectionRequest[] {
   if (typeof window === "undefined") return [];
-
   try {
-    const storeRaw = localStorage.getItem("mv_patient_store_v1");
-    if (!storeRaw) return [];
-    const store = JSON.parse(storeRaw);
-    return Array.isArray(store.pendingFamilyRequests) ? (store.pendingFamilyRequests as FamilyConnectionRequest[]) : [];
+    const store = getStore();
+    return Array.isArray(store.pendingFamilyRequests) ? store.pendingFamilyRequests : [];
   } catch {
     return [];
   }

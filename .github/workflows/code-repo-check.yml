@@ -1,0 +1,21 @@
+name: Code Repo Registry Check
+
+on:
+  pull_request:
+
+jobs:
+  code-repo-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for TODO descriptions in CODE_REPO.md
+        run: |
+          if grep -n "TODO: describe" CODE_REPO.md; then
+            echo ""
+            echo "❌ CODE_REPO.md has undescribed files (lines above)."
+            echo "Replace each 'TODO: describe' with a one-line purpose before merging."
+            exit 1
+          else
+            echo "✓ All files in CODE_REPO.md have descriptions."
+          fi

@@ -17,18 +17,15 @@
  * on the left at 280px width.
  */
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import {
   Plus,
   MessageSquare,
   X,
-  LayoutDashboard,
   CheckSquare,
   Square,
   Trash2,
   Archive,
-  ChevronDown,
-  ChevronRight,
+  ArchiveRestore,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
@@ -179,8 +176,21 @@ export function ThreadSidebar({
     deletedThreads: ThreadSummary[];
   } | null>(null);
 
-  // ── Archived section ─────────────────────────────────────────────────
-  const [archivedOpen, setArchivedOpen] = useState(false);
+  // ── Tabs: "active" | "archived" ─────────────────────────────────────
+  const [tab, setTab] = useState<"active" | "archived">("active");
+
+  // ── Full ID list for cross-pagination select-all (8c) ────────────────
+  const [allThreadIds, setAllThreadIds] = useState<string[]>([]);
+
+  // ── Unarchive in-flight guard ─────────────────────────────────────────
+  const [unarchivedId, setUnarchivedId] = useState<string | null>(null);
+
+  // Sorted archived list — newest archivedAt first
+  const sortedArchivedThreads = [...(archivedThreads ?? [])].sort((a, b) => {
+    const da = a.archivedAt ? new Date(a.archivedAt).getTime() : 0;
+    const db = b.archivedAt ? new Date(b.archivedAt).getTime() : 0;
+    return db - da;
+  });
 
   // Derive the effective confirmingId — if the thread has vanished, treat as null.
   const effectiveConfirmingId =
@@ -193,9 +203,25 @@ export function ThreadSidebar({
     : selected;
 
   function toggleSelectMode() {
-    setSelectMode((v) => !v);
+    const entering = !selectMode;
+    setSelectMode(entering);
     setSelected(new Set());
     setConfirmingId(null);
+    if (entering) {
+      // Fetch the full ID list from the server for cross-pagination select-all
+      const archived = tab === "archived";
+      fetch(`/api/threads?idsOnly=true${archived ? "&archived=true" : ""}`)
+        .then((r) => r.json())
+        .then((data: { ids?: string[] }) => {
+          if (data.ids) setAllThreadIds(data.ids);
+        })
+        .catch(() => {
+          // fallback to client-visible IDs
+          setAllThreadIds(threads.map((t) => t.id));
+        });
+    } else {
+      setAllThreadIds([]);
+    }
   }
 
   function toggleItem(id: string) {
@@ -207,12 +233,34 @@ export function ThreadSidebar({
     });
   }
 
+  const allSelected =
+    allThreadIds.length > 0
+      ? effectiveSelected.size === allThreadIds.length
+      : threads.length > 0 && effectiveSelected.size === threads.length;
+
   function selectAll() {
-    setSelected(new Set(threads.map((t) => t.id)));
+    if (allThreadIds.length > 0) {
+      setSelected(new Set(allThreadIds));
+    } else {
+      setSelected(new Set(threads.map((t) => t.id)));
+    }
   }
 
   function deselectAll() {
     setSelected(new Set());
+  }
+
+  async function handleUnarchive(id: string) {
+    if (unarchivedId) return;
+    setUnarchivedId(id);
+    try {
+      await fetch(`/api/threads/${id}/unarchive`, { method: "POST" });
+      // Parent will re-fetch on its own polling interval; we just optimistically
+      // switch back to active tab so the user sees the result.
+      setTab("active");
+    } finally {
+      setUnarchivedId(null);
+    }
   }
 
   async function handleBulkArchive() {
@@ -236,22 +284,10 @@ export function ThreadSidebar({
     });
   }
 
-  const allSelected = threads.length > 0 && effectiveSelected.size === threads.length;
-
   const list = (
     <div className="flex h-full flex-col gap-0 p-3">
       {/* ── Header ─────────────────────────────────────────── */}
       <div className="mb-3 flex items-center justify-between gap-1">
-        {/* Dashboard icon link */}
-        <Link
-          href="/dashboard"
-          title="Go to Dashboard"
-          aria-label="Go to Dashboard"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--muted)] hover:bg-[var(--panel-2)] hover:text-[var(--fg)] transition-colors"
-        >
-          <LayoutDashboard className="h-5 w-5" aria-hidden />
-        </Link>
-
         <h2 className="flex-1 text-sm font-semibold text-[var(--fg)]">Chats</h2>
 
         {/* Select / Cancel select mode */}
@@ -285,8 +321,34 @@ export function ThreadSidebar({
         )}
       </div>
 
+      {/* ── Active / Archived tabs ────────────────────────── */}
+      <div className="flex gap-1 p-1 rounded-2xl bg-[var(--panel-2)] mb-3">
+        <button
+          type="button"
+          className={`flex-1 h-9 rounded-xl text-sm transition-colors ${
+            tab === "active"
+              ? "bg-[var(--panel)] text-[var(--accent)] shadow-sm"
+              : "text-[var(--muted)] hover:text-[var(--fg)]"
+          }`}
+          onClick={() => setTab("active")}
+        >
+          Active <span className="ml-1 text-[var(--muted)]">{threads.length}</span>
+        </button>
+        <button
+          type="button"
+          className={`flex-1 h-9 rounded-xl text-sm transition-colors ${
+            tab === "archived"
+              ? "bg-[var(--panel)] text-[var(--accent)] shadow-sm"
+              : "text-[var(--muted)] hover:text-[var(--fg)]"
+          }`}
+          onClick={() => setTab("archived")}
+        >
+          Archived <span className="ml-1 text-[var(--muted)]">{sortedArchivedThreads.length}</span>
+        </button>
+      </div>
+
       {/* ── Select-all bar ────────────────────────────────── */}
-      {selectMode && (
+      {selectMode && tab === "active" && (
         <div className="mb-2 flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--panel-2)] px-3 py-2">
           <button
             type="button"
@@ -302,160 +364,153 @@ export function ThreadSidebar({
             <span>{allSelected ? "Deselect all" : "Select all"}</span>
           </button>
           {effectiveSelected.size > 0 && (
-            <span className="text-xs text-[var(--muted)]">{effectiveSelected.size} selected</span>
+            <span className="text-sm text-[var(--accent)]">
+              Selected {effectiveSelected.size} of {allThreadIds.length || threads.length}
+            </span>
           )}
         </div>
       )}
 
       {/* ── Thread list ───────────────────────────────────── */}
       <div className="-mx-1 flex-1 overflow-y-auto pr-1">
-        {loading && threads.length === 0 ? (
-          <p className="px-3 py-2 text-xs mv-muted">Loading…</p>
-        ) : null}
-        {!loading && threads.length === 0 ? (
-          <p className="px-3 py-2 text-xs mv-muted">No chats yet. Start a new one.</p>
-        ) : null}
-        <ul className="space-y-1">
-          {threads.map((t) => {
-            const isActive = t.id === activeThreadId;
-            const isChecked = effectiveSelected.has(t.id);
-            const title = t.title?.trim() || synthesizedTitle(t);
-            const subtitle = formatRelative(t.lastMessageAt);
-            const isConfirming = !selectMode && effectiveConfirmingId === t.id;
-            return (
-              <li key={t.id}>
-                <div
-                  className={
-                    "group flex items-start gap-2 rounded-xl border px-3 py-2 transition-colors " +
-                    (isActive && !selectMode
-                      ? "border-[var(--accent)]/40 bg-[var(--accent)]/8"
-                      : isChecked
-                      ? "border-[var(--accent)]/30 bg-[var(--accent)]/5"
-                      : "border-transparent hover:bg-[var(--panel-2)]")
-                  }
-                >
-                  {/* Checkbox in select mode */}
-                  {selectMode ? (
-                    <button
-                      type="button"
-                      onClick={() => toggleItem(t.id)}
-                      aria-label={isChecked ? `Deselect ${title}` : `Select ${title}`}
-                      className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+
+        {/* Active tab */}
+        {tab === "active" && (
+          <>
+            {loading && threads.length === 0 ? (
+              <p className="px-3 py-2 text-xs mv-muted">Loading…</p>
+            ) : null}
+            {!loading && threads.length === 0 ? (
+              <p className="px-3 py-2 text-xs mv-muted">No chats yet. Start a new one.</p>
+            ) : null}
+            <ul className="space-y-1">
+              {threads.map((t) => {
+                const isActive = t.id === activeThreadId;
+                const isChecked = effectiveSelected.has(t.id);
+                const title = t.title?.trim() || synthesizedTitle(t);
+                const subtitle = formatRelative(t.lastMessageAt);
+                const isConfirming = !selectMode && effectiveConfirmingId === t.id;
+                return (
+                  <li key={t.id}>
+                    <div
+                      className={
+                        "group flex items-start gap-2 rounded-xl border px-3 py-2 transition-colors " +
+                        (isActive && !selectMode
+                          ? "border-[var(--accent)]/40 bg-[var(--accent)]/8"
+                          : isChecked
+                          ? "border-[var(--accent)]/30 bg-[var(--accent)]/5"
+                          : "border-transparent hover:bg-[var(--panel-2)]")
+                      }
                     >
-                      {isChecked ? (
-                        <CheckSquare className="h-5 w-5 text-[var(--accent)]" aria-hidden />
-                      ) : (
-                        <Square className="h-5 w-5 text-[var(--muted)]" aria-hidden />
-                      )}
-                    </button>
-                  ) : null}
-
-                  <button
-                    type="button"
-                    onClick={() => (selectMode ? toggleItem(t.id) : onSelect(t.id))}
-                    className="flex min-w-0 flex-1 items-start gap-2 text-left"
-                  >
-                    {!selectMode && (
-                      <MessageSquare
-                        className={
-                          "mt-0.5 h-4 w-4 shrink-0 " +
-                          (isActive ? "text-[var(--accent)]" : "mv-muted")
-                        }
-                        aria-hidden
-                      />
-                    )}
-                    <span className="min-w-0 flex-1">
-                      <span
-                        className={
-                          "block truncate text-sm " +
-                          (isActive && !selectMode
-                            ? "font-semibold text-[var(--fg)]"
-                            : "text-[var(--fg)]")
-                        }
-                      >
-                        {title}
-                      </span>
-                      <span className="block truncate text-[11px] mv-muted">{subtitle}</span>
-                    </span>
-                  </button>
-
-                  {/* Single-item confirm / delete (non-select mode) */}
-                  {!selectMode && (
-                    isConfirming ? (
-                      <div className="flex shrink-0 items-center gap-1">
-                        <Button
+                      {/* Checkbox in select mode */}
+                      {selectMode ? (
+                        <button
                           type="button"
-                          variant="ghost"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => setConfirmingId(null)}
+                          onClick={() => toggleItem(t.id)}
+                          aria-label={isChecked ? `Deselect ${title}` : `Select ${title}`}
+                          className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
                         >
-                          Cancel
-                        </Button>
-                        <Button
-                          type="button"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => {
-                            onArchive(t.id);
-                            setConfirmingId(null);
-                          }}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    ) : (
+                          {isChecked ? (
+                            <CheckSquare className="h-5 w-5 text-[var(--accent)]" aria-hidden />
+                          ) : (
+                            <Square className="h-5 w-5 text-[var(--muted)]" aria-hidden />
+                          )}
+                        </button>
+                      ) : null}
+
                       <button
                         type="button"
-                        aria-label="Delete this chat"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setConfirmingId(t.id);
-                        }}
-                        className="invisible h-7 w-7 shrink-0 rounded-md text-[var(--muted)] hover:bg-[var(--panel)] hover:text-red-400 group-hover:visible"
+                        onClick={() => (selectMode ? toggleItem(t.id) : onSelect(t.id))}
+                        className="flex min-w-0 flex-1 items-start gap-2 text-left"
                       >
-                        <Trash2 className="mx-auto h-4 w-4" aria-hidden />
+                        {!selectMode && (
+                          <MessageSquare
+                            className={
+                              "mt-0.5 h-4 w-4 shrink-0 " +
+                              (isActive ? "text-[var(--accent)]" : "mv-muted")
+                            }
+                            aria-hidden
+                          />
+                        )}
+                        <span className="min-w-0 flex-1">
+                          <span
+                            className={
+                              "block truncate text-sm " +
+                              (isActive && !selectMode
+                                ? "font-semibold text-[var(--fg)]"
+                                : "text-[var(--fg)]")
+                            }
+                          >
+                            {title}
+                          </span>
+                          <span className="block truncate text-[11px] mv-muted">{subtitle}</span>
+                        </span>
                       </button>
-                    )
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
 
-        {/* ── Archived section ───────────────────────────── */}
-        {archivedThreads && archivedThreads.length > 0 && (
-          <div className="mt-4">
-            <button
-              type="button"
-              onClick={() => setArchivedOpen((v) => !v)}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--muted)] hover:bg-[var(--panel-2)] hover:text-[var(--fg)] transition-colors min-h-[44px]"
-              aria-expanded={archivedOpen}
-              aria-controls="archived-thread-list"
-            >
-              {archivedOpen ? (
-                <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
-              ) : (
-                <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
-              )}
-              <Archive className="h-4 w-4 shrink-0" aria-hidden />
-              <span>Archived ({archivedThreads.length})</span>
-            </button>
-            {archivedOpen && (
-              <ul id="archived-thread-list" className="mt-1 space-y-1">
-                {archivedThreads.map((t) => {
-                  const title = t.title?.trim() || synthesizedTitle(t);
-                  const subtitle = formatRelative(t.lastMessageAt);
-                  return (
-                    <li key={t.id}>
+                      {/* Single-item confirm / delete (non-select mode) */}
+                      {!selectMode && (
+                        isConfirming ? (
+                          <div className="flex shrink-0 items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => setConfirmingId(null)}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              type="button"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => {
+                                onArchive(t.id);
+                                setConfirmingId(null);
+                              }}
+                            >
+                              Delete
+                            </Button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            aria-label="Delete this chat"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmingId(t.id);
+                            }}
+                            className="invisible h-7 w-7 shrink-0 rounded-md text-[var(--muted)] hover:bg-[var(--panel)] hover:text-red-400 group-hover:visible"
+                          >
+                            <Trash2 className="mx-auto h-4 w-4" aria-hidden />
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
+
+        {/* Archived tab */}
+        {tab === "archived" && (
+          <>
+            {sortedArchivedThreads.length === 0 ? (
+              <p className="px-3 py-2 text-xs mv-muted">No archived chats.</p>
+            ) : null}
+            <ul className="space-y-1">
+              {sortedArchivedThreads.map((t) => {
+                const title = t.title?.trim() || synthesizedTitle(t);
+                const subtitle = formatRelative(t.lastMessageAt);
+                return (
+                  <li key={t.id}>
+                    <div className="group flex items-start gap-2 rounded-xl border border-transparent px-3 py-2 hover:bg-[var(--panel-2)] transition-colors">
                       <button
                         type="button"
                         onClick={() => onSelect(t.id)}
-                        className="flex w-full items-start gap-2 rounded-xl border border-transparent px-3 py-2 text-left hover:bg-[var(--panel-2)] transition-colors"
+                        className="flex min-w-0 flex-1 items-start gap-2 text-left"
                       >
-                        <Archive
-                          className="mt-0.5 h-4 w-4 shrink-0 mv-muted"
-                          aria-hidden
-                        />
+                        <Archive className="mt-0.5 h-4 w-4 shrink-0 mv-muted" aria-hidden />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm text-[var(--muted)]">
                             {title}
@@ -463,12 +518,25 @@ export function ThreadSidebar({
                           <span className="block truncate text-[11px] mv-muted">{subtitle}</span>
                         </span>
                       </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
+                      <button
+                        type="button"
+                        title="Move back to active"
+                        aria-label="Unarchive this chat"
+                        disabled={unarchivedId === t.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleUnarchive(t.id);
+                        }}
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--muted)] hover:bg-[var(--panel)] hover:text-[var(--accent)] transition-colors disabled:opacity-40"
+                      >
+                        <ArchiveRestore className="h-4 w-4" aria-hidden />
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         )}
       </div>
 

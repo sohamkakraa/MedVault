@@ -27,7 +27,15 @@ export async function GET(req: NextRequest) {
   if (!userId) return NextResponse.json({ ok: false, error: "Not signed in." }, { status: 401 });
   const { searchParams } = new URL(req.url);
   const archived = searchParams.get("archived") === "true";
+  const idsOnly = searchParams.get("idsOnly") === "true";
   try {
+    if (idsOnly) {
+      // Return only IDs — used by select-all across pagination
+      const threads = archived
+        ? await listArchivedThreads(userId)
+        : await listThreads(userId);
+      return NextResponse.json({ ids: threads.map((t) => t.id) });
+    }
     if (archived) {
       const threads = await listArchivedThreads(userId);
       return NextResponse.json({ ok: true, threads });

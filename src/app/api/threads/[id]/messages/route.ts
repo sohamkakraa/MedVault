@@ -20,6 +20,7 @@ import { requireUserId } from "@/lib/server/authSession";
 import { prisma } from "@/lib/prisma";
 import { parsePatientStoreJson } from "@/lib/patientStoreApi";
 import { listMessages, appendMessage, setActiveThread, updateContextSummary } from "@/lib/server/threads";
+import { proposeThreadTitle } from "@/lib/server/threadNaming";
 import { buildContextWindow, summarizeOlderMessages, SUMMARY_THRESHOLD, UPDATE_EVERY } from "@/lib/intent/cavemanSummarize";
 import { parseReminderIntent, applyReminderIntent } from "@/lib/whatsapp/reminderIntent";
 import { parseConditionIntent, applyConditionIntent } from "@/lib/whatsapp/conditionIntent";
@@ -205,8 +206,12 @@ export async function POST(
   if (totalCount > SUMMARY_THRESHOLD && totalCount % UPDATE_EVERY === 0) {
     const msgs = recent.map((m) => ({ role: m.role, content: m.content }));
     summarizeOlderMessages(msgs, thread.contextSummary ?? null)
-      .then((summary) => {
-        if (summary) return updateContextSummary(id, summary);
+      .then(async (summary) => {
+        if (summary) {
+          await updateContextSummary(id, summary);
+          // Auto-rename thread from the fresh summary (non-critical)
+          proposeThreadTitle(id, summary).catch(() => {/* non-critical */});
+        }
       })
       .catch(() => {/* non-critical */});
   }
@@ -269,10 +274,11 @@ async function callConversationLLM(
   const messages = [...compressed];
   messages.push({ role: "user", content: userContent });
 
+  // Cache the static system prompt for 5 min — saves ~90% input-token cost on turns 2–N
   const completion = await anthropic.messages.create({
     model,
     max_tokens: 1200,
-    system,
+    system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
     messages,
   });
   let text = completion.content

@@ -317,7 +317,8 @@ export type DashboardWidgetId =
   | "sideEffects"
   | "healthTrends"
   | "labs"
-  | "bmi";
+  | "bmi"
+  | "concerningItems";
 
 export type BentoSize = "hero" | "large" | "medium" | "small" | "micro";
 

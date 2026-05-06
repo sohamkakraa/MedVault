@@ -64,6 +64,25 @@ type TidyResponse = {
   summary: string;
   /** Optional explanatory note from the LLM about what it found. */
   note?: string;
+  /** Only included when ?debug=1 is present in the request URL. */
+  debug?: TidyDebugEnvelope;
+};
+
+type TidyDebugEnvelope = {
+  inputSnapshot: {
+    doctorCount: number;
+    doctorNames: string[];
+    hospitalCount: number;
+    hospitalNames: string[];
+    conditionCount: number;
+    allergyCount: number;
+    medicationCount: number;
+  };
+  promptText: string;
+  rawLlmOutput: unknown;
+  schemaErrors: { path: string; message: string }[];
+  appliedOps: unknown[];
+  rejectedOps: { op: unknown; reason: string }[];
 };
 
 // ── Anthropic tool schema ────────────────────────────────────────────────
@@ -117,7 +136,7 @@ function op(
 }
 
 // ── Route ────────────────────────────────────────────────────────────────
-export async function POST(_req: NextRequest) {
+export async function POST(req: NextRequest) {
   // Fixed VULN-001: load the patient store from the database using the
   // authenticated userId. The client must NOT supply the store — a malicious
   // client could inject adversarial strings into the LLM system prompt via
@@ -126,6 +145,8 @@ export async function POST(_req: NextRequest) {
   if (!userId) {
     return NextResponse.json({ ok: false, error: "Not signed in." }, { status: 401 });
   }
+
+  const debugMode = req.nextUrl.searchParams.get("debug") === "1";
 
   const dbRecord = await prisma.patientRecord.findUnique({ where: { userId } });
   if (!dbRecord?.data) {
@@ -145,18 +166,44 @@ export async function POST(_req: NextRequest) {
 
   const docDoctorMentions = collectDocDoctorMentions(store);
 
+  // Build input snapshot for debug envelope (safe — counts only, first 5 names).
+  const doctors = store.profile.doctorQuickPick ?? [];
+  const hospitals = store.profile.facilityQuickPick ?? [];
+  const inputSnapshot: TidyDebugEnvelope["inputSnapshot"] = {
+    doctorCount: doctors.length,
+    doctorNames: doctors.slice(0, 5),
+    hospitalCount: hospitals.length,
+    hospitalNames: hospitals.slice(0, 5),
+    conditionCount: (store.profile.conditions ?? []).length,
+    allergyCount: (store.profile.allergies ?? []).length,
+    medicationCount: (store.meds ?? []).length,
+  };
+
   // No API key? Return the heuristic. Surface that clearly.
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     const heur = heuristicOps(store, docDoctorMentions);
-    return NextResponse.json<TidyResponse>({
+    const resp: TidyResponse = {
       ok: true,
       source: "heuristic",
       ops: heur.ops,
       summary: heur.summary,
       note: "Anthropic API key not configured — running pattern-based heuristics only.",
-    });
+    };
+    if (debugMode) {
+      resp.debug = {
+        inputSnapshot,
+        promptText: "(no LLM call — API key not configured)",
+        rawLlmOutput: null,
+        schemaErrors: [],
+        appliedOps: heur.ops,
+        rejectedOps: [],
+      };
+    }
+    return NextResponse.json<TidyResponse>(resp);
   }
+
+  const userMessage = buildUserMessage(store, docDoctorMentions);
 
   try {
     const Anthropic = (await import("@anthropic-ai/sdk")).default;
@@ -179,7 +226,7 @@ export async function POST(_req: NextRequest) {
         },
       ],
       messages: [
-        { role: "user", content: buildUserMessage(store, docDoctorMentions) },
+        { role: "user", content: userMessage },
       ],
     });
 
@@ -189,43 +236,116 @@ export async function POST(_req: NextRequest) {
 
     if (!toolUse?.input) {
       // The LLM declined to call the tool — that's a valid "nothing to do" signal.
-      return NextResponse.json<TidyResponse>({
+      const resp: TidyResponse = {
         ok: true,
         source: "llm",
         ops: [],
         summary: "Your lists look clean — nothing to tidy.",
-      });
+      };
+      if (debugMode) {
+        resp.debug = {
+          inputSnapshot,
+          promptText: buildDebugPromptText(userMessage),
+          rawLlmOutput: null,
+          schemaErrors: [],
+          appliedOps: [],
+          rejectedOps: [],
+        };
+      }
+      return NextResponse.json<TidyResponse>(resp);
     }
 
-    const ok = StorePatchSchema.safeParse(toolUse.input);
-    if (!ok.success) {
+    const parseResult = StorePatchSchema.safeParse(toolUse.input);
+    if (!parseResult.success) {
       // Tool input didn't validate. Fall back to heuristic but keep going.
       const heur = heuristicOps(store, docDoctorMentions);
-      return NextResponse.json<TidyResponse>({
+      const schemaErrors = parseResult.error.issues.map((e) => ({
+        path: e.path.join("."),
+        message: e.message,
+      }));
+      const resp: TidyResponse = {
         ok: true,
         source: "heuristic_fallback",
         ops: heur.ops,
         summary: heur.summary,
         note: "AI response didn't match the expected shape — showing pattern-based suggestions instead.",
-      });
+      };
+      if (debugMode) {
+        resp.debug = {
+          inputSnapshot,
+          promptText: buildDebugPromptText(userMessage),
+          rawLlmOutput: toolUse.input,
+          schemaErrors,
+          appliedOps: heur.ops,
+          rejectedOps: [],
+        };
+      }
+      return NextResponse.json<TidyResponse>(resp);
     }
 
-    return NextResponse.json<TidyResponse>({
+    // Validate each op individually to track which were rejected.
+    const appliedOps: StorePatchOp[] = [];
+    const rejectedOps: { op: unknown; reason: string }[] = [];
+    for (const rawOp of parseResult.data.ops) {
+      const opCheck = StorePatchOpSchema.safeParse(rawOp);
+      if (opCheck.success) {
+        appliedOps.push(opCheck.data);
+      } else {
+        rejectedOps.push({
+          op: rawOp,
+          reason: opCheck.error.issues.map((e) => e.message).join("; "),
+        });
+      }
+    }
+
+    const resp: TidyResponse = {
       ok: true,
       source: "llm",
-      ops: ok.data.ops,
-      summary: ok.data.summary,
-    });
+      ops: appliedOps,
+      summary: parseResult.data.summary,
+    };
+    if (debugMode) {
+      resp.debug = {
+        inputSnapshot,
+        promptText: buildDebugPromptText(userMessage),
+        rawLlmOutput: toolUse.input,
+        schemaErrors: [],
+        appliedOps,
+        rejectedOps,
+      };
+    }
+    return NextResponse.json<TidyResponse>(resp);
   } catch (err) {
     const heur = heuristicOps(store, docDoctorMentions);
-    return NextResponse.json<TidyResponse>({
+    const resp: TidyResponse = {
       ok: true,
       source: "heuristic_fallback",
       ops: heur.ops,
       summary: heur.summary,
       note: err instanceof Error ? err.message.slice(0, 200) : "AI call failed.",
-    });
+    };
+    if (debugMode) {
+      resp.debug = {
+        inputSnapshot,
+        promptText: buildDebugPromptText(userMessage),
+        rawLlmOutput: null,
+        schemaErrors: [
+          {
+            path: "llm_call",
+            message: err instanceof Error ? err.message.slice(0, 300) : "AI call failed.",
+          },
+        ],
+        appliedOps: heur.ops,
+        rejectedOps: [],
+      };
+    }
+    return NextResponse.json<TidyResponse>(resp);
   }
+}
+
+/** Build a single readable string from the system + user messages for debug display. */
+function buildDebugPromptText(userMessage: string): string {
+  return `=== SYSTEM ===\n${TIDY_SYSTEM_PROMPT}\n\n=== USER ===\n${userMessage}`;
 }
 
 // ── Prompt + context builders ────────────────────────────────────────────

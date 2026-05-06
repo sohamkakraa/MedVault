@@ -18,10 +18,11 @@
  */
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Sparkles, Loader2, X, Check, Plus, Minus, ArrowRight, Bot, Cpu } from "lucide-react";
+import { Sparkles, Loader2, X, Plus, Minus, ArrowRight, Bot, Cpu, Bug } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { getStore, saveStore } from "@/lib/store";
 import { applyStorePatch, type StorePatchOp } from "@/lib/intent/storePatch";
+import { TidyDebugSheet, type TidyDebugRun } from "@/components/tidy/TidyDebugSheet";
 
 type TidySource = "llm" | "heuristic" | "heuristic_fallback";
 
@@ -31,6 +32,8 @@ type TidyResponse = {
   ops: StorePatchOp[];
   summary: string;
   note?: string;
+  /** Present only when ?debug=1 was passed to the API. */
+  debug?: Omit<TidyDebugRun, "timestamp" | "source">;
 };
 
 export function TidyButton() {
@@ -42,45 +45,56 @@ export function TidyButton() {
   // We portal into document.body, so we need to delay rendering until the
   // client mount happens — `document` doesn't exist during SSR.
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  // Debug panel state.
+  const [debugOpen, setDebugOpen] = useState(false);
+  const [debugRun, setDebugRun] = useState<TidyDebugRun | null>(null);
+  const [showDebug, setShowDebug] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    // Check for debug mode: URL ?debug=1 or localStorage.uma_debug === "1"
+    const urlDebug =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("debug") === "1";
+    const storageDebug =
+      typeof window !== "undefined" && localStorage.getItem("uma_debug") === "1";
+    setShowDebug(urlDebug || storageDebug);
+
+    // Load the last debug run from localStorage if available.
+    try {
+      const stored = localStorage.getItem("uma_tidy_debug_runs");
+      if (stored) {
+        const runs = JSON.parse(stored) as TidyDebugRun[];
+        if (runs.length > 0) setDebugRun(runs[0]);
+      }
+    } catch {
+      // Ignore parse errors.
+    }
+  }, []);
+
+  /** Whether the current request URL includes ?debug=1 or localStorage flag is set. */
+  function isDebugMode(): boolean {
+    const urlDebug =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("debug") === "1";
+    const storageDebug =
+      typeof window !== "undefined" && localStorage.getItem("uma_debug") === "1";
+    return urlDebug || storageDebug;
+  }
 
   async function runTidy() {
     setLoading(true);
     setError(null);
     setResponse(null);
     setAccepted([]);
+    const debugMode = isDebugMode();
     try {
-      const store = getStore();
-      const payload = {
-        store: {
-          profile: {
-            primaryCareProvider: store.profile?.primaryCareProvider ?? null,
-            nextVisitHospital: store.profile?.nextVisitHospital ?? null,
-            doctorQuickPick: store.profile?.doctorQuickPick ?? [],
-            facilityQuickPick: store.profile?.facilityQuickPick ?? [],
-            doctorQuickPickHidden: store.profile?.doctorQuickPickHidden ?? [],
-            facilityQuickPickHidden: store.profile?.facilityQuickPickHidden ?? [],
-            conditions: store.profile?.conditions ?? [],
-            allergies: store.profile?.allergies ?? [],
-          },
-          docs: (store.docs ?? []).slice(0, 200).map((d) => ({
-            id: d.id,
-            provider: d.provider ?? null,
-            doctors: d.doctors ?? [],
-            facilityName: d.facilityName ?? null,
-          })),
-          meds: (store.meds ?? []).slice(0, 100).map((m) => ({
-            name: m.name,
-            dose: m.dose ?? "",
-            frequency: m.frequency ?? "",
-          })),
-        },
-      };
-      const res = await fetch("/api/tidy", {
+      const url = debugMode ? "/api/tidy?debug=1" : "/api/tidy";
+      const res = await fetch(url, {
         method: "POST",
         headers: { "content-type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify(payload),
+        body: JSON.stringify({}),
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
@@ -91,6 +105,33 @@ export function TidyButton() {
       // Default-accept everything; user toggles off any op they reject.
       setAccepted(j.ops.map(() => true));
       setOpen(true);
+
+      // Persist debug envelope if present.
+      if (debugMode && j.debug) {
+        const run: TidyDebugRun = {
+          timestamp: new Date().toISOString(),
+          source: j.source,
+          inputSnapshot: j.debug.inputSnapshot,
+          promptText: j.debug.promptText,
+          rawLlmOutput: j.debug.rawLlmOutput,
+          schemaErrors: j.debug.schemaErrors,
+          appliedOps: j.debug.appliedOps,
+          rejectedOps: j.debug.rejectedOps,
+        };
+        setDebugRun(run);
+        try {
+          const existing = JSON.parse(
+            localStorage.getItem("uma_tidy_debug_runs") ?? "[]",
+          ) as TidyDebugRun[];
+          existing.unshift(run);
+          localStorage.setItem(
+            "uma_tidy_debug_runs",
+            JSON.stringify(existing.slice(0, 5)),
+          );
+        } catch {
+          // localStorage may be unavailable — not critical.
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Tidy failed.");
       setOpen(true);
@@ -245,21 +286,41 @@ export function TidyButton() {
 
   return (
     <>
-      <Button
-        type="button"
-        variant="ghost"
-        className="gap-1.5 max-sm:hidden"
-        onClick={runTidy}
-        disabled={loading}
-        title="Beta: ask UMA to clean up your saved lists"
-      >
-        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-        <span className="hidden md:inline">Tidy</span>
-        <span className="hidden md:inline rounded-full border border-[var(--accent-2)]/30 bg-[var(--accent-2)]/10 px-1.5 py-0.5 text-[10px] font-medium text-[var(--accent-2)]">
-          Beta
-        </span>
-      </Button>
+      <div className="flex items-center max-sm:hidden">
+        <Button
+          type="button"
+          variant="ghost"
+          className="gap-1.5"
+          onClick={runTidy}
+          disabled={loading}
+          title="Beta: ask UMA to clean up your saved lists"
+        >
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+          <span className="hidden md:inline">Tidy</span>
+          <span className="hidden md:inline rounded-full border border-[var(--accent-2)]/30 bg-[var(--accent-2)]/10 px-1.5 py-0.5 text-[10px] font-medium text-[var(--accent-2)]">
+            Beta
+          </span>
+        </Button>
+        {showDebug && (
+          <button
+            type="button"
+            onClick={() => setDebugOpen(true)}
+            className="ml-1 h-8 w-8 rounded-lg text-[var(--muted)] hover:bg-[var(--panel-2)] hover:text-[var(--fg)] flex items-center justify-center transition-colors"
+            aria-label="Tidy debug panel"
+            title="Tidy debug"
+          >
+            <Bug className="h-4 w-4" />
+          </button>
+        )}
+      </div>
       {modal}
+      {mounted && (
+        <TidyDebugSheet
+          open={debugOpen}
+          onClose={() => setDebugOpen(false)}
+          debugData={debugRun}
+        />
+      )}
     </>
   );
 }

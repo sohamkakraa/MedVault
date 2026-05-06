@@ -12,6 +12,7 @@ import {
   clearLocalPatientStore,
   getHydrationSafeStore,
   getStore,
+  saveStore,
   getHydrationSafeViewingStore,
   getViewingStore,
   saveViewingStore,
@@ -52,7 +53,11 @@ import {
 import { AppTopNav } from "@/components/nav/AppTopNav";
 import { Footer } from "@/components/ui/Footer";
 import { InsuranceSection } from "@/components/insurance/InsuranceSection";
-import { Droplets, Plus, LogOut, Ruler, Users, Trash2, Link2, UserCheck, UserX, Send, Mail, Check, X } from "lucide-react";
+import { RecordNoticeToast } from "@/components/ui/RecordNoticeToast";
+import { PROVIDERS } from "@/lib/providers/registry";
+import type { ProviderId } from "@/lib/providers/registry";
+import { Droplets, Plus, LogOut, Ruler, Users, Trash2, Link2, UserCheck, UserX, Send, Mail, Check, X, Pencil, Eye, EyeOff } from "lucide-react";
+import { motion } from "framer-motion";
 
 const RELATION_EMOJI: Record<string, string> = {
   mother: "👩", father: "👨", spouse: "💑", husband: "🧑", wife: "👩",
@@ -719,6 +724,24 @@ export default function ProfilePage() {
   const [ccDropOpen, setCcDropOpen] = useState(false);
   const [ccSearch, setCcSearch] = useState("");
   const ccDropRef = useRef<HTMLDivElement>(null);
+  // Inline pencil-edit state for doctor picker
+  const [editingDoctor, setEditingDoctor] = useState(false);
+  const [editDoctorValue, setEditDoctorValue] = useState("");
+  const [shakeDoctor, setShakeDoctor] = useState(false);
+  // Inline pencil-edit state for hospital picker
+  const [editingHospital, setEditingHospital] = useState(false);
+  const [editHospitalValue, setEditHospitalValue] = useState("");
+  const [shakeHospital, setShakeHospital] = useState(false);
+  // BYOK — AI provider state
+  const [byokProvider, setByokProvider] = useState<string>("anthropic");
+  const [byokModel, setByokModel] = useState<string>("claude-haiku-4-5-20251001");
+  const [byokKey, setByokKey] = useState("");
+  const [byokShowKey, setByokShowKey] = useState(false);
+  const [byokState, setByokState] = useState<"idle" | "verifying" | "ok" | "bad">("idle");
+  const [byokError, setByokError] = useState<string | null>(null);
+  const [byokLastFour, setByokLastFour] = useState<string | null>(null);
+  const [hasUserKey, setHasUserKey] = useState(false);
+  const [byokLoaded, setByokLoaded] = useState(false);
   const doctorNameSuggestions = useMemo(
     () => mergeDoctorQuickPick(store.profile, doctorNamesFromDocs(store.docs)),
     [
@@ -808,6 +831,30 @@ export default function ProfilePage() {
     const guess = map[lang] ?? map[lang.split("-")[0]];
     if (guess) setCountryCodeInput(guess);
   }, [hydrated]);
+
+  // Load BYOK credential meta on mount
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/profile/llm-credentials")
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data && data.provider) {
+          setHasUserKey(true);
+          setByokProvider(data.provider);
+          setByokModel(data.modelId);
+          setByokLastFour(data.lastFour ?? null);
+        }
+        setByokLoaded(true);
+      })
+      .catch(() => {
+        if (!cancelled) setByokLoaded(true);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  // BYOK toast state
+  const [byokToast, setByokToast] = useState<string | null>(null);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -927,6 +974,32 @@ export default function ProfilePage() {
     const next = { ...store, profile };
     setStore(next);
     saveViewingStore(next);
+  }
+
+  function saveDoctorRename(e?: React.FormEvent) {
+    e?.preventDefault();
+    const trimmed = editDoctorValue.trim();
+    if (!trimmed) {
+      setShakeDoctor(true);
+      setTimeout(() => setShakeDoctor(false), 300);
+      return;
+    }
+    const prev = store.profile.primaryCareProvider ?? "";
+    if (trimmed !== prev) renameDoctorSuggestion(prev, trimmed);
+    setEditingDoctor(false);
+  }
+
+  function saveHospitalRename(e?: React.FormEvent) {
+    e?.preventDefault();
+    const trimmed = editHospitalValue.trim();
+    if (!trimmed) {
+      setShakeHospital(true);
+      setTimeout(() => setShakeHospital(false), 300);
+      return;
+    }
+    const prev = store.profile.nextVisitHospital ?? "";
+    if (trimmed !== prev) renameFacilitySuggestion(prev, trimmed);
+    setEditingHospital(false);
   }
 
   function updateBodyMetrics(patch: Partial<NonNullable<typeof store.profile.bodyMetrics>>) {
@@ -1193,21 +1266,63 @@ export default function ProfilePage() {
                 </div>
                 <div className="flex min-w-0 flex-col gap-1.5 text-xs mv-muted">
                   <span className="leading-tight">Regular doctor</span>
-                  <Combobox
-                    value={store.profile.primaryCareProvider ?? ""}
-                    onChange={(v) =>
-                      updateProfile({ primaryCareProvider: v.trim() || undefined })
-                    }
-                    suggestions={hydrated ? doctorNameSuggestions : []}
-                    placeholder={
-                      hydrated && doctorNameSuggestions.length > 0
-                        ? "Pick, edit, or remove names — save your own to the list"
-                        : "Your doctor's name (optional)"
-                    }
-                    onRemoveSuggestion={hydrated ? removeDoctorSuggestion : undefined}
-                    onRenameSuggestion={hydrated ? renameDoctorSuggestion : undefined}
-                    onAppendCustom={hydrated ? appendDoctorQuickPick : undefined}
-                  />
+                  {editingDoctor ? (
+                    <form onSubmit={saveDoctorRename} className="flex flex-col gap-2">
+                      <motion.div
+                        animate={shakeDoctor ? { x: [0, -4, 4, -2, 2, 0] } : { x: 0 }}
+                        transition={{ duration: 0.25 }}
+                      >
+                        <Input
+                          autoFocus
+                          value={editDoctorValue}
+                          onChange={(e) => setEditDoctorValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Escape") setEditingDoctor(false);
+                          }}
+                          className="h-9 text-sm"
+                        />
+                      </motion.div>
+                      <div className="flex items-center gap-2">
+                        <Button type="submit" className="h-8 px-3 text-xs">Save</Button>
+                        <Button type="button" variant="ghost" className="h-8 px-3 text-xs" onClick={() => setEditingDoctor(false)}>Cancel</Button>
+                      </div>
+                    </form>
+                  ) : (
+                    <>
+                      <Combobox
+                        value={store.profile.primaryCareProvider ?? ""}
+                        onChange={(v) =>
+                          updateProfile({ primaryCareProvider: v.trim() || undefined })
+                        }
+                        suggestions={hydrated ? doctorNameSuggestions : []}
+                        placeholder={
+                          hydrated && doctorNameSuggestions.length > 0
+                            ? "Pick, edit, or remove names — save your own to the list"
+                            : "Your doctor's name (optional)"
+                        }
+                        onRemoveSuggestion={hydrated ? removeDoctorSuggestion : undefined}
+                        onRenameSuggestion={hydrated ? renameDoctorSuggestion : undefined}
+                        onAppendCustom={hydrated ? appendDoctorQuickPick : undefined}
+                      />
+                      {store.profile.primaryCareProvider && (
+                        <div className="flex items-center gap-1.5 pt-0.5">
+                          <span className="truncate text-xs text-[var(--muted)]">{store.profile.primaryCareProvider}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditDoctorValue(store.profile.primaryCareProvider ?? "");
+                              setEditingDoctor(true);
+                            }}
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[var(--muted)] transition-colors hover:bg-[var(--panel-2)] hover:text-[var(--fg)]"
+                            aria-label="Rename doctor"
+                            title="Rename"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
                 <div className="flex min-w-0 flex-col gap-1.5 text-xs mv-muted">
                   <span className="leading-tight">Next doctor visit</span>
@@ -1219,21 +1334,63 @@ export default function ProfilePage() {
                 </div>
                 <div className="flex min-w-0 flex-col gap-1.5 text-xs mv-muted">
                   <span className="leading-tight">Hospital / Clinic</span>
-                  <Combobox
-                    value={store.profile.nextVisitHospital ?? ""}
-                    onChange={(v) =>
-                      updateProfile({ nextVisitHospital: v.trim() || undefined })
-                    }
-                    suggestions={hydrated ? facilityNameSuggestions : []}
-                    placeholder={
-                      hydrated && facilityNameSuggestions.length > 0
-                        ? "Pick, edit, or remove — save your own to the list"
-                        : "Hospital or clinic name"
-                    }
-                    onRemoveSuggestion={hydrated ? removeFacilitySuggestion : undefined}
-                    onRenameSuggestion={hydrated ? renameFacilitySuggestion : undefined}
-                    onAppendCustom={hydrated ? appendFacilityQuickPick : undefined}
-                  />
+                  {editingHospital ? (
+                    <form onSubmit={saveHospitalRename} className="flex flex-col gap-2">
+                      <motion.div
+                        animate={shakeHospital ? { x: [0, -4, 4, -2, 2, 0] } : { x: 0 }}
+                        transition={{ duration: 0.25 }}
+                      >
+                        <Input
+                          autoFocus
+                          value={editHospitalValue}
+                          onChange={(e) => setEditHospitalValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Escape") setEditingHospital(false);
+                          }}
+                          className="h-9 text-sm"
+                        />
+                      </motion.div>
+                      <div className="flex items-center gap-2">
+                        <Button type="submit" className="h-8 px-3 text-xs">Save</Button>
+                        <Button type="button" variant="ghost" className="h-8 px-3 text-xs" onClick={() => setEditingHospital(false)}>Cancel</Button>
+                      </div>
+                    </form>
+                  ) : (
+                    <>
+                      <Combobox
+                        value={store.profile.nextVisitHospital ?? ""}
+                        onChange={(v) =>
+                          updateProfile({ nextVisitHospital: v.trim() || undefined })
+                        }
+                        suggestions={hydrated ? facilityNameSuggestions : []}
+                        placeholder={
+                          hydrated && facilityNameSuggestions.length > 0
+                            ? "Pick, edit, or remove — save your own to the list"
+                            : "Hospital or clinic name"
+                        }
+                        onRemoveSuggestion={hydrated ? removeFacilitySuggestion : undefined}
+                        onRenameSuggestion={hydrated ? renameFacilitySuggestion : undefined}
+                        onAppendCustom={hydrated ? appendFacilityQuickPick : undefined}
+                      />
+                      {store.profile.nextVisitHospital && (
+                        <div className="flex items-center gap-1.5 pt-0.5">
+                          <span className="truncate text-xs text-[var(--muted)]">{store.profile.nextVisitHospital}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditHospitalValue(store.profile.nextVisitHospital ?? "");
+                              setEditingHospital(true);
+                            }}
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[var(--muted)] transition-colors hover:bg-[var(--panel-2)] hover:text-[var(--fg)]"
+                            aria-label="Rename hospital"
+                            title="Rename"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
                 <label className="flex min-w-0 flex-col gap-1.5 text-xs mv-muted md:col-span-2">
                   <span className="leading-tight">Private notes</span>
@@ -1584,6 +1741,187 @@ export default function ProfilePage() {
         {/* ── Insurance — always shown ── */}
         <InsuranceSection store={store} onStoreChange={() => window.dispatchEvent(new Event("mv-store-update"))} />
 
+        {/* ── AI provider (BYOK) — always shown ── */}
+        <section id="profile-ai-provider" className="mv-card rounded-3xl p-5 sm:p-6 scroll-mt-24">
+          <header className="mb-4 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="mv-title text-xl">AI provider</h2>
+              <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
+                UMA uses Claude by default. Plug in your own key to use a different provider — your costs go to the provider, not us.
+              </p>
+            </div>
+            <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${hasUserKey ? "bg-[var(--accent)]/12 text-[var(--accent)]" : "bg-[var(--panel-2)] text-[var(--muted)]"}`}>
+              {byokLoaded ? (hasUserKey ? "Using your key" : "Using UMA’s default") : "Loading…"}
+            </span>
+          </header>
+
+          <div className="space-y-4">
+            {/* Provider row */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium" style={{ color: "var(--fg)" }}>
+                  Provider
+                </label>
+                <Select
+                  value={byokProvider}
+                  onValueChange={(v) => {
+                    setByokProvider(v);
+                    const spec = PROVIDERS[v as ProviderId];
+                    if (spec) setByokModel(spec.curatedModels[0]?.id ?? "");
+                    setByokState("idle");
+                    setByokError(null);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.values(PROVIDERS) as typeof PROVIDERS[ProviderId][]).filter((p) => p.id !== "default").map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Model row */}
+              <div>
+                <label className="mb-1 block text-sm font-medium" style={{ color: "var(--fg)" }}>
+                  Model
+                </label>
+                <Select
+                  value={byokModel}
+                  onValueChange={(v) => { setByokModel(v); setByokState("idle"); setByokError(null); }}
+                  disabled={byokProvider === "default"}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(PROVIDERS[byokProvider as ProviderId]?.curatedModels ?? []).map((m) => (
+                      <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Key row */}
+            {hasUserKey && byokLastFour ? (
+              <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-2)] px-4 py-3 flex items-center justify-between gap-3">
+                <p className="text-sm" style={{ color: "var(--muted)" }}>
+                  Current key: <span className="font-mono tracking-wider text-[var(--fg)]">sk-••••{byokLastFour}</span>
+                </p>
+                <Button
+                  variant="ghost"
+                  className="h-8 text-xs shrink-0"
+                  onClick={() => { setHasUserKey(false); setByokLastFour(null); setByokKey(""); setByokState("idle"); setByokError(null); }}
+                >
+                  Replace
+                </Button>
+              </div>
+            ) : (
+              <div>
+                <label className="mb-1 block text-sm font-medium" style={{ color: "var(--fg)" }}>
+                  API key
+                </label>
+                <div className="relative">
+                  <Input
+                    type={byokShowKey ? "text" : "password"}
+                    placeholder={PROVIDERS[byokProvider as ProviderId]?.apiKeyPattern ? "Paste your API key here" : "Paste your API key here"}
+                    value={byokKey}
+                    onChange={(e) => { setByokKey(e.target.value); setByokState("idle"); setByokError(null); }}
+                    className="pr-10"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--fg)] transition-colors"
+                    aria-label={byokShowKey ? "Hide key" : "Show key"}
+                    onClick={() => setByokShowKey((v) => !v)}
+                  >
+                    {byokShowKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {byokError && (
+                  <p className="mt-1.5 text-sm" style={{ color: "var(--accent-2, #e05252)" }}>{byokError}</p>
+                )}
+                {byokState === "ok" && (
+                  <p className="mt-1.5 flex items-center gap-1.5 text-sm text-[var(--accent)]">
+                    <Check className="h-3.5 w-3.5" /> Provider verified
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Save button — only show when key is not yet saved or being replaced */}
+            {!hasUserKey && (
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={async () => {
+                    if (!byokKey.trim()) { setByokError("Please enter an API key."); return; }
+                    setByokState("verifying");
+                    setByokError(null);
+                    try {
+                      const res = await fetch("/api/profile/llm-credentials/verify", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ provider: byokProvider, modelId: byokModel, apiKey: byokKey }),
+                      });
+                      const data = await res.json() as { ok?: boolean; reason?: string; lastFour?: string };
+                      if (res.ok && data.ok) {
+                        setByokState("ok");
+                        setHasUserKey(true);
+                        setByokLastFour(data.lastFour ?? byokKey.slice(-4));
+                        setByokKey("");
+                        setByokToast("Provider verified and key saved.");
+                      } else {
+                        setByokState("bad");
+                        setByokError(data.reason ?? "Verification failed. Check your key and model.");
+                      }
+                    } catch {
+                      setByokState("bad");
+                      setByokError("Network error. Please try again.");
+                    }
+                  }}
+                  disabled={byokState === "verifying" || !byokKey.trim()}
+                  className="gap-2"
+                >
+                  {byokState === "verifying" ? "Verifying…" : "Save & verify"}
+                </Button>
+              </div>
+            )}
+
+            {/* Reset to default — only when user has a key saved */}
+            {hasUserKey && (
+              <div className="pt-1">
+                <button
+                  type="button"
+                  className="text-sm hover:underline"
+                  style={{ color: "var(--muted)" }}
+                  onClick={async () => {
+                    await fetch("/api/profile/llm-credentials", { method: "DELETE" });
+                    setHasUserKey(false);
+                    setByokLastFour(null);
+                    setByokProvider("anthropic");
+                    setByokModel("claude-haiku-4-5-20251001");
+                    setByokKey("");
+                    setByokState("idle");
+                    setByokError(null);
+                    setByokToast("Switched back to UMA’s default provider.");
+                  }}
+                >
+                  Use UMA&apos;s default again
+                </button>
+              </div>
+            )}
+          </div>
+
+          <p className="mt-4 text-sm italic" style={{ color: "var(--muted)" }}>
+            When you provide your own key, your messages go directly from UMA&apos;s server to your chosen provider using your key. Your costs are billed by that provider.
+          </p>
+        </section>
+
         {/* ── Family profiles — only shown for the primary account holder ── */}
         {!activeMember && (
           <Card id="profile-family" className="scroll-mt-24">
@@ -1836,18 +2174,9 @@ export default function ProfilePage() {
                                   l.id === link.id ? { ...l, myVisibility: vis } : l
                                 );
                                 setFamilyLinks(updated);
-                                try {
-                                  const storeRaw = localStorage.getItem("mv_patient_store_v1");
-                                  if (storeRaw) {
-                                    const s = JSON.parse(storeRaw);
-                                    s.familyLinks = updated;
-                                    s.updatedAtISO = new Date().toISOString();
-                                    localStorage.setItem("mv_patient_store_v1", JSON.stringify(s));
-                                    window.dispatchEvent(new CustomEvent("mv-store-update", { detail: s }));
-                                  }
-                                } catch {
-                                  // Ignore
-                                }
+                                const s = getStore();
+                                s.familyLinks = updated;
+                                saveStore(s);
                               }}
                             >
                               <SelectTrigger className="text-xs rounded-lg border border-[var(--border)] bg-[var(--panel)] py-1.5 px-2 text-[var(--fg)]">
@@ -2234,6 +2563,13 @@ export default function ProfilePage() {
       </main>
 
       <Footer />
+
+      {/* BYOK toast */}
+      <RecordNoticeToast
+        message={byokToast}
+        onDismiss={() => setByokToast(null)}
+        kind="success"
+      />
     </div>
   );
 }

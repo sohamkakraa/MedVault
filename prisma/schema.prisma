@@ -36,6 +36,7 @@ model User {
   threads          Thread[]
   messages         Message[]
   waterLogs        WaterLog[]
+  llmCredential    UserLlmCredential?
 }
 
 /**
@@ -140,6 +141,24 @@ model RateLimit {
   @@map("rate_limits")
 }
 
+/**
+ * Per-user bring-your-own-key (BYOK) LLM credential.
+ * The API key is stored encrypted using pgp_sym_encrypt with LLM_CRED_MASTER_SECRET.
+ * Only one credential per user is stored (upsert pattern) — the "active" provider.
+ */
+model UserLlmCredential {
+  userId         String    @id @map("user_id")
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider       String
+  modelId        String    @map("model_id")
+  apiKeyCipher   Bytes     @map("api_key_cipher")
+  apiKeyLastFour String    @map("api_key_last_four")
+  verifiedAt     DateTime? @map("verified_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@map("user_llm_credentials")
+}
+
 /** Demo / wiring table (Neon tutorial parity); not part of core health data flows. */
 model Comment {
   id        String   @id @default(cuid())
@@ -194,6 +213,7 @@ model Thread {
    * a few turns in.
    */
   title         String?
+  titleIsManual Boolean   @default(false) @map("title_is_manual")
   archivedAt    DateTime? @map("archived_at")
   /**
    * lastMessageAt is denormalized so thread-list reads don't need a JOIN +

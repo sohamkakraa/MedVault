@@ -3,6 +3,12 @@
  * replaces older messages with a terse running summary so the LLM has
  * long-range memory without burning tokens on full verbatim history.
  *
+ * NOTE: This is UMA's own implementation of context compression, named
+ * "caveman" for its terse, token-efficient summaries. It is unrelated to
+ * the JuliusBrussee caveman/cavemem/cavekit open-source ecosystem. Do NOT
+ * attempt to import from or replace this with those packages — they solve a
+ * different problem (CLI UX, not LLM context management).
+ *
  * Usage:
  *   1. On every LLM call: call buildContextWindow(messages, storedSummary)
  *      to get [summary injected as prefix] + last KEEP_LAST messages.

@@ -77,8 +77,9 @@ function buildRetrievalContext(
   store: PatientStore,
   retrievalQuery: string,
   activeFamilyMember?: { id: string; relation: string; displayName: string } | null,
-): string {
+): { cacheablePrefix: string; dynamicSuffix: string } {
   const p = store.profile;
+  // viewingLabel is per-turn (changes when user switches family member) → dynamicSuffix
   const viewingLabel = activeFamilyMember
     ? `You are currently helping with the health records of **${activeFamilyMember.displayName}** (${activeFamilyMember.relation} of the account holder). All data provided is for this family member, not the account holder. Make sure every response is clearly about ${activeFamilyMember.displayName}.`
     : "You are currently helping the primary account holder.";
@@ -86,12 +87,12 @@ function buildRetrievalContext(
     ? `⚠ SAFETY — PATIENT ALLERGIES: ${p.allergies.join(", ")} — ALWAYS include in health summaries and overviews.`
     : "";
 
+  // cacheablePrefix — static across turns; cached by Anthropic for 5 min
   const lines: string[] = [
     ...(allergyBanner ? [allergyBanner] : []),
     "You are the **conversation agent** for UMA (Ur Medical Assistant). A parallel **records agent** may extract data from PDFs the user attaches; you will see a short note about its result appended to your context after you reply is generated — for your first reply, assume extraction may be in progress and speak only from stored records plus the user's words.",
     "You are NOT a doctor. Never diagnose. Use plain language.",
     "CRITICAL: You CANNOT create reminders, set notifications, update medicines, or write to the user's records. Only the app's UI can do those things. Confirm past-tense actions ONLY when the system prompt explicitly states the app already performed them. Never claim to have 'set a reminder' or 'updated your record' on your own.",
-    viewingLabel,
     "Answer from the patient context below. If something is missing, say what is missing and still move them forward.",
     "",
     "### How to behave (proactive, not passive)",
@@ -248,7 +249,12 @@ function buildRetrievalContext(
     "When asked whether a lab value is improving/worsening/stable: cite the specific dates and values from the timeline above. If all readings show the same numeric value, the result is **stable** — do not say 'improved' or 'worsened'. If readings are from different documents (e.g. a referral letter re-stating a prior result), note that they may reflect the same test. Never infer a direction without two distinct date-value pairs showing a real change.",
   );
 
-  return lines.join("\n");
+  return {
+    cacheablePrefix: lines.join("\n"),
+    // viewingLabel is separated so it doesn't break the Anthropic prompt cache
+    // when the user switches family members mid-session.
+    dynamicSuffix: viewingLabel,
+  };
 }
 
 function trimHistoryForLlm(history: ChatMsg[]): ChatMsg[] {
@@ -260,7 +266,14 @@ function trimHistoryForLlm(history: ChatMsg[]): ChatMsg[] {
 
 type LLMResponse = {
   text: string;
-  usage?: { inputTokens: number; outputTokens: number; model: string; totalUSD: number } | null;
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheCreationInputTokens: number;
+    cacheReadInputTokens: number;
+    model: string;
+    totalUSD: number;
+  } | null;
 };
 
 /** Approximate pricing per million tokens for chat models. */
@@ -274,10 +287,22 @@ const CHAT_MODEL_PRICING: Record<string, { inputPerMTok: number; outputPerMTok: 
 };
 const CHAT_DEFAULT_PRICING = { inputPerMTok: 1, outputPerMTok: 5 };
 
-function computeChatCost(model: string, inputTokens: number, outputTokens: number) {
+function computeChatCost(
+  model: string,
+  inputTokens: number,
+  outputTokens: number,
+  cacheReadTokens = 0,
+  cacheWriteTokens = 0,
+) {
   const key = Object.keys(CHAT_MODEL_PRICING).find((k) => model.startsWith(k)) ?? "";
   const p = CHAT_MODEL_PRICING[key] ?? CHAT_DEFAULT_PRICING;
-  return (inputTokens / 1_000_000) * p.inputPerMTok + (outputTokens / 1_000_000) * p.outputPerMTok;
+  const M = 1_000_000;
+  return (
+    (inputTokens    / M) * p.inputPerMTok +
+    (cacheReadTokens  / M) * p.inputPerMTok * 0.10 +
+    (cacheWriteTokens / M) * p.inputPerMTok * 1.25 +
+    (outputTokens   / M) * p.outputPerMTok
+  );
 }
 
 async function conversationAgentLLM(
@@ -288,8 +313,8 @@ async function conversationAgentLLM(
   activeFamilyMember?: { id: string; relation: string; displayName: string } | null
 ): Promise<LLMResponse> {
   const ragQuery = buildRetrievalQuery(userContent, history);
-  const base = buildRetrievalContext(store, ragQuery, activeFamilyMember);
-  const systemPrompt = diaryAugment ? `${base}\n\n${diaryAugment}` : base;
+  const { cacheablePrefix, dynamicSuffix: baseDynamic } = buildRetrievalContext(store, ragQuery, activeFamilyMember);
+  const dynamicSuffix = [baseDynamic, diaryAugment].filter(Boolean).join("\n\n");
 
   const trimmedHistory = trimHistoryForLlm(history);
 
@@ -300,20 +325,30 @@ async function conversationAgentLLM(
     const msg = await client.messages.create({
       model: chatModel,
       max_tokens: 900,
-      system: systemPrompt,
+      system: [
+        // STATIC prefix — patient profile, meds, labs, docs, insurance — cached by Anthropic for 5 min
+        { type: "text", text: cacheablePrefix, cache_control: { type: "ephemeral" } },
+        // DYNAMIC suffix — family-member label + per-turn diary augment — must NOT be cached
+        ...(dynamicSuffix ? [{ type: "text" as const, text: dynamicSuffix }] : []),
+      ],
       messages: [...trimmedHistory, { role: "user", content: userContent }],
     });
     const block = msg.content[0];
     if (block.type !== "text") throw new Error("Unexpected Claude response type");
-    const inputTokens = (msg.usage as { input_tokens?: number })?.input_tokens ?? 0;
-    const outputTokens = (msg.usage as { output_tokens?: number })?.output_tokens ?? 0;
+    const u = msg.usage as { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number };
+    const inputTokens = u?.input_tokens ?? 0;
+    const outputTokens = u?.output_tokens ?? 0;
+    const cacheCreationInputTokens = u?.cache_creation_input_tokens ?? 0;
+    const cacheReadInputTokens = u?.cache_read_input_tokens ?? 0;
     return {
       text: block.text,
       usage: {
         inputTokens,
         outputTokens,
+        cacheCreationInputTokens,
+        cacheReadInputTokens,
         model: chatModel,
-        totalUSD: computeChatCost(chatModel, inputTokens, outputTokens),
+        totalUSD: computeChatCost(chatModel, inputTokens, outputTokens, cacheReadInputTokens, cacheCreationInputTokens),
       },
     };
   }
@@ -322,6 +357,8 @@ async function conversationAgentLLM(
     const OpenAI = (await import("openai")).default;
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const oaiModel = process.env.OPENAI_CHAT_MODEL || "gpt-4o-mini";
+    // OpenAI: caching n/a — concatenate prefix + suffix into a single system string
+    const systemPrompt = [cacheablePrefix, dynamicSuffix].filter(Boolean).join("\n\n");
     const completion = await client.chat.completions.create({
       model: oaiModel,
       max_tokens: 900,
@@ -346,8 +383,8 @@ async function conversationAgentLLMStream(
   onDelta?: (text: string) => void
 ): Promise<LLMResponse> {
   const ragQuery = buildRetrievalQuery(userContent, history);
-  const base = buildRetrievalContext(store, ragQuery, activeFamilyMember);
-  const systemPrompt = diaryAugment ? `${base}\n\n${diaryAugment}` : base;
+  const { cacheablePrefix, dynamicSuffix: baseDynamic } = buildRetrievalContext(store, ragQuery, activeFamilyMember);
+  const dynamicSuffix = [baseDynamic, diaryAugment].filter(Boolean).join("\n\n");
 
   const trimmedHistory = trimHistoryForLlm(history);
 
@@ -359,11 +396,18 @@ async function conversationAgentLLMStream(
     let fullText = "";
     let inputTokens = 0;
     let outputTokens = 0;
+    let cacheCreationInputTokens = 0;
+    let cacheReadInputTokens = 0;
 
     const stream = await client.messages.stream({
       model: chatModel,
       max_tokens: 900,
-      system: systemPrompt,
+      system: [
+        // STATIC prefix — patient profile, meds, labs, docs, insurance — cached by Anthropic for 5 min
+        { type: "text", text: cacheablePrefix, cache_control: { type: "ephemeral" } },
+        // DYNAMIC suffix — family-member label + per-turn diary augment — must NOT be cached
+        ...(dynamicSuffix ? [{ type: "text" as const, text: dynamicSuffix }] : []),
+      ],
       messages: [...trimmedHistory, { role: "user", content: userContent }],
     });
 
@@ -372,7 +416,10 @@ async function conversationAgentLLMStream(
         fullText += event.delta.text;
         onDelta?.(event.delta.text);
       } else if (event.type === "message_start" && event.message.usage) {
-        inputTokens = event.message.usage.input_tokens ?? 0;
+        const u = event.message.usage as { input_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number };
+        inputTokens = u?.input_tokens ?? 0;
+        cacheCreationInputTokens = u?.cache_creation_input_tokens ?? 0;
+        cacheReadInputTokens = u?.cache_read_input_tokens ?? 0;
       } else if (event.type === "message_delta" && event.usage) {
         outputTokens = event.usage.output_tokens ?? 0;
       }
@@ -383,8 +430,10 @@ async function conversationAgentLLMStream(
       usage: {
         inputTokens,
         outputTokens,
+        cacheCreationInputTokens,
+        cacheReadInputTokens,
         model: chatModel,
-        totalUSD: computeChatCost(chatModel, inputTokens, outputTokens),
+        totalUSD: computeChatCost(chatModel, inputTokens, outputTokens, cacheReadInputTokens, cacheCreationInputTokens),
       },
     };
   }
@@ -393,6 +442,8 @@ async function conversationAgentLLMStream(
     const OpenAI = (await import("openai")).default;
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const oaiModel = process.env.OPENAI_CHAT_MODEL || "gpt-4o-mini";
+    // OpenAI: caching n/a — concatenate prefix + suffix into a single system string
+    const systemPrompt = [cacheablePrefix, dynamicSuffix].filter(Boolean).join("\n\n");
 
     let fullText = "";
 
@@ -645,7 +696,7 @@ export async function POST(req: Request) {
       try {
         // Stream conversation agent with deltas
         let conversationAnswerText = "";
-        let chatUsage: { inputTokens: number; outputTokens: number; model: string; totalUSD: number } | null = null;
+        let chatUsage: { inputTokens: number; outputTokens: number; cacheCreationInputTokens: number; cacheReadInputTokens: number; model: string; totalUSD: number } | null = null;
 
         try {
           const convAnswer = await conversationAgentLLMStream(
@@ -712,6 +763,8 @@ export async function POST(req: Request) {
             type: "usage",
             inputTokens: chatUsage.inputTokens,
             outputTokens: chatUsage.outputTokens,
+            cacheCreationInputTokens: chatUsage.cacheCreationInputTokens,
+            cacheReadInputTokens: chatUsage.cacheReadInputTokens,
             model: chatUsage.model,
             totalUSD: chatUsage.totalUSD,
           })}\n\n`;

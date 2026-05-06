@@ -1,0 +1,38 @@
+name: Murphy Visual Regression
+
+on:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  murphy:
+    # Only run when the 'ui' label is added to a PR
+    if: contains(github.event.label.name, 'ui')
+    runs-on: ubuntu-latest
+    # Non-blocking for the first 2 weeks — flip continue-on-error to false after baseline is established
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Run Murphy visual regression
+        env:
+          MURPHY_URL: ${{ vars.VERCEL_PREVIEW_URL || 'http://localhost:3000' }}
+        run: |
+          uv run murphy --url "$MURPHY_URL" --output murphy/output/ci/
+        continue-on-error: true
+
+      - name: Upload Murphy output
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: murphy-output-${{ github.event.pull_request.number }}
+          path: murphy/output/ci/
+          retention-days: 14

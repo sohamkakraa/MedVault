@@ -1,5 +1,11 @@
 # UMA — CLAUDE.md
 
+## Where to look first
+
+**READ THIS FIRST.** Before opening source files, read `CODE_REPO.md`. It is a per-file index of every TypeScript, TSX, Prisma, and script file in the codebase. Use `Glob` / `Grep` only when `CODE_REPO.md` points you to the right area but doesn't tell you enough. If you make a code change, update the matching row in `CODE_REPO.md` in the same commit.
+
+---
+
 ## Project Vision
 
 UMA (Ur Medical Assistant) is a personal health companion that bridges the gap between raw medical data and human understanding. The core idea: connect to any hospital or clinic database the user has visited, pull their records into one place, and present everything in plain language that a non-medical person can actually understand and act on.
@@ -173,6 +179,7 @@ Widget column spans are set as **inline styles** on `motion.div` in `BentoGrid.t
 | sideEffects | medium | 4 | Only visible when at least 1 entry exists |
 | labs | large | 6 | GaugeCard per flagged lab; hidden if no flagged labs |
 | healthTrends | hero | 12 | Full-width chart, forced to hero size in normalizeDashboardLayout |
+| concerningItems | hero | 12 | Full-width hero section — flagged lab tiles + BMI tile, forced to hero size in normalizeDashboardLayout |
 | bmi | small | 4 | |
 
 **Card height rule**: Cards must NOT have internal scroll. Show ≤3 items inline; add a "View all" / "Show more" button for additional items. The card height auto-adjusts to its content.
@@ -241,6 +248,7 @@ Located at `src/components/notifications/NotificationCenter.tsx`.
 | `LLAMA_CLOUD_API_KEY` | Optional. When set, LlamaParse is used as primary PDF extractor (10k free credits/month, 3 credits/page). Falls back to Claude full PDF on HTTP 402 or errors. |
 | `OPENAI_API_KEY` | Optional chat fallback if Anthropic is not configured. |
 | `OPENAI_CHAT_MODEL` | OpenAI chat model when using the fallback (default: `gpt-4o-mini`). |
+| `LLM_CRED_MASTER_SECRET` | Required for BYOK. Symmetric encryption key (32+ random chars) used by `pgp_sym_encrypt`/`pgp_sym_decrypt` (pgcrypto) to store user API keys in `user_llm_credentials`. Never log or expose this value. |
 
 ---
 

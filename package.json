@@ -13,7 +13,15 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "murphy": "uv run murphy --url http://localhost:3000",
+    "murphy:auth": "uv run murphy --url http://localhost:3000 --auth",
+    "murphy:goal": "uv run murphy --url http://localhost:3000 --goal",
+    "murphy:open": "uv run murphy --open",
+    "eval": "playwright test --project=elderly --project=young-fast",
+    "eval:visual": "playwright test tests/e2e/visual",
+    "eval:a11y": "playwright test tests/e2e/a11y",
+    "eval:update-snapshots": "playwright test --update-snapshots"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
@@ -64,5 +72,8 @@
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-arm64-gnu": "*"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "node scripts/check-code-repo-sync.mjs"
   }
 }
