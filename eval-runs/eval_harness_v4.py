@@ -20,7 +20,11 @@ from playwright.async_api import async_playwright, Page
 
 # ─── Config ────────────────────────────────────────────────────────────────────
 APP_URL     = "http://localhost:3000"
-LOGIN_EMAIL = "sohamkakra@gmail.com"
+# Synthetic test identity — NEVER use a real user's email or ID here.
+# This user ID must not exist in production; it is only valid against the
+# dev auth secret (uma-dev-auth-secret-32chars-xxxx) which is NOT the
+# production AUTH_SECRET, so the cookie is inert on the live deployment.
+LOGIN_EMAIL = "eval-arjun-mehta@uma-test.invalid"
 RICH_STORE  = Path("/Users/soham.kakra/Desktop/UMA/eval-runs/rich_test_patient.json")
 
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -118,7 +122,7 @@ def _make_session_token(user_id: str, email: str) -> str:
 
 async def login(page: Page) -> bool:
     log("→ Login (cookie injection) …")
-    token = _make_session_token("cmnrjndkm000111isckkkz7ui", LOGIN_EMAIL)
+    token = _make_session_token("eval-test-user-arjun-mehta-0001", LOGIN_EMAIL)
     await page.context.add_cookies([{
         "name":     "mv_session",
         "value":    token,
