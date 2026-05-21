@@ -38,14 +38,16 @@
 - `scripts/set-wa-profile.mjs` · 167 lines · TODO: describe · no named exports
 - `scripts/test-whatsapp.mjs` · 204 lines · TODO: describe · no named exports
 - `scripts/vercel-build.mjs` · 115 lines · Vercel build script — runs prisma migrate (3 retries for Neon P1002) then next build · no named exports
+- `scripts/run-openai-cua-test.mjs` · 121 lines · Runs OpenAI CUA testing agent against localhost UMA via _tmp-testing-agent clone · no named exports
 
 ## `src/`
-- `src/proxy.ts` · 36 lines · DEPRECATED — check if referenced before using; may be an unused dev proxy · exports: `proxy`, `config`
+- `src/proxy.ts` · 35 lines · Next.js proxy — redirects unauthenticated users from protected routes to /login (signed mv_session only; no legacy cookie bypass) · exports: `proxy`, `config`
 
 ## `src/app/`
 - `src/app/api/auth/google/callback/route.ts` · 168 lines · Google OAuth callback — exchanges code for tokens, upserts user, sets session cookie · exports: `runtime`, `GET`
 - `src/app/api/auth/google/route.ts` · 46 lines · Initiates Google OAuth redirect · exports: `runtime`, `GET`
-- `src/app/api/auth/login/route.ts` · 12 lines · Dev-only login route — sets mv_session cookie with dev token · exports: `runtime`, `POST`
+- `src/app/api/auth/login/route.ts` · 12 lines · Legacy password login — returns 410 (OTP-only) · exports: `runtime`, `POST`
+- `src/app/api/auth/test-session/route.ts` · 62 lines · Dev/automation only — POST ensures test User row + signed mv_session cookie · exports: `runtime`, `POST`
 - `src/app/api/auth/logout/route.ts` · 12 lines · Clears mv_session cookie · exports: `runtime`, `POST`
 - `src/app/api/auth/refresh-session/route.ts` · 123 lines · Refreshes session expiry; also syncs localStorage store to DB on first-sync · exports: `runtime`, `POST`
 - `src/app/api/auth/request-otp/route.ts` · 202 lines · Sends OTP via WhatsApp or SMS; stores hashed code in DB · exports: `runtime`, `POST`
@@ -215,6 +217,7 @@
 - `src/lib/server/__tests__/sseStream.test.ts` · 137 lines · TODO: describe · no named exports
 - `src/lib/server/__tests__/whatsappIdempotency.test.ts` · 134 lines · TODO: describe · no named exports
 - `src/lib/server/authSession.ts` · 27 lines · requireUserId() — extracts and validates userId from session cookie · exports: `getSessionClaims`, `requireUserId`
+- `src/lib/server/ensureTestUser.ts` · 28 lines · Upserts User row for e2e/CUA test-session identities (avoids patient-store FK errors) · exports: `ensureTestUser`
 - `src/lib/server/intentBus.ts` · 11 lines · TODO: describe · exports: `IntentPayload`, `intentBus`
 - `src/lib/server/medicalPdfPipeline.ts` · 747 lines · LlamaParse + Claude two-stage extraction pipeline; falls back to Claude full-PDF · exports: `ExtractMedicalPdfInput`, `ExtractMedicalPdfSuccess`, `ExtractMedicalPdfFailure`, `extractMedicalPdfFromBuffer`
 - `src/lib/server/patientStoreServer.ts` · 46 lines · TODO: describe · exports: `getServerPatientStore`, `upsertPatientStore`
@@ -235,7 +238,7 @@
 
 ## `tests/e2e/`
 - `tests/e2e/a11y/full-page.spec.ts` · 26 lines · TODO: describe · no named exports
-- `tests/e2e/fixtures/auth.ts` · 24 lines · TODO: describe · exports: `DEV_TOKEN`, `DEV_SESSION_COOKIE`, `loginWithDevToken`, `test`
+- `tests/e2e/fixtures/auth.ts` · 28 lines · Playwright auth — POST /api/auth/test-session (creates User + cookie) · exports: `loginWithDevToken`, `test`
 - `tests/e2e/fixtures/personas/elderly.ts` · 19 lines · TODO: describe · exports: `elderly`, `test`
 - `tests/e2e/fixtures/personas/young-fast.ts` · 8 lines · TODO: describe · exports: `test`
 - `tests/e2e/fixtures/seed-store.ts` · 40 lines · TODO: describe · exports: `ARJUN_FIXTURE`, `seedPatientStore`

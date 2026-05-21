@@ -8,11 +8,10 @@ export async function proxy(req: NextRequest) {
   const isProtected = PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   if (!isProtected) return NextResponse.next();
 
-  const legacy = req.cookies.get("mv_auth")?.value === "1";
   const token = req.cookies.get(SESSION_COOKIE)?.value;
   const session = token ? await verifySessionToken(token) : null;
 
-  if (!session && !legacy) {
+  if (!session) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);

@@ -2205,7 +2205,10 @@ function DashboardInner() {
             const hasConcerningData = concerningLabItems.length > 0 || bmiInfo !== null;
 
             widgetNodes.concerningItems = (
-              <div className="mv-card rounded-3xl p-5 sm:p-6">
+              <div
+                className="mv-card rounded-3xl p-5 sm:p-6"
+                data-testid="concerning-items-section"
+              >
                 {/* Section heading */}
                 <div className="mb-5">
                   <h2 className="mv-title text-xl" style={{ color: "var(--fg)" }}>

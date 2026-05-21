@@ -1,16 +1,22 @@
 import { test as base, type Page } from "@playwright/test";
 
-export const DEV_TOKEN = "dev-token"; // matches the dev auth cookie set by the login route
-export const DEV_SESSION_COOKIE = "mv_session";
+const E2E_USER_ID = "e2e-dev-user";
+const E2E_EMAIL = "e2e-dev@uma.local";
 
+/**
+ * Signs in via POST /api/auth/test-session (dev only), which creates the User row
+ * and sets a valid signed mv_session cookie — required for chat/threads DB APIs.
+ */
 export async function loginWithDevToken(page: Page): Promise<void> {
-  await page.context().addCookies([{
-    name: DEV_SESSION_COOKIE,
-    value: DEV_TOKEN,
-    domain: "localhost",
-    path: "/",
-    httpOnly: false,
-  }]);
+  const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+  const res = await page.request.post(`${baseUrl}/api/auth/test-session`, {
+    data: { sub: E2E_USER_ID, email: E2E_EMAIL },
+  });
+  if (!res.ok()) {
+    throw new Error(
+      `test-session failed (${res.status()}). Is the dev server running with DATABASE_URL set?`,
+    );
+  }
 }
 
 export const test = base.extend<{

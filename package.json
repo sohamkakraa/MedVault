@@ -21,7 +21,8 @@
     "eval": "playwright test --project=elderly --project=young-fast",
     "eval:visual": "playwright test tests/e2e/visual",
     "eval:a11y": "playwright test tests/e2e/a11y",
-    "eval:update-snapshots": "playwright test --update-snapshots"
+    "eval:update-snapshots": "playwright test --update-snapshots",
+    "test:cua": "node scripts/run-openai-cua-test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
@@ -75,6 +76,7 @@
     "eslint-config-next": "16.1.6",
     "jsdom": "^29.1.1",
     "playwright": "^1.59.1",
+    "socket.io-client": "^4.8.3",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^3.2.4"
